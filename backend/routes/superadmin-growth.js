@@ -7,6 +7,8 @@ import { Router } from 'express';
 import GrowthContent from '../models/GrowthContent.js';
 import { generateDailyContent, regeneratePlatformContent, getISTDateDetails } from '../services/growthContentEngine.js';
 import { safeErrorMessage } from '../utils/safeError.js';
+import { getRouter } from '../ai/router.js';
+import { ensureS3Url } from '../utils/s3.js';
 
 const router = Router();
 
@@ -146,6 +148,95 @@ router.post('/:id/regenerate', async (req, res) => {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
+
+// ══════════════════════════════════════════════════════════════
+// POST /api/superadmin/growth/:id/generate-image — Generate image for post
+// ══════════════════════════════════════════════════════════════
+router.post('/:id/generate-image', async (req, res) => {
+    try {
+        const { platform, index = 0, slideIndex = null, imageModel = 'gpt-image-2' } = req.body;
+        const content = await GrowthContent.findById(req.params.id);
+        if (!content) return res.status(404).json({ success: false, error: 'Content not found' });
+
+        let promptText = '';
+        let targetObj = null;
+        let aspectRatio = '1:1';
+
+        if (platform === 'linkedin' && content.linkedin[index]) {
+            targetObj = content.linkedin[index];
+            promptText = `Create a professional LinkedIn graphic for the following post: ${targetObj.content}`;
+            aspectRatio = '16:9';
+        } else if (platform === 'twitter' && content.twitter[index]) {
+            targetObj = content.twitter[index];
+            promptText = `Create an engaging Twitter graphic for this tweet: ${targetObj.tweets[0]}`;
+            aspectRatio = '16:9';
+        } else if (platform === 'reddit' && content.reddit[index]) {
+            targetObj = content.reddit[index];
+            promptText = `Create a Reddit post image for title: ${targetObj.title}. Tone: ${targetObj.tone}`;
+            aspectRatio = '16:9';
+        } else if (platform === 'instagram_post') {
+            if (slideIndex !== null) {
+                if (content.instagram.post.slides[slideIndex]) {
+                    targetObj = content.instagram.post.slides[slideIndex];
+                    promptText = targetObj.visualDescription || targetObj.text;
+                } else {
+                    return res.status(400).json({ success: false, error: 'Invalid slide index for instagram post' });
+                }
+            } else {
+                // Generate COVER IMAGE!
+                const post = content.instagram.post;
+                const firstSlideText = post.slides?.[0]?.text || '';
+                const theme = content.theme || '';
+                promptText = `A highly aesthetic and scroll-stopping Instagram carousel cover graphic. Main Title/Hook text: "${firstSlideText}". Visual theme context: "${theme}". The cover should be visually striking, clean, premium, and designed to maximize engagement and CTR. Use harmonious color palettes, sophisticated modern layout, and clean typography. Avoid cluttered elements. Make it look like a professional, high-end design agency creation.`;
+            }
+            aspectRatio = '4:5';
+        } else if (platform === 'instagram_story') {
+            if (slideIndex !== null && content.instagram.story.slides[slideIndex]) {
+                targetObj = content.instagram.story.slides[slideIndex];
+                promptText = targetObj.visualDescription || targetObj.text;
+            } else {
+                return res.status(400).json({ success: false, error: 'Slide index required for instagram story' });
+            }
+            aspectRatio = '9:16';
+        } else {
+            return res.status(400).json({ success: false, error: 'Invalid platform or index' });
+        }
+
+        const aiRouter = getRouter();
+
+        // Determine the correct provider based on the model name.
+        // The default image provider is Gemini, so OpenAI models (gpt-image-*)
+        // must explicitly request the 'openai' provider to avoid being routed
+        // to Gemini which doesn't recognise gpt-image-* model IDs.
+        const isOpenAIModel = imageModel.startsWith('gpt-') || imageModel.startsWith('dall-e');
+        const providerPreference = isOpenAIModel ? 'openai' : 'gemini';
+
+        const result = await aiRouter.generateImage({ 
+            prompt: promptText, 
+            aspectRatio,
+            model: imageModel
+        }, { provider: providerPreference });
+
+        if (!result.imageUrl) throw new Error('Image generation failed to return URL');
+
+        // Decode base64 and upload to S3 (this also stores a copy on local SSD)
+        console.log(`📤 Growth Image: Uploading generated image to S3...`);
+        const s3Url = await ensureS3Url(result.imageUrl, `growth/gen-${Date.now()}`);
+
+        if (platform === 'instagram_post' && slideIndex === null) {
+            content.instagram.post.coverImageUrl = s3Url;
+        } else {
+            targetObj.imageUrl = s3Url;
+        }
+        await content.save();
+
+        res.json({ success: true, content });
+    } catch (error) {
+        console.error('[Growth Generate Image]', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
 
 // ══════════════════════════════════════════════════════════════
 // GET /api/superadmin/growth/stats — Posting stats & streak

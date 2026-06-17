@@ -98,6 +98,9 @@ export default {
         region: process.env.AWS_REGION || 'ap-south-1',
     },
 
+    // Local SSD Backup Path
+    localSsdPath: process.env.LOCAL_SSD_PATH || '',
+
     // Meta / Facebook
     facebook: {
         appId: process.env.FACEBOOK_APP_ID,

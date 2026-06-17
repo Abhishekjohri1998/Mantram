@@ -26,7 +26,7 @@ import {
     publishCarouselToLinkedIn,
 } from './socialService.js';
 import { publishVideoToTikTok, publishPhotosToTikTok } from './tiktokService.js';
-import { uploadToS3, mirrorUrlToS3 } from '../utils/s3.js';
+import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded } from '../utils/s3.js';
 import { sendRetentionEmail } from '../agents/retention/mailer.js';
 import config from '../config/env.js';
 
@@ -112,18 +112,42 @@ async function sendOneHourReminder(post) {
     }
 }
 
+// ── Helper: If a URL is from our S3 bucket, map it to our clean public proxy route ──
+function getPublicProxyUrl(url) {
+    if (!url || typeof url !== 'string') return url;
+    const bucket = process.env.AWS_S3_BUCKET || config.aws?.bucket || 'mantram-ai-generated-media';
+    const isS3 = (url.includes('.amazonaws.com') && url.includes(bucket)) || url.includes('mantram-media-assets.s3');
+    if (isS3) {
+        try {
+            const parsedUrl = new URL(url);
+            let pathname = parsedUrl.pathname;
+            const pathParts = pathname.split('/').filter(Boolean);
+            let key = pathParts[0] === bucket ? pathParts.slice(1).join('/') : pathParts.join('/');
+            key = key.split('?')[0];
+            try { key = decodeURIComponent(key); } catch { }
+            const baseUrl = (config.backendUrl || 'https://api.mantram.ai').replace(/\/$/, '');
+            return `${baseUrl}/api/media/file/${key}`;
+        } catch (e) {
+            console.warn('[PROXY URL] Failed to parse S3 URL:', url, e.message);
+        }
+    }
+    return url;
+}
+
 // ── Resolve media URL to an absolute, publicly-accessible URL ─────────────────
 async function resolveMediaUrl(url, userId, ext = 'png') {
     if (!url) return '';
 
     // Already an absolute URL
-    if (url.startsWith('http')) return url;
+    if (url.startsWith('http')) {
+        return getPublicProxyUrl(url);
+    }
 
     // Data URI — upload to S3
     if (url.startsWith('data:')) {
         try {
             const s3Url = await uploadToS3(url, `social-scheduled/${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`);
-            return s3Url;
+            return getPublicProxyUrl(s3Url);
         } catch (s3Err) {
             console.error('[SCHEDULER] S3 upload failed:', s3Err.message);
             return url; // Return original as fallback
@@ -133,7 +157,8 @@ async function resolveMediaUrl(url, userId, ext = 'png') {
     // Relative path — prepend backend URL
     const baseUrl = (config.backendUrl || '').replace(/\/$/, '');
     const path = url.startsWith('/') ? url : `/${url}`;
-    return `${baseUrl}${path}`;
+    const fullUrl = `${baseUrl}${path}`;
+    return getPublicProxyUrl(fullUrl);
 }
 
 // ── Publish a single post ─────────────────────────────────────────────────────

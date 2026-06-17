@@ -3,7 +3,9 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Upload } from "@aws-sdk/lib-storage";
 import config from "../config/env.js";
 import crypto from "crypto";
-
+import axios from "axios";
+import fs from "fs";
+import path from "path";
 
 const s3Client = new S3Client({
     region: config.aws.region,
@@ -14,6 +16,70 @@ const s3Client = new S3Client({
 });
 
 /**
+ * Helper to upload files to public anonymous image hosting when AWS S3 is down or not configured.
+ * Tries Catbox.moe first, falls back to tmpfiles.org.
+ */
+const uploadToPublicFallback = async (buffer, mimeType = "image/png") => {
+    try {
+        console.log(`📤 AWS S3 is down/unconfigured. Uploading to public fallback host (Catbox)...`);
+        
+        const formData = new globalThis.FormData();
+        const fileBlob = new globalThis.Blob([buffer], { type: mimeType });
+        formData.append("reqtype", "fileupload");
+        formData.append("fileToUpload", fileBlob, `upload-${Date.now()}.${mimeType.split('/')[1] || 'png'}`);
+
+        const response = await axios.post("https://catbox.moe/user/api.php", formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+
+        if (response.data && typeof response.data === "string" && response.data.startsWith("http")) {
+            const publicUrl = response.data.trim();
+            console.log(`✅ Catbox upload success: ${publicUrl}`);
+            return publicUrl;
+        } else {
+            throw new Error(`Unexpected Catbox response: ${response.data}`);
+        }
+    } catch (err) {
+        console.warn("⚠️ Catbox upload failed, trying tmpfiles.org...", err.message);
+        try {
+            const formData = new globalThis.FormData();
+            const fileBlob = new globalThis.Blob([buffer], { type: mimeType });
+            formData.append("file", fileBlob, `upload-${Date.now()}.${mimeType.split('/')[1] || 'png'}`);
+            
+            const response = await axios.post("https://tmpfiles.org/api/v1/upload", formData);
+            if (response.data && response.data.status === "success" && response.data.data?.url) {
+                const viewerUrl = response.data.data.url;
+                const directUrl = viewerUrl.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/");
+                console.log(`✅ tmpfiles upload success: ${directUrl}`);
+                return directUrl;
+            }
+            throw new Error(`Unexpected tmpfiles response: ${JSON.stringify(response.data)}`);
+        } catch (tmpErr) {
+            console.error("❌ Both fallback hosts failed:", tmpErr.message);
+            throw new Error(`Public hosting fallback failed. Catbox error: ${err.message}. Tmpfiles error: ${tmpErr.message}`);
+        }
+    }
+};
+
+/**
+ * Helper to save a file copy to the local SSD backup directory if configured
+ * @param {Buffer} buffer - The file contents
+ * @param {string} key - S3 Key/Path of the file
+ */
+const saveToLocalSsd = (buffer, key) => {
+    if (!config.localSsdPath) return;
+    try {
+        const localFilePath = path.join(config.localSsdPath, key);
+        // Ensure parent directories exist
+        fs.mkdirSync(path.dirname(localFilePath), { recursive: true });
+        fs.writeFileSync(localFilePath, buffer);
+        console.log(`💾 Local SSD backup successful: ${localFilePath}`);
+    } catch (err) {
+        console.error(`❌ Local SSD backup failed for key "${key}":`, err.message);
+    }
+};
+
+/**
  * Uploads a buffer or base64 string to S3
  * @param {Buffer|string} fileContent - The file content to upload
  * @param {string} fileName - Optional filename, will generate if missing
@@ -21,19 +87,26 @@ const s3Client = new S3Client({
  * @returns {Promise<string>} - The public URL of the uploaded file
  */
 export const uploadToS3 = async (fileContent, fileName, mimeType = "image/png") => {
+    let buffer = fileContent;
     try {
-        let buffer = fileContent;
         if (typeof fileContent === "string" && fileContent.startsWith("data:")) {
-            // Extract base64 data
             const base64Data = fileContent.split(",")[1];
             buffer = Buffer.from(base64Data, "base64");
         } else if (typeof fileContent === "string") {
             buffer = Buffer.from(fileContent, "base64");
         }
+    } catch (parseErr) {
+        console.error("Error decoding base64 content:", parseErr);
+    }
 
-        // BUG-22 FIX: Sanitize filename to prevent path traversal
-        const sanitizedName = fileName ? fileName.replace(/\.\./g, '').replace(/\/+/g, '/').replace(/^\//, '') : null;
-        const key = sanitizedName || `uploads/${crypto.randomUUID()}.png`;
+    // BUG-22 FIX: Sanitize filename to prevent path traversal
+    const sanitizedName = fileName ? fileName.replace(/\.\./g, '').replace(/\/+/g, '/').replace(/^\//, '') : null;
+    const key = sanitizedName || `uploads/${crypto.randomUUID()}.png`;
+
+    // Save copy to local SSD if configured
+    saveToLocalSsd(buffer, key);
+
+    try {
 
         const upload = new Upload({
             client: s3Client,
@@ -55,8 +128,13 @@ export const uploadToS3 = async (fileContent, fileName, mimeType = "image/png") 
         const encodedKey = key.split('/').map(seg => encodeURIComponent(seg)).join('/');
         return `https://s3.${config.aws.region}.amazonaws.com/${config.aws.bucket}/${encodedKey}`;
     } catch (error) {
-        console.error("S3 Upload Error:", error);
-        throw new Error(`S3 Upload failed: ${error.message}`);
+        console.warn("⚠️ S3 Upload failed (or AWS unconfigured). Falling back to public anonymous hosting:", error.message);
+        try {
+            return await uploadToPublicFallback(buffer, mimeType);
+        } catch (fallbackError) {
+            console.error("❌ Fallback upload failed:", fallbackError);
+            throw new Error(`S3 Upload failed and fallback failed: ${error.message}. Fallback error: ${fallbackError.message}`);
+        }
     }
 };
 

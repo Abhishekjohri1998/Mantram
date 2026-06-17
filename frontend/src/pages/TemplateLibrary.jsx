@@ -484,7 +484,7 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
                             const titleText = (template.name || '').toUpperCase().replace(/\s+/g, ' • ');
 
                             return (
-                                <button key={template._id} className="explore-card" onClick={() => handleTemplateClick(template)} onMouseLeave={() => setMobileTappedTemplateId(null)}>
+                                <div key={template._id} className="explore-card" onClick={() => handleTemplateClick(template)} onMouseLeave={() => setMobileTappedTemplateId(null)} role="button" tabIndex={0}>
                                     <div className="explore-card-thumb">
                                         {isVideo && (template.previewVideoUrl || template.previewUrl) ? (
                                             <video src={template.previewVideoUrl || template.previewUrl} muted autoPlay loop playsInline />
@@ -531,7 +531,7 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
                                         <span className="card-username">{username}</span>
                                         <span className="card-likes">♥ {fmtLikes(likes)}</span>
                                     </div>
-                                </button>
+                                </div>
                             );
                         })}
                     </div>

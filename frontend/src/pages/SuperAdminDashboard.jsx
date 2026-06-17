@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import SEOHead from '../components/SEOHead'
-import { superadmin as API } from '../services/api'
+import { superadmin as API, social as socialAPI } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import TemplateManager from './TemplateManager'
 import QAdsManager from './QAdsManager'
@@ -149,8 +149,15 @@ export default function SuperAdminDashboard() {
     const [growthPlatformTab, setGrowthPlatformTab] = useState('linkedin')
     const [growthCopied, setGrowthCopied] = useState(null)
     const [growthRegenerating, setGrowthRegenerating] = useState(null)
+    const [growthGeneratingImage, setGrowthGeneratingImage] = useState(null)
+    const [growthImageModel, setGrowthImageModel] = useState('gpt-image-2')
     const [growthHistoryPage, setGrowthHistoryPage] = useState(1)
     const [showGrowthHistory, setShowGrowthHistory] = useState(false)
+    const [socialAccounts, setSocialAccounts] = useState([])
+    const [isPublishing, setIsPublishing] = useState(null)
+    const [publishModalConfig, setPublishModalConfig] = useState(null)
+    const [showIgSliders, setShowIgSliders] = useState(false)
+    const [growthPreviewImage, setGrowthPreviewImage] = useState(null)
 
     if (user?.role !== 'superadmin') {
         return <DashboardLayout><div className="flex items-center justify-center h-screen"><div className="text-center"><span className="material-symbols-outlined text-6xl text-primary mb-4">shield</span><h2 className="text-2xl font-bold text-[var(--sys-text)] mb-2">Access Denied</h2><p className="text-[var(--sys-text-muted)]">Super Admin access required</p></div></div></DashboardLayout>
@@ -220,15 +227,36 @@ export default function SuperAdminDashboard() {
     // Reload users when segment/sort changes while on users tab
     useEffect(() => { if (tab === 'users') loadUsers() }, [userSegment, userSort, userSortOrder])
 
+    const downloadImage = async (url, filename) => {
+        try {
+            const response = await fetch(url, { mode: 'cors' })
+            if (!response.ok) throw new Error('Network response was not ok')
+            const blob = await response.blob()
+            const blobUrl = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = blobUrl
+            a.download = filename
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+            URL.revokeObjectURL(blobUrl)
+        } catch (err) {
+            console.error('Failed to download image via blob, opening in new tab:', err)
+            window.open(url, '_blank')
+        }
+    }
+
     const loadGrowthData = async () => {
         setGrowthLoading(true)
         try {
-            const [contentRes, statsRes] = await Promise.all([
+            const [contentRes, statsRes, accountsRes] = await Promise.all([
                 API.getGrowthContent(),
                 API.getGrowthStats(),
+                socialAPI.accounts().catch(() => ({ data: [] }))
             ])
             setGrowthContent(contentRes.content)
             setGrowthStats(statsRes.stats)
+            setSocialAccounts(accountsRes.data || [])
         } catch (e) { console.error('Growth data load failed:', e) }
         finally { setGrowthLoading(false) }
     }
@@ -261,6 +289,87 @@ export default function SuperAdminDashboard() {
         } catch (e) { showToast('Failed to update', 'error') }
     }
 
+    const triggerPublishModal = (platform, index = 0, slideIndex = null) => {
+        const socialPlatform = platform.startsWith('instagram') ? 'instagram' : platform
+        const platformAccounts = socialAccounts.filter(a => a.platform === socialPlatform)
+        if (platformAccounts.length === 0) {
+            showToast(`No ${socialPlatform} accounts connected. Please connect one in Integrations.`, 'error')
+            return
+        }
+        setPublishModalConfig({ platform, index, slideIndex, accounts: platformAccounts, selectedAccountId: platformAccounts[0]._id })
+    }
+
+    const executeDirectPublish = async () => {
+        if (!publishModalConfig || !publishModalConfig.selectedAccountId) return
+        const { platform, index, slideIndex, selectedAccountId } = publishModalConfig
+        
+        const publishKey = slideIndex !== null ? `${platform}-${index}-${slideIndex}` : `${platform}-${index}`
+        setIsPublishing(publishKey)
+        setPublishModalConfig(null)
+        
+        try {
+            let text = ''
+            let imageUrls = []
+            let imageUrl = null
+
+            if (platform === 'linkedin') {
+                const post = growthContent.linkedin[index]
+                text = `${post.content}\n\n${post.hashtags?.join(' ')}`
+                if (post.imageUrl) imageUrls.push(post.imageUrl)
+            } else if (platform === 'twitter') {
+                const post = growthContent.twitter[index]
+                text = post.tweets.join('\n\n')
+                if (post.imageUrl) imageUrl = post.imageUrl
+            } else if (platform === 'reddit') {
+                const post = growthContent.reddit[index]
+                text = `${post.title}\n\n${post.body}`
+                if (post.imageUrl) imageUrl = post.imageUrl
+            } else if (platform === 'instagram_post') {
+                const post = growthContent.instagram.post
+                text = `${post.caption}\n\n${post.hashtags?.join(' ')}`
+                imageUrls = post.slides.map(s => s.imageUrl).filter(Boolean)
+            } else if (platform === 'instagram_story') {
+                const story = growthContent.instagram.story
+                if (slideIndex !== null) {
+                    text = ''
+                    imageUrl = story.slides[slideIndex]?.imageUrl
+                } else {
+                    text = ''
+                    imageUrls = story.slides.map(s => s.imageUrl).filter(Boolean)
+                }
+            } else if (platform === 'instagram_reel') {
+                const reel = growthContent.instagram.reel
+                text = `${reel.caption}\n\n${reel.hashtags?.join(' ')}`
+                if (reel.slides?.[0]?.imageUrl) imageUrl = reel.slides[0].imageUrl
+            }
+
+            const payload = {
+                accountIds: [selectedAccountId],
+                text,
+                ...(imageUrls.length > 1 ? { imageUrls } : {}),
+                ...(imageUrls.length === 1 && !imageUrl ? { imageUrl: imageUrls[0] } : {}),
+                ...(imageUrl ? { imageUrl } : {})
+            }
+
+            const res = await socialAPI.publish(payload)
+            if (res.success) {
+                const errorResults = res.results?.filter(r => r.status === 'error' || r.status === 'failed') || []
+                if (errorResults.length > 0) {
+                    const errMsg = errorResults.map(r => r.error || 'Unknown error').join(', ')
+                    showToast(`Publishing failed: ${errMsg}`, 'error')
+                } else {
+                    showToast(`Successfully published to ${platform}!`)
+                    await handleMarkPosted(platform, index)
+                }
+            }
+        } catch (e) {
+            console.error('Publish error:', e)
+            showToast(e.message || 'Publishing failed', 'error')
+        } finally {
+            setIsPublishing(null)
+        }
+    }
+
     const handleRegeneratePost = async (platform, index = 0) => {
         if (!growthContent?._id) return
         setGrowthRegenerating(`${platform}-${index}`)
@@ -272,6 +381,20 @@ export default function SuperAdminDashboard() {
             }
         } catch (e) { showToast('Regeneration failed', 'error') }
         finally { setGrowthRegenerating(null) }
+    }
+
+    const handleGenerateImage = async (platform, index = 0, slideIndex = null) => {
+        if (!growthContent?._id) return
+        const key = slideIndex !== null ? `${platform}-${index}-${slideIndex}` : `${platform}-${index}`
+        setGrowthGeneratingImage(key)
+        try {
+            const res = await API.generateGrowthImage(growthContent._id, { platform, index, slideIndex, imageModel: growthImageModel })
+            if (res.success) {
+                setGrowthContent(res.content)
+                showToast('Image generated successfully!')
+            }
+        } catch (e) { showToast(e.message || 'Image generation failed', 'error') }
+        finally { setGrowthGeneratingImage(null) }
     }
 
     const handleCopyContent = (text, key) => {
@@ -4687,28 +4810,45 @@ export default function SuperAdminDashboard() {
                                     )}
                                 </div>
 
-                                {/* Platform Tabs */}
-                                <div className="flex gap-1 p-1 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)]" style={{ width: 'fit-content' }}>
-                                    {[
-                                        { id: 'linkedin', label: 'LinkedIn', icon: '💼', color: '#0A66C2', count: growthContent.linkedin?.length || 0 },
-                                        { id: 'instagram', label: 'Instagram', icon: '📸', color: '#E4405F', count: 3 },
-                                        { id: 'twitter', label: 'Twitter/X', icon: '🐦', color: '#1DA1F2', count: growthContent.twitter?.length || 0 },
-                                        { id: 'reddit', label: 'Reddit', icon: '🟠', color: '#FF4500', count: growthContent.reddit?.length || 0 },
-                                    ].map(p => (
-                                        <button
-                                            key={p.id}
-                                            onClick={() => setGrowthPlatformTab(p.id)}
-                                            className={`px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-2 ${
-                                                growthPlatformTab === p.id
-                                                    ? 'text-white shadow-lg'
-                                                    : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'
-                                            }`}
-                                            style={growthPlatformTab === p.id ? { background: p.color } : {}}
+                                {/* Top Controls */}
+                                <div className="flex items-center justify-between mt-4">
+                                    {/* Platform Tabs */}
+                                    <div className="flex gap-1 p-1 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)]" style={{ width: 'fit-content' }}>
+                                        {[
+                                            { id: 'linkedin', label: 'LinkedIn', icon: '💼', color: '#0A66C2', count: growthContent.linkedin?.length || 0 },
+                                            { id: 'instagram', label: 'Instagram', icon: '📸', color: '#E4405F', count: 3 },
+                                            { id: 'twitter', label: 'Twitter/X', icon: '🐦', color: '#1DA1F2', count: growthContent.twitter?.length || 0 },
+                                            { id: 'reddit', label: 'Reddit', icon: '🟠', color: '#FF4500', count: growthContent.reddit?.length || 0 },
+                                        ].map(p => (
+                                            <button
+                                                key={p.id}
+                                                onClick={() => setGrowthPlatformTab(p.id)}
+                                                className={`px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-2 ${
+                                                    growthPlatformTab === p.id
+                                                        ? 'text-white shadow-lg'
+                                                        : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'
+                                                }`}
+                                                style={growthPlatformTab === p.id ? { background: p.color } : {}}
+                                            >
+                                                <span>{p.icon}</span> {p.label}
+                                                <span className="px-1.5 py-0.5 rounded-full text-[9px]" style={{ background: growthPlatformTab === p.id ? 'rgba(255,255,255,0.2)' : 'var(--sys-border)' }}>{p.count}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {/* Image Model Selector */}
+                                    <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)]" style={{ width: 'fit-content' }}>
+                                        <span className="text-xs font-bold text-[var(--sys-text-muted)] pl-2">🖼️ Image Model:</span>
+                                        <select
+                                            value={growthImageModel}
+                                            onChange={(e) => setGrowthImageModel(e.target.value)}
+                                            className="text-xs p-1.5 rounded-xl bg-[var(--sys-bg)] border border-[var(--sys-border)] text-[var(--sys-text)] outline-none font-bold cursor-pointer"
                                         >
-                                            <span>{p.icon}</span> {p.label}
-                                            <span className="px-1.5 py-0.5 rounded-full text-[9px]" style={{ background: growthPlatformTab === p.id ? 'rgba(255,255,255,0.2)' : 'var(--sys-border)' }}>{p.count}</span>
-                                        </button>
-                                    ))}
+                                            <option value="gpt-image-2">GPT Image 2</option>
+                                            <option value="nanobanana-2">NanoBanana 2</option>
+                                            <option value="nanobanana-pro">NanoBanana Pro</option>
+                                        </select>
+                                    </div>
                                 </div>
 
                                 {/* LINKEDIN POSTS */}
@@ -4724,15 +4864,29 @@ export default function SuperAdminDashboard() {
                                                         {post.bestTime && <span className="text-[10px] text-[var(--sys-text-muted)]">⏰ {post.bestTime}</span>}
                                                     </div>
                                                     <div className="flex items-center gap-2">
-                                                        <button onClick={() => handleMarkPosted('linkedin', i)} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${post.posted ? 'bg-emerald-500/10 text-emerald-500' : 'bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-emerald-500'}`}>
-                                                            {post.posted ? '✅ Posted' : '○ Mark Posted'}
+                                                        <button 
+                                                            onClick={() => triggerPublishModal('linkedin', i)}
+                                                            disabled={isPublishing === `linkedin-${i}`}
+                                                            className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-primary text-white hover:bg-primary/90 cursor-pointer transition-all flex items-center gap-1 disabled:opacity-50"
+                                                        >
+                                                            {isPublishing === `linkedin-${i}` ? <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span> : '🚀'} Publish
+                                                        </button>
+                                                        <button onClick={() => handleMarkPosted('linkedin', i)} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-all flex items-center gap-1 ${post.posted ? 'bg-emerald-500/10 text-emerald-500' : 'bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-emerald-500'}`}>
+                                                            {post.posted ? '✅ Posted' : '○ Mark'}
                                                         </button>
                                                         <button
                                                             onClick={() => handleRegeneratePost('linkedin', i)}
                                                             disabled={growthRegenerating === `linkedin-${i}`}
-                                                            className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-purple-500 cursor-pointer transition-all disabled:opacity-50"
+                                                            className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-purple-500 cursor-pointer transition-all disabled:opacity-50 flex items-center gap-1"
                                                         >
-                                                            {growthRegenerating === `linkedin-${i}` ? '⏳' : '🔄'} Regen
+                                                            {growthRegenerating === `linkedin-${i}` ? <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span> : '🔄'} Regen
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleGenerateImage('linkedin', i)}
+                                                            disabled={growthGeneratingImage === `linkedin-${i}`}
+                                                            className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-blue-500 cursor-pointer transition-all disabled:opacity-50 flex items-center gap-1"
+                                                        >
+                                                            {growthGeneratingImage === `linkedin-${i}` ? <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span> : '🖼️'} Gen Image
                                                         </button>
                                                         <button
                                                             onClick={() => handleCopyContent(post.content + '\n\n' + (post.hashtags || []).join(' '), `li-${i}`)}
@@ -4749,6 +4903,27 @@ export default function SuperAdminDashboard() {
                                                             {post.hashtags.map((h, j) => (
                                                                 <span key={j} className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-500">{h}</span>
                                                             ))}
+                                                        </div>
+                                                    )}
+                                                    {post.imageUrl && (
+                                                        <div className="mt-3 rounded-lg overflow-hidden border border-[var(--sys-border)] relative group cursor-zoom-in" onClick={() => setGrowthPreviewImage(post.imageUrl)}>
+                                                            <img src={post.imageUrl} alt="Generated" className="w-full h-auto object-cover max-h-64 transition-transform duration-500 group-hover:scale-105" />
+                                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-3 backdrop-blur-sm">
+                                                                <button 
+                                                                    onClick={(e) => { e.stopPropagation(); setGrowthPreviewImage(post.imageUrl); }}
+                                                                    className="p-2 bg-white/20 hover:bg-white/40 rounded-full text-white transition-colors backdrop-blur-lg flex items-center justify-center border border-white/20"
+                                                                    title="Zoom Preview"
+                                                                >
+                                                                    <span className="material-symbols-outlined text-xl">zoom_in</span>
+                                                                </button>
+                                                                <button 
+                                                                    onClick={(e) => { e.stopPropagation(); downloadImage(post.imageUrl, `linkedin-post-${i + 1}.png`); }}
+                                                                    className="p-2 bg-white/20 hover:bg-white/40 rounded-full text-white transition-colors backdrop-blur-lg flex items-center justify-center border border-white/20"
+                                                                    title="Download Image"
+                                                                >
+                                                                    <span className="material-symbols-outlined text-xl">download</span>
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     )}
                                                 </div>
@@ -4769,31 +4944,252 @@ export default function SuperAdminDashboard() {
                                                     {growthContent.instagram?.post?.bestTime && <span className="text-[10px] text-[var(--sys-text-muted)]">⏰ {growthContent.instagram.post.bestTime}</span>}
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <button onClick={() => handleMarkPosted('instagram_post')} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${growthContent.instagram?.post?.posted ? 'bg-emerald-500/10 text-emerald-500' : 'bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-emerald-500'}`}>
-                                                        {growthContent.instagram?.post?.posted ? '✅ Posted' : '○ Mark Posted'}
+                                                    <button 
+                                                        onClick={() => triggerPublishModal('instagram_post')}
+                                                        disabled={isPublishing === `instagram_post-0`}
+                                                        className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-primary text-white hover:bg-primary/90 cursor-pointer transition-all flex items-center gap-1 disabled:opacity-50"
+                                                    >
+                                                        {isPublishing === `instagram_post-0` ? <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span> : '🚀'} Publish
                                                     </button>
-                                                    <button onClick={() => handleRegeneratePost('instagram_post')} disabled={growthRegenerating === 'instagram_post-0'} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-purple-500 cursor-pointer transition-all disabled:opacity-50">
-                                                        {growthRegenerating === 'instagram_post-0' ? '⏳' : '🔄'} Regen
+                                                    <button onClick={() => handleMarkPosted('instagram_post')} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-all flex items-center gap-1 ${growthContent.instagram?.post?.posted ? 'bg-emerald-500/10 text-emerald-500' : 'bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-emerald-500'}`}>
+                                                        {growthContent.instagram?.post?.posted ? '✅ Posted' : '○ Mark'}
+                                                    </button>
+                                                    <button onClick={() => handleRegeneratePost('instagram_post')} disabled={growthRegenerating === 'instagram_post-0'} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-purple-500 cursor-pointer transition-all disabled:opacity-50 flex items-center gap-1">
+                                                        {growthRegenerating === 'instagram_post-0' ? <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span> : '🔄'} Regen
                                                     </button>
                                                     <button
                                                         onClick={() => handleCopyContent(growthContent.instagram?.post?.caption + '\n\n' + (growthContent.instagram?.post?.hashtags || []).join(' '), 'ig-post')}
-                                                        className="px-3 py-1 rounded-lg text-[10px] font-bold text-white cursor-pointer transition-all" style={{ background: 'linear-gradient(135deg, #E4405F, #833AB4)' }}
+                                                        className="px-3 py-1 rounded-lg text-[10px] font-bold text-white cursor-pointer transition-all flex items-center gap-1" style={{ background: 'linear-gradient(135deg, #E4405F, #833AB4)' }}
                                                     >
-                                                        {growthCopied === 'ig-post' ? '✓ Copied!' : '📋 Copy Caption'}
+                                                        {growthCopied === 'ig-post' ? '✓ Copied!' : '📋 Copy'}
                                                     </button>
                                                 </div>
                                             </div>
                                             <div className="p-4">
                                                 <pre className="text-sm text-[var(--sys-text)] whitespace-pre-wrap font-sans leading-relaxed mb-4">{growthContent.instagram?.post?.caption}</pre>
+                                                
+                                                {/* Aesthetic Instagram Feed Post Mockup Card */}
                                                 {growthContent.instagram?.post?.slides?.length > 0 && (
-                                                    <div className="mt-4">
+                                                    <div className="mb-6 flex flex-col items-center">
+                                                        <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-widest mb-3 self-start">📱 Instagram Feed Mockup (Cover Page)</p>
+                                                        <div 
+                                                            onClick={() => setShowIgSliders(!showIgSliders)}
+                                                            className="w-full max-w-[360px] bg-black rounded-2xl border border-neutral-850 shadow-[0_15px_40px_rgba(228,64,95,0.08)] overflow-hidden cursor-pointer hover:border-pink-500/40 hover:shadow-[0_20px_50px_rgba(228,64,95,0.18)] transition-all duration-500 group relative"
+                                                        >
+                                                            {/* Mock Header */}
+                                                            <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-neutral-900 bg-black">
+                                                                <div className="flex items-center gap-2.5">
+                                                                    {/* Stylized Instagram Avatar Border */}
+                                                                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#f9ce34] via-[#ee2a7b] to-[#6228d7] p-[1.8px] flex items-center justify-center">
+                                                                        <div className="w-full h-full rounded-full bg-black flex items-center justify-center">
+                                                                            <span className="text-[10px] font-black tracking-tighter text-pink-500">M</span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="leading-tight">
+                                                                        <div className="text-[11px] font-bold text-white flex items-center gap-1">
+                                                                            mantram.ai
+                                                                            <span className="material-symbols-outlined text-[10px] text-blue-400 font-bold">verified</span>
+                                                                        </div>
+                                                                        <div className="text-[8px] text-neutral-400 font-medium">Sponsored • Growth Engine</div>
+                                                                    </div>
+                                                                </div>
+                                                                <span className="material-symbols-outlined text-[16px] text-neutral-400 cursor-pointer">more_horiz</span>
+                                                            </div>
+
+                                                            {/* Media Block */}
+                                                            <div className="relative aspect-square w-full bg-gradient-to-br from-[#121212] via-[#1a1a1a] to-[#281c2d] flex items-center justify-center overflow-hidden">
+                                                                {/* Ambient Glow */}
+                                                                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(228,64,95,0.15)_0%,transparent_70%)] pointer-events-none" />
+
+                                                                {/* Image or template overlay */}
+                                                                {growthContent.instagram.post.slides[0]?.imageUrl ? (
+                                                                    <div className="relative w-full h-full group">
+                                                                        <img 
+                                                                            src={growthContent.instagram.post.slides[0].imageUrl} 
+                                                                            alt="Cover Graphic" 
+                                                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
+                                                                        />
+                                                                        {growthGeneratingImage === 'instagram_post-0-0' && (
+                                                                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm">
+                                                                                <span className="material-symbols-outlined text-white text-3xl animate-spin mb-2">progress_activity</span>
+                                                                                <span className="text-[10px] text-white font-bold tracking-wider animate-pulse">GENERATING COVER...</span>
+                                                                            </div>
+                                                                        )}
+                                                                        
+                                                                        {/* Swipe right on cover overlay */}
+                                                                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur-md px-4 py-2 rounded-full border border-pink-500/30 text-[10px] font-bold text-white flex items-center gap-1.5 shadow-lg animate-bounce z-10">
+                                                                            <span className="material-symbols-outlined text-[12px] text-pink-500">swipe_left</span>
+                                                                            Swipe Right 👉
+                                                                        </div>
+
+                                                                        {/* Regenerate cover image button on hover */}
+                                                                        <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-3 backdrop-blur-sm">
+                                                                            <div className="flex gap-3">
+                                                                                <button 
+                                                                                    onClick={(e) => { e.stopPropagation(); setGrowthPreviewImage(growthContent.instagram.post.slides[0].imageUrl); }}
+                                                                                    className="p-2 bg-white/20 hover:bg-white/40 rounded-full text-white transition-colors backdrop-blur-lg flex items-center justify-center border border-white/20"
+                                                                                    title="Zoom Preview"
+                                                                                >
+                                                                                    <span className="material-symbols-outlined text-xl">zoom_in</span>
+                                                                                </button>
+                                                                                <button 
+                                                                                    onClick={(e) => { e.stopPropagation(); downloadImage(growthContent.instagram.post.slides[0].imageUrl, 'instagram-cover.png'); }}
+                                                                                    className="p-2 bg-white/20 hover:bg-white/40 rounded-full text-white transition-colors backdrop-blur-lg flex items-center justify-center border border-white/20"
+                                                                                    title="Download Image"
+                                                                                >
+                                                                                    <span className="material-symbols-outlined text-xl">download</span>
+                                                                                </button>
+                                                                            </div>
+                                                                            <button 
+                                                                                onClick={(e) => { e.stopPropagation(); handleGenerateImage('instagram_post', 0, 0); }}
+                                                                                className="px-3 py-1.5 rounded-lg bg-pink-600/90 text-white font-bold text-xs shadow-lg hover:bg-pink-700 transition-all flex items-center gap-1.5 cursor-pointer border border-pink-400/20"
+                                                                            >
+                                                                                <span className="material-symbols-outlined text-sm">cached</span>
+                                                                                Regenerate Cover
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="absolute inset-0 flex flex-col justify-between p-6 text-center">
+                                                                        <div className="absolute inset-0 opacity-[0.03] bg-[linear-gradient(to_right,#808080_1px,transparent_1px),linear-gradient(to_bottom,#808080_1px,transparent_1px)] bg-[size:14px_24px]" />
+                                                                        
+                                                                        <div className="text-[9px] font-bold text-pink-500/60 uppercase tracking-widest mt-2">Mantram Instagram Cover</div>
+                                                                        
+                                                                        <div className="my-auto px-4 z-10">
+                                                                            <h4 className="text-sm font-black text-white leading-snug tracking-tight uppercase mb-2 font-sans bg-gradient-to-b from-white to-neutral-300 bg-clip-text text-transparent drop-shadow-lg">
+                                                                                {growthContent.instagram.post.slides[0]?.text || "Why US SaaS Tools Fail Indian D2C"}
+                                                                            </h4>
+                                                                            <p className="text-[9px] text-neutral-400 leading-normal max-w-xs mx-auto line-clamp-2">
+                                                                                {growthContent.instagram.post.slides[0]?.visualDescription || "A beautiful layout showcasing D2C metrics"}
+                                                                            </p>
+                                                                        </div>
+
+                                                                        <div className="flex flex-col items-center gap-2.5 z-10 mb-2">
+                                                                            {growthGeneratingImage === 'instagram_post-0-0' ? (
+                                                                                <div className="flex flex-col items-center gap-1">
+                                                                                    <span className="material-symbols-outlined text-pink-500 text-lg animate-spin">progress_activity</span>
+                                                                                    <span className="text-[9px] font-bold text-pink-500 animate-pulse">Generating Cover...</span>
+                                                                                </div>
+                                                                            ) : (
+                                                                                <button
+                                                                                    onClick={(e) => { e.stopPropagation(); handleGenerateImage('instagram_post', 0, 0); }}
+                                                                                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-bold text-xs shadow-lg hover:shadow-pink-500/20 transition-all flex items-center gap-1.5 cursor-pointer border border-pink-400/20"
+                                                                                >
+                                                                                    <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
+                                                                                    Generate Cover Image
+                                                                                </button>
+                                                                            )}
+                                                                            <span className="text-[8px] text-neutral-500">(Slide 1 image of the carousel sliders)</span>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+
+                                                                {/* Translucent Carousel Badge */}
+                                                                <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-neutral-800 text-[9px] font-bold text-white z-10 flex items-center gap-1 shadow-md">
+                                                                    <span className="material-symbols-outlined text-[10px] text-pink-500">view_carousel</span>
+                                                                    1 / {growthContent.instagram.post.slides.length}
+                                                                </div>
+
+                                                                {/* Pulse Indicator */}
+                                                                <div className="absolute bottom-3 right-3 bg-pink-500 text-white rounded-full p-1.5 shadow-lg shadow-pink-500/30 opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 transition-all duration-300 z-10 flex items-center justify-center">
+                                                                    <span className="material-symbols-outlined text-[14px]">touch_app</span>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Action Bar */}
+                                                            <div className="px-3.5 py-3 bg-black">
+                                                                <div className="flex items-center justify-between mb-2">
+                                                                    <div className="flex items-center gap-3.5">
+                                                                        <span className="material-symbols-outlined text-[18px] text-white hover:text-pink-500 transition-colors">favorite</span>
+                                                                        <span className="material-symbols-outlined text-[18px] text-white hover:text-pink-500 transition-colors">mode_comment</span>
+                                                                        <span className="material-symbols-outlined text-[18px] text-white hover:text-pink-500 transition-colors">send</span>
+                                                                    </div>
+                                                                    {/* Dots indicator */}
+                                                                    <div className="flex items-center gap-1">
+                                                                        {growthContent.instagram.post.slides.map((_, dotIdx) => (
+                                                                            <div 
+                                                                                key={dotIdx} 
+                                                                                className={`w-1.5 h-1.5 rounded-full transition-all ${dotIdx === 0 ? 'bg-pink-500 w-2' : 'bg-neutral-700'}`} 
+                                                                            />
+                                                                        ))}
+                                                                    </div>
+                                                                    <span className="material-symbols-outlined text-[18px] text-white hover:text-pink-500 transition-colors">bookmark</span>
+                                                                </div>
+
+                                                                {/* Caption */}
+                                                                <div className="text-[11px] leading-relaxed text-neutral-300 line-clamp-2 mt-2 font-sans">
+                                                                    <span className="font-bold text-white mr-1.5">mantram.ai</span>
+                                                                    {growthContent.instagram.post.caption}
+                                                                </div>
+                                                                
+                                                                {/* Reveal Banner */}
+                                                                <div className="mt-3.5 pt-2 border-t border-neutral-900 flex items-center justify-between">
+                                                                    <div className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                                                                        <span className="material-symbols-outlined text-[12px] text-pink-500 animate-pulse">{showIgSliders ? 'expand_less' : 'expand_more'}</span>
+                                                                        {showIgSliders ? 'Hide Sliders' : 'Click to Swipe & View Carousel Sliders'}
+                                                                    </div>
+                                                                    <span className="text-[9px] font-bold text-pink-500 bg-pink-500/10 px-2 py-0.5 rounded-full border border-pink-500/20 group-hover:bg-pink-500 group-hover:text-white transition-all">
+                                                                        {showIgSliders ? 'Collapse' : 'Reveal Slides'}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {growthContent.instagram?.post?.slides?.length > 0 && showIgSliders && (
+                                                    <div className="mt-4 animate-in fade-in slide-in-from-top-4 duration-300">
                                                         <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2">📑 Carousel Slides</p>
                                                         <div className="grid grid-cols-2 gap-2">
                                                             {growthContent.instagram.post.slides.map((s, j) => (
-                                                                <div key={j} className="p-3 rounded-xl bg-[var(--sys-bg)] border border-[var(--sys-border)]">
-                                                                    <p className="text-[10px] font-bold text-pink-500 mb-1">Slide {s.slideNumber}</p>
-                                                                    <p className="text-xs text-[var(--sys-text)] font-bold mb-1">{s.text}</p>
-                                                                    <p className="text-[10px] text-[var(--sys-text-muted)] italic">🎨 {s.visualDescription}</p>
+                                                                <div key={j} className="p-3 rounded-xl bg-[var(--sys-bg)] border border-[var(--sys-border)] flex flex-col justify-between">
+                                                                    <div>
+                                                                        <p className="text-[10px] font-bold text-pink-500 mb-1">Slide {s.slideNumber}</p>
+                                                                        <p className="text-xs text-[var(--sys-text)] font-bold mb-1">{s.text}</p>
+                                                                        <p className="text-[10px] text-[var(--sys-text-muted)] italic mb-2">🎨 {s.visualDescription}</p>
+                                                                    </div>
+                                                                    <div className="mt-2 relative">
+                                                                        {growthGeneratingImage === `instagram_post-0-${j}` && !s.imageUrl && (
+                                                                            <div className="w-full h-32 rounded-lg bg-[var(--sys-bg)] border-2 border-dashed border-pink-500/30 flex flex-col items-center justify-center gap-2 mb-2 relative overflow-hidden">
+                                                                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-pink-500/5 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
+                                                                                <span className="material-symbols-outlined text-pink-500 text-2xl animate-spin">progress_activity</span>
+                                                                                <span className="text-[10px] font-bold text-pink-500 animate-pulse">Generating...</span>
+                                                                            </div>
+                                                                        )}
+                                                                        {s.imageUrl && (
+                                                                            <div className="relative group cursor-zoom-in mb-2 rounded-lg overflow-hidden border border-[var(--sys-border)]" onClick={() => setGrowthPreviewImage(s.imageUrl)}>
+                                                                                <img src={s.imageUrl} alt={`Slide ${s.slideNumber}`} className={`w-full h-auto object-cover transition-all duration-500 ${growthGeneratingImage === `instagram_post-0-${j}` ? 'opacity-50 blur-sm scale-105' : 'group-hover:scale-105'}`} />
+                                                                                {growthGeneratingImage === `instagram_post-0-${j}` && (
+                                                                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px]">
+                                                                                        <span className="material-symbols-outlined text-white text-2xl animate-spin mb-1 drop-shadow-lg">progress_activity</span>
+                                                                                    </div>
+                                                                                )}
+                                                                                <div className={`absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-3 backdrop-blur-sm ${growthGeneratingImage === `instagram_post-0-${j}` ? 'hidden' : ''}`}>
+                                                                                    <button 
+                                                                                        onClick={(e) => { e.stopPropagation(); setGrowthPreviewImage(s.imageUrl); }}
+                                                                                        className="p-1.5 bg-white/20 hover:bg-white/40 rounded-full text-white transition-colors backdrop-blur-lg flex items-center justify-center border border-white/20"
+                                                                                        title="Zoom Preview"
+                                                                                    >
+                                                                                        <span className="material-symbols-outlined text-lg">zoom_in</span>
+                                                                                    </button>
+                                                                                    <button 
+                                                                                        onClick={(e) => { e.stopPropagation(); downloadImage(s.imageUrl, `instagram-post-slide-${j + 1}.png`); }}
+                                                                                        className="p-1.5 bg-white/20 hover:bg-white/40 rounded-full text-white transition-colors backdrop-blur-lg flex items-center justify-center border border-white/20"
+                                                                                        title="Download Image"
+                                                                                    >
+                                                                                        <span className="material-symbols-outlined text-lg">download</span>
+                                                                                    </button>
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+                                                                        <button
+                                                                            onClick={() => handleGenerateImage('instagram_post', 0, j)}
+                                                                            disabled={growthGeneratingImage === `instagram_post-0-${j}`}
+                                                                            className="w-full py-1.5 rounded-lg text-[10px] font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:bg-pink-500/10 hover:text-pink-500 hover:border-pink-500/30 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1"
+                                                                        >
+                                                                            {growthGeneratingImage === `instagram_post-0-${j}` ? <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span> : '🖼️'} {growthGeneratingImage === `instagram_post-0-${j}` ? 'Generating...' : 'Gen Image'}
+                                                                        </button>
+                                                                    </div>
                                                                 </div>
                                                             ))}
                                                         </div>
@@ -4809,27 +5205,36 @@ export default function SuperAdminDashboard() {
                                             </div>
                                         </div>
 
-                                        {/* Instagram Story */}
-                                        <div className="rounded-2xl border border-[var(--sys-border)] bg-[var(--sys-surface)] overflow-hidden">
-                                            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #833AB410, #FD1D1D10, transparent)' }}>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-sm">📱</span>
-                                                    <span className="text-xs font-bold text-[var(--sys-text)]">Instagram Story Script</span>
-                                                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-500/10 text-purple-500">{growthContent.instagram?.story?.slides?.length || 0} slides</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <button onClick={() => handleMarkPosted('instagram_story')} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${growthContent.instagram?.story?.posted ? 'bg-emerald-500/10 text-emerald-500' : 'bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-emerald-500'}`}>
-                                                        {growthContent.instagram?.story?.posted ? '✅ Posted' : '○ Mark Posted'}
-                                                    </button>
-                                                    <button onClick={() => handleRegeneratePost('instagram_story')} disabled={growthRegenerating === 'instagram_story-0'} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-purple-500 cursor-pointer transition-all disabled:opacity-50">
-                                                        {growthRegenerating === 'instagram_story-0' ? '⏳' : '🔄'} Regen
-                                                    </button>
-                                                </div>
+
+                                    {/* Instagram Story */}
+                                    <div className="rounded-2xl border border-[var(--sys-border)] bg-[var(--sys-surface)] overflow-hidden">
+                                        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #833AB410, #FD1D1D10, transparent)' }}>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm">📱</span>
+                                                <span className="text-xs font-bold text-[var(--sys-text)]">Instagram Story Script</span>
+                                                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-500/10 text-purple-500">{growthContent.instagram?.story?.slides?.length || 0} slides</span>
                                             </div>
-                                            <div className="p-4">
-                                                <div className="flex gap-3 overflow-x-auto pb-2">
-                                                    {(growthContent.instagram?.story?.slides || []).map((s, j) => (
-                                                        <div key={j} className="flex-shrink-0 w-48 p-3 rounded-xl bg-[var(--sys-bg)] border border-[var(--sys-border)]">
+                                                <div className="flex items-center gap-2">
+                                                    <button 
+                                                        onClick={() => triggerPublishModal('instagram_story')}
+                                                        disabled={isPublishing === 'instagram_story-0'}
+                                                        className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-primary text-white hover:bg-primary/90 cursor-pointer transition-all flex items-center gap-1 disabled:opacity-50"
+                                                    >
+                                                        {isPublishing === 'instagram_story-0' ? <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span> : '🚀'} Publish All
+                                                    </button>
+                                                    <button onClick={() => handleMarkPosted('instagram_story')} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-all flex items-center gap-1 ${growthContent.instagram?.story?.posted ? 'bg-emerald-500/10 text-emerald-500' : 'bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-emerald-500'}`}>
+                                                        {growthContent.instagram?.story?.posted ? '✅ Posted' : '○ Mark'}
+                                                    </button>
+                                                    <button onClick={() => handleRegeneratePost('instagram_story')} disabled={growthRegenerating === 'instagram_story-0'} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-purple-500 cursor-pointer transition-all disabled:opacity-50 flex items-center gap-1">
+                                                        {growthRegenerating === 'instagram_story-0' ? <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span> : '🔄'} Regen
+                                                    </button>
+                                                </div>
+                                        </div>
+                                        <div className="p-4">
+                                            <div className="flex gap-3 overflow-x-auto pb-2">
+                                                {(growthContent.instagram?.story?.slides || []).map((s, j) => (
+                                                    <div key={j} className="flex-shrink-0 w-48 p-3 rounded-xl bg-[var(--sys-bg)] border border-[var(--sys-border)] flex flex-col justify-between">
+                                                        <div>
                                                             <div className="flex items-center gap-1.5 mb-2">
                                                                 <span className="text-[10px] font-bold text-purple-500">Slide {s.slideNumber}</span>
                                                                 <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-purple-500/10 text-purple-500">{s.type}</span>
@@ -4837,9 +5242,49 @@ export default function SuperAdminDashboard() {
                                                             <p className="text-xs text-[var(--sys-text)] font-bold mb-1">{s.text}</p>
                                                             {s.visualDescription && <p className="text-[10px] text-[var(--sys-text-muted)] italic mb-1">🎨 {s.visualDescription}</p>}
                                                             {s.ctaText && <p className="text-[10px] text-emerald-500 font-bold">👆 {s.ctaText}</p>}
-                                                            {s.stickerSuggestion && <p className="text-[10px] text-amber-500">🏷️ {s.stickerSuggestion}</p>}
+                                                            {s.stickerSuggestion && <p className="text-[10px] text-amber-500 mb-2">🏷️ {s.stickerSuggestion}</p>}
                                                         </div>
-                                                    ))}
+                                                        <div className="mt-2 space-y-1.5">
+                                                            {s.imageUrl && (
+                                                                <div className="relative group cursor-zoom-in mb-2 rounded-lg overflow-hidden border border-[var(--sys-border)]" onClick={() => setGrowthPreviewImage(s.imageUrl)}>
+                                                                    <img src={s.imageUrl} alt={`Story ${s.slideNumber}`} className="w-full h-auto object-cover aspect-[9/16] transition-transform duration-500 group-hover:scale-105" />
+                                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-3 backdrop-blur-sm">
+                                                                        <button 
+                                                                            onClick={(e) => { e.stopPropagation(); setGrowthPreviewImage(s.imageUrl); }}
+                                                                            className="p-2 bg-white/20 hover:bg-white/40 rounded-full text-white transition-colors backdrop-blur-lg flex items-center justify-center border border-white/20"
+                                                                            title="Zoom Preview"
+                                                                        >
+                                                                            <span className="material-symbols-outlined text-sm">zoom_in</span>
+                                                                        </button>
+                                                                        <button 
+                                                                            onClick={(e) => { e.stopPropagation(); downloadImage(s.imageUrl, `instagram-story-slide-${j + 1}.png`); }}
+                                                                            className="p-2 bg-white/20 hover:bg-white/40 rounded-full text-white transition-colors backdrop-blur-lg flex items-center justify-center border border-white/20"
+                                                                            title="Download Image"
+                                                                        >
+                                                                            <span className="material-symbols-outlined text-sm">download</span>
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            <button
+                                                                onClick={() => handleGenerateImage('instagram_story', 0, j)}
+                                                                disabled={growthGeneratingImage === `instagram_story-0-${j}`}
+                                                                className="w-full py-1.5 rounded-lg text-[10px] font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:bg-purple-500/10 hover:text-purple-500 hover:border-purple-500/30 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1"
+                                                            >
+                                                                {growthGeneratingImage === `instagram_story-0-${j}` ? <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span> : '🖼️'} {growthGeneratingImage === `instagram_story-0-${j}` ? 'Generating...' : 'Generate Image'}
+                                                            </button>
+                                                            {s.imageUrl && (
+                                                                <button
+                                                                    onClick={() => triggerPublishModal('instagram_story', 0, j)}
+                                                                    disabled={isPublishing === `instagram_story-0-${j}`}
+                                                                    className="w-full py-1.5 rounded-lg text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1"
+                                                                >
+                                                                    {isPublishing === `instagram_story-0-${j}` ? <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span> : '🚀'} Publish Slide
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
                                                 </div>
                                             </div>
                                         </div>
@@ -4854,20 +5299,27 @@ export default function SuperAdminDashboard() {
                                                     {growthContent.instagram?.reel?.totalDuration && <span className="text-[10px] text-[var(--sys-text-muted)]">⏱️ {growthContent.instagram.reel.totalDuration}</span>}
                                                     {growthContent.instagram?.reel?.bestTime && <span className="text-[10px] text-[var(--sys-text-muted)]">⏰ {growthContent.instagram.reel.bestTime}</span>}
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    <button onClick={() => handleMarkPosted('instagram_reel')} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${growthContent.instagram?.reel?.posted ? 'bg-emerald-500/10 text-emerald-500' : 'bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-emerald-500'}`}>
-                                                        {growthContent.instagram?.reel?.posted ? '✅ Posted' : '○ Mark Posted'}
-                                                    </button>
-                                                    <button onClick={() => handleRegeneratePost('instagram_reel')} disabled={growthRegenerating === 'instagram_reel-0'} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-purple-500 cursor-pointer transition-all disabled:opacity-50">
-                                                        {growthRegenerating === 'instagram_reel-0' ? '⏳' : '🔄'} Regen
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleCopyContent(growthContent.instagram?.reel?.caption + '\n\n' + (growthContent.instagram?.reel?.hashtags || []).join(' '), 'ig-reel')}
-                                                        className="px-3 py-1 rounded-lg text-[10px] font-bold text-white cursor-pointer transition-all" style={{ background: 'linear-gradient(135deg, #FF0066, #FE3504)' }}
-                                                    >
-                                                        {growthCopied === 'ig-reel' ? '✓ Copied!' : '📋 Copy Caption'}
-                                                    </button>
-                                                </div>
+                                                 <div className="flex items-center gap-2">
+                                                     <button 
+                                                         onClick={() => triggerPublishModal('instagram_reel')}
+                                                         disabled={isPublishing === 'instagram_reel-0'}
+                                                         className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-primary text-white hover:bg-primary/90 cursor-pointer transition-all flex items-center gap-1 disabled:opacity-50"
+                                                     >
+                                                         {isPublishing === 'instagram_reel-0' ? <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span> : '🚀'} Publish
+                                                     </button>
+                                                     <button onClick={() => handleMarkPosted('instagram_reel')} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-all flex items-center gap-1 ${growthContent.instagram?.reel?.posted ? 'bg-emerald-500/10 text-emerald-500' : 'bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-emerald-500'}`}>
+                                                         {growthContent.instagram?.reel?.posted ? '✅ Posted' : '○ Mark'}
+                                                     </button>
+                                                     <button onClick={() => handleRegeneratePost('instagram_reel')} disabled={growthRegenerating === 'instagram_reel-0'} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-purple-500 cursor-pointer transition-all disabled:opacity-50 flex items-center gap-1">
+                                                         {growthRegenerating === 'instagram_reel-0' ? <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span> : '🔄'} Regen
+                                                     </button>
+                                                     <button
+                                                         onClick={() => handleCopyContent(growthContent.instagram?.reel?.caption + '\n\n' + (growthContent.instagram?.reel?.hashtags || []).join(' '), 'ig-reel')}
+                                                         className="px-3 py-1 rounded-lg text-[10px] font-bold text-white cursor-pointer transition-all flex items-center gap-1" style={{ background: 'linear-gradient(135deg, #FF0066, #FE3504)' }}
+                                                     >
+                                                         {growthCopied === 'ig-reel' ? '✓ Copied!' : '📋 Copy Caption'}
+                                                     </button>
+                                                 </div>
                                             </div>
                                             <div className="p-4 space-y-4">
                                                 {/* Hook + Concept */}
@@ -4945,20 +5397,34 @@ export default function SuperAdminDashboard() {
                                                         {post.type === 'thread' && <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-sky-500/10 text-sky-500">{post.tweets?.length} tweets</span>}
                                                         {post.bestTime && <span className="text-[10px] text-[var(--sys-text-muted)]">⏰ {post.bestTime}</span>}
                                                     </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <button onClick={() => handleMarkPosted('twitter', i)} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${post.posted ? 'bg-emerald-500/10 text-emerald-500' : 'bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-emerald-500'}`}>
-                                                            {post.posted ? '✅ Posted' : '○ Mark Posted'}
-                                                        </button>
-                                                        <button onClick={() => handleRegeneratePost('twitter', i)} disabled={growthRegenerating === `twitter-${i}`} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-purple-500 cursor-pointer transition-all disabled:opacity-50">
-                                                            {growthRegenerating === `twitter-${i}` ? '⏳' : '🔄'} Regen
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleCopyContent(post.tweets?.join('\n\n---\n\n') || '', `tw-${i}`)}
-                                                            className="px-3 py-1 rounded-lg text-[10px] font-bold bg-sky-500 text-white hover:bg-sky-600 cursor-pointer transition-all"
-                                                        >
-                                                            {growthCopied === `tw-${i}` ? '✓ Copied!' : '📋 Copy'}
-                                                        </button>
-                                                    </div>
+                                                     <div className="flex items-center gap-2">
+                                                         <button 
+                                                             onClick={() => triggerPublishModal('twitter', i)}
+                                                             disabled={isPublishing === `twitter-${i}`}
+                                                             className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-primary text-white hover:bg-primary/90 cursor-pointer transition-all flex items-center gap-1 disabled:opacity-50"
+                                                         >
+                                                             {isPublishing === `twitter-${i}` ? <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span> : '🚀'} Publish
+                                                         </button>
+                                                         <button onClick={() => handleMarkPosted('twitter', i)} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-all flex items-center gap-1 ${post.posted ? 'bg-emerald-500/10 text-emerald-500' : 'bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-emerald-500'}`}>
+                                                             {post.posted ? '✅ Posted' : '○ Mark'}
+                                                         </button>
+                                                         <button onClick={() => handleRegeneratePost('twitter', i)} disabled={growthRegenerating === `twitter-${i}`} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-purple-500 cursor-pointer transition-all disabled:opacity-50 flex items-center gap-1">
+                                                             {growthRegenerating === `twitter-${i}` ? <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span> : '🔄'} Regen
+                                                         </button>
+                                                         <button
+                                                             onClick={() => handleGenerateImage('twitter', i)}
+                                                             disabled={growthGeneratingImage === `twitter-${i}`}
+                                                             className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-blue-500 cursor-pointer transition-all disabled:opacity-50 flex items-center gap-1"
+                                                         >
+                                                             {growthGeneratingImage === `twitter-${i}` ? <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span> : '🖼️'} Gen Image
+                                                         </button>
+                                                         <button
+                                                             onClick={() => handleCopyContent(post.tweets?.join('\n\n---\n\n') || '', `tw-${i}`)}
+                                                             className="px-3 py-1 rounded-lg text-[10px] font-bold bg-sky-500 text-white hover:bg-sky-600 cursor-pointer transition-all flex items-center gap-1"
+                                                         >
+                                                             {growthCopied === `tw-${i}` ? '✓ Copied!' : '📋 Copy'}
+                                                         </button>
+                                                     </div>
                                                 </div>
                                                 <div className="p-4 space-y-3">
                                                     {(post.tweets || []).map((tweet, j) => (
@@ -4975,6 +5441,27 @@ export default function SuperAdminDashboard() {
                                                             </div>
                                                         </div>
                                                     ))}
+                                                    {post.imageUrl && (
+                                                        <div className="mt-3 rounded-lg overflow-hidden border border-[var(--sys-border)] relative group cursor-zoom-in" onClick={() => setGrowthPreviewImage(post.imageUrl)}>
+                                                            <img src={post.imageUrl} alt="Generated" className="w-full h-auto object-cover max-h-64 transition-transform duration-500 group-hover:scale-105" />
+                                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-3 backdrop-blur-sm">
+                                                                <button 
+                                                                    onClick={(e) => { e.stopPropagation(); setGrowthPreviewImage(post.imageUrl); }}
+                                                                    className="p-2 bg-white/20 hover:bg-white/40 rounded-full text-white transition-colors backdrop-blur-lg flex items-center justify-center border border-white/20"
+                                                                    title="Zoom Preview"
+                                                                >
+                                                                    <span className="material-symbols-outlined text-xl">zoom_in</span>
+                                                                </button>
+                                                                <button 
+                                                                    onClick={(e) => { e.stopPropagation(); downloadImage(post.imageUrl, `twitter-post-${i + 1}.png`); }}
+                                                                    className="p-2 bg-white/20 hover:bg-white/40 rounded-full text-white transition-colors backdrop-blur-lg flex items-center justify-center border border-white/20"
+                                                                    title="Download Image"
+                                                                >
+                                                                    <span className="material-symbols-outlined text-xl">download</span>
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         ))}
@@ -4993,20 +5480,34 @@ export default function SuperAdminDashboard() {
                                                         <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-orange-500/10 text-orange-500">{post.tone}</span>
                                                         {post.bestTime && <span className="text-[10px] text-[var(--sys-text-muted)]">⏰ {post.bestTime}</span>}
                                                     </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <button onClick={() => handleMarkPosted('reddit', i)} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${post.posted ? 'bg-emerald-500/10 text-emerald-500' : 'bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-emerald-500'}`}>
-                                                            {post.posted ? '✅ Posted' : '○ Mark Posted'}
-                                                        </button>
-                                                        <button onClick={() => handleRegeneratePost('reddit', i)} disabled={growthRegenerating === `reddit-${i}`} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-purple-500 cursor-pointer transition-all disabled:opacity-50">
-                                                            {growthRegenerating === `reddit-${i}` ? '⏳' : '🔄'} Regen
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleCopyContent(post.title + '\n\n' + post.body, `rd-${i}`)}
-                                                            className="px-3 py-1 rounded-lg text-[10px] font-bold bg-orange-600 text-white hover:bg-orange-700 cursor-pointer transition-all"
-                                                        >
-                                                            {growthCopied === `rd-${i}` ? '✓ Copied!' : '📋 Copy All'}
-                                                        </button>
-                                                    </div>
+                                                     <div className="flex items-center gap-2">
+                                                         <button 
+                                                             onClick={() => triggerPublishModal('reddit', i)}
+                                                             disabled={isPublishing === `reddit-${i}`}
+                                                             className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-primary text-white hover:bg-primary/90 cursor-pointer transition-all flex items-center gap-1 disabled:opacity-50"
+                                                         >
+                                                             {isPublishing === `reddit-${i}` ? <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span> : '🚀'} Publish
+                                                         </button>
+                                                         <button onClick={() => handleMarkPosted('reddit', i)} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-all flex items-center gap-1 ${post.posted ? 'bg-emerald-500/10 text-emerald-500' : 'bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-emerald-500'}`}>
+                                                             {post.posted ? '✅ Posted' : '○ Mark'}
+                                                         </button>
+                                                         <button onClick={() => handleRegeneratePost('reddit', i)} disabled={growthRegenerating === `reddit-${i}`} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-purple-500 cursor-pointer transition-all disabled:opacity-50 flex items-center gap-1">
+                                                             {growthRegenerating === `reddit-${i}` ? <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span> : '🔄'} Regen
+                                                         </button>
+                                                         <button
+                                                             onClick={() => handleGenerateImage('reddit', i)}
+                                                             disabled={growthGeneratingImage === `reddit-${i}`}
+                                                             className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-orange-500 cursor-pointer transition-all disabled:opacity-50 flex items-center gap-1"
+                                                         >
+                                                             {growthGeneratingImage === `reddit-${i}` ? <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span> : '🖼️'} Gen Image
+                                                         </button>
+                                                         <button
+                                                             onClick={() => handleCopyContent(post.title + '\n\n' + post.body, `rd-${i}`)}
+                                                             className="px-3 py-1 rounded-lg text-[10px] font-bold bg-orange-600 text-white hover:bg-orange-700 cursor-pointer transition-all flex items-center gap-1"
+                                                         >
+                                                             {growthCopied === `rd-${i}` ? '✓ Copied!' : '📋 Copy All'}
+                                                         </button>
+                                                     </div>
                                                 </div>
                                                 <div className="p-4">
                                                     <div className="flex items-center gap-2 mb-3">
@@ -5016,6 +5517,27 @@ export default function SuperAdminDashboard() {
                                                         <h4 className="text-sm font-bold text-[var(--sys-text)]">{post.title}</h4>
                                                     </div>
                                                     <pre className="text-sm text-[var(--sys-text)] whitespace-pre-wrap font-sans leading-relaxed">{post.body}</pre>
+                                                    {post.imageUrl && (
+                                                        <div className="mt-4 rounded-lg overflow-hidden border border-[var(--sys-border)] relative group cursor-zoom-in" onClick={() => setGrowthPreviewImage(post.imageUrl)}>
+                                                            <img src={post.imageUrl} alt="Generated" className="w-full h-auto object-cover max-h-64 transition-transform duration-500 group-hover:scale-105" />
+                                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-3 backdrop-blur-sm">
+                                                                <button 
+                                                                    onClick={(e) => { e.stopPropagation(); setGrowthPreviewImage(post.imageUrl); }}
+                                                                    className="p-2 bg-white/20 hover:bg-white/40 rounded-full text-white transition-colors backdrop-blur-lg flex items-center justify-center border border-white/20"
+                                                                    title="Zoom Preview"
+                                                                >
+                                                                    <span className="material-symbols-outlined text-xl">zoom_in</span>
+                                                                </button>
+                                                                <button 
+                                                                    onClick={(e) => { e.stopPropagation(); downloadImage(post.imageUrl, `reddit-post-${i + 1}.png`); }}
+                                                                    className="p-2 bg-white/20 hover:bg-white/40 rounded-full text-white transition-colors backdrop-blur-lg flex items-center justify-center border border-white/20"
+                                                                    title="Download Image"
+                                                                >
+                                                                    <span className="material-symbols-outlined text-xl">download</span>
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         ))}
@@ -5047,6 +5569,74 @@ export default function SuperAdminDashboard() {
                                 </div>
                             </div>
                         )}
+                    </div>
+                )}
+
+                {/* Publish Account Selection Modal */}
+                {publishModalConfig && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" style={{ zIndex: 9999 }}>
+                        <div className="bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-2xl w-full max-w-md shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                            <div className="p-4 border-b border-[var(--sys-border)] flex items-center justify-between">
+                                <h3 className="font-bold text-[var(--sys-text)] flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary">send</span>
+                                    Select Account to Publish
+                                </h3>
+                                <button onClick={() => setPublishModalConfig(null)} className="p-2 hover:bg-[var(--sys-bg)] rounded-xl transition-colors">
+                                    <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-[20px]">close</span>
+                                </button>
+                            </div>
+                            <div className="p-4 space-y-2 max-h-[60vh] overflow-y-auto">
+                                {publishModalConfig.accounts.map(acc => (
+                                    <div 
+                                        key={acc._id} 
+                                        onClick={() => setPublishModalConfig({ ...publishModalConfig, selectedAccountId: acc._id })}
+                                        className={`p-3 rounded-xl cursor-pointer transition-all border flex items-center justify-between ${publishModalConfig.selectedAccountId === acc._id ? 'border-primary bg-primary/5' : 'border-[var(--sys-border)] bg-[var(--sys-bg)] hover:border-primary/50'}`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-[var(--sys-surface)] flex items-center justify-center border border-[var(--sys-border)]">
+                                                <span className="material-symbols-outlined text-sm">{acc.platform === 'linkedin' ? 'work' : acc.platform === 'twitter' ? 'tag' : acc.platform === 'reddit' ? 'forum' : 'photo_camera'}</span>
+                                            </div>
+                                            <div>
+                                                <div className="font-bold text-sm text-[var(--sys-text)]">{acc.accountName || acc.displayName || acc.platform}</div>
+                                                <div className="text-xs text-[var(--sys-text-muted)] capitalize">{acc.platform}</div>
+                                            </div>
+                                        </div>
+                                        {publishModalConfig.selectedAccountId === acc._id && (
+                                            <span className="material-symbols-outlined text-primary">check_circle</span>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="p-4 border-t border-[var(--sys-border)] bg-[var(--sys-bg)] flex justify-end gap-2">
+                                <button onClick={() => setPublishModalConfig(null)} className="px-4 py-2 rounded-xl text-sm font-bold text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] transition-all">Cancel</button>
+                                <button onClick={executeDirectPublish} className="px-4 py-2 rounded-xl text-sm font-bold bg-primary text-white hover:bg-primary/90 transition-all flex items-center gap-2 shadow-lg shadow-primary/20">
+                                    <span className="material-symbols-outlined text-[16px]">send</span> Publish Now
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Image Preview Modal */}
+                {growthPreviewImage && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200" onClick={() => setGrowthPreviewImage(null)}>
+                        <div className="absolute top-4 right-4 flex items-center gap-4">
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); downloadImage(growthPreviewImage, 'mantram-growth-image.png') }}
+                                className="px-4 py-2 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-colors flex items-center gap-2 shadow-xl"
+                            >
+                                <span className="material-symbols-outlined text-sm">download</span> Download High-Res
+                            </button>
+                            <button onClick={() => setGrowthPreviewImage(null)} className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors backdrop-blur-lg">
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+                        <img 
+                            src={growthPreviewImage} 
+                            alt="Preview" 
+                            className="max-w-[90vw] max-h-[90vh] object-contain rounded-xl shadow-2xl animate-in zoom-in-95 duration-200" 
+                            onClick={e => e.stopPropagation()} 
+                        />
                     </div>
                 )}
 

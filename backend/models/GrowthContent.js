@@ -4,6 +4,7 @@ const postSchema = new mongoose.Schema({
     type: { type: String }, // 'founder_story', 'product_insight', 'standalone', 'thread', etc.
     content: { type: String, required: true },
     hashtags: [String],
+    imageUrl: { type: String },
     bestTime: String,
     posted: { type: Boolean, default: false },
     postedAt: Date,
@@ -13,6 +14,7 @@ const instagramSlideSchema = new mongoose.Schema({
     slideNumber: Number,
     text: String,
     visualDescription: String,
+    imageUrl: { type: String },
 }, { _id: false });
 
 const storySlideSchema = new mongoose.Schema({
@@ -20,6 +22,7 @@ const storySlideSchema = new mongoose.Schema({
     type: { type: String, enum: ['text', 'image', 'video', 'poll', 'quiz', 'countdown'] },
     text: String,
     visualDescription: String,
+    imageUrl: { type: String },
     ctaText: String,
     stickerSuggestion: String,
 }, { _id: false });
@@ -37,6 +40,7 @@ const reelSceneSchema = new mongoose.Schema({
 const twitterPostSchema = new mongoose.Schema({
     type: { type: String, enum: ['standalone', 'thread'] },
     tweets: [String],
+    imageUrl: { type: String },
     bestTime: String,
     posted: { type: Boolean, default: false },
     postedAt: Date,
@@ -47,6 +51,7 @@ const redditPostSchema = new mongoose.Schema({
     title: String,
     body: String,
     tone: String,
+    imageUrl: { type: String },
     bestTime: String,
     posted: { type: Boolean, default: false },
     postedAt: Date,
@@ -66,6 +71,7 @@ const growthContentSchema = new mongoose.Schema({
             caption: String,
             hashtags: [String],
             slides: [instagramSlideSchema],
+            coverImageUrl: String,
             bestTime: String,
             posted: { type: Boolean, default: false },
             postedAt: Date,
