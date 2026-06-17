@@ -38,9 +38,9 @@ if [ "$PKG_MANAGER" = "apt" ]; then
     echo "📦 Updating system packages..."
     sudo apt update && sudo apt upgrade -y
     
-    echo "📦 Installing Node.js 22..."
+    echo "📦 Installing Git & Node.js 22..."
     curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-    sudo apt install -y nodejs
+    sudo apt install -y git nodejs
     
     echo "📦 Installing Nginx..."
     sudo apt install -y nginx
@@ -52,9 +52,9 @@ else
     echo "📦 Updating system packages..."
     sudo dnf update -y
     
-    echo "📦 Installing Node.js 22..."
+    echo "📦 Installing Git & Node.js 22..."
     curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -
-    sudo dnf install -y nodejs
+    sudo dnf install -y git nodejs
     
     echo "📦 Installing Nginx..."
     sudo dnf install -y nginx
