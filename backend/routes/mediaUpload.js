@@ -21,6 +21,36 @@ import config from '../config/env.js';
 const router = Router();
 
 // ══════════════════════════════════════════════════════════════════════════════
+// GET /api/media/file/* — Query-parameter-less public proxy route for social media publishers
+// Retrieves S3 objects using AWS credentials and streams them directly.
+router.get('/file/*', async (req, res) => {
+    try {
+        const s3Key = req.params[0];
+        if (!s3Key) {
+            return res.status(400).send('S3 Key is required');
+        }
+
+        // Prevent directory traversal
+        const cleanKey = s3Key.replace(/\.\./g, '');
+        console.log(`📡 [MEDIA PROXY] Streaming S3 Key: ${cleanKey}`);
+
+        const { stream, contentType, contentLength } = await getObjectStream(cleanKey);
+
+        if (contentType) res.setHeader('Content-Type', contentType);
+        if (contentLength) res.setHeader('Content-Length', contentLength);
+
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+
+        return stream.pipe(res);
+    } catch (error) {
+        console.error(`❌ [MEDIA PROXY] S3 stream failed for key ${req.params[0]}:`, error.message);
+        const statusCode = error.$metadata?.httpStatusCode || 500;
+        return res.status(statusCode).send(`Failed to fetch media: ${error.message}`);
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
 // GET /api/media/proxy — CORS Proxy for S3 assets (required for Canvas)
 // This must be public because browser <img> tags and canvas loading don't send Auth headers.
 // Security is enforced via strict domain allow-listing.

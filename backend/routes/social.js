@@ -50,6 +50,31 @@ const freshSignedUrl = async (url) => {
     return url;
 };
 
+/**
+ * Helper: If a URL is from our S3 bucket, map it to our clean public proxy route
+ * to avoid query parameters and permissions issues during Meta/LinkedIn crawling.
+ */
+const getPublicProxyUrl = (url) => {
+    if (!url || typeof url !== 'string') return url;
+    const bucket = process.env.AWS_S3_BUCKET || config.aws?.bucket || 'mantram-ai-generated-media';
+    const isS3 = (url.includes('.amazonaws.com') && url.includes(bucket)) || url.includes('mantram-media-assets.s3');
+    if (isS3) {
+        try {
+            const parsedUrl = new URL(url);
+            let pathname = parsedUrl.pathname;
+            const pathParts = pathname.split('/').filter(Boolean);
+            let key = pathParts[0] === bucket ? pathParts.slice(1).join('/') : pathParts.join('/');
+            key = key.split('?')[0];
+            try { key = decodeURIComponent(key); } catch { }
+            const baseUrl = (config.backendUrl || 'https://api.mantram.ai').replace(/\/$/, '');
+            return `${baseUrl}/api/media/file/${key}`;
+        } catch (e) {
+            console.warn('[PROXY URL] Failed to parse S3 URL:', url, e.message);
+        }
+    }
+    return url;
+};
+
 // BUG-3 FIX: Sign OAuth state with HMAC to prevent tampering
 // Uses '|' as delimiter — safe because base64 and hex never contain pipes.
 function signState(payload) {
@@ -706,7 +731,7 @@ router.post('/publish', protect, async (req, res) => {
             try {
                 const userId = req.user._id;
                 const s3Url = await uploadToS3(imageUrl, `social-fallback/${userId}/${Date.now()}.png`);
-                absoluteImageUrl = s3Url;
+                absoluteImageUrl = getPublicProxyUrl(s3Url);
                 console.log(`[SOCIAL] Fallback S3 Upload Success: ${absoluteImageUrl}`);
             } catch (s3Err) {
                 console.error('[SOCIAL] Fallback S3 Upload Failed:', s3Err.message);
@@ -719,14 +744,13 @@ router.post('/publish', protect, async (req, res) => {
         }
     } else if (!isCarousel && imageUrl) {
         console.log(`[SOCIAL] Using provided absolute URL: ${imageUrl}`);
-        // If it's our own S3 URL, just freshen the signature
         const bucket = process.env.AWS_S3_BUCKET || config.aws?.bucket || '';
         if (imageUrl.includes('.amazonaws.com') && bucket && imageUrl.includes(bucket)) {
-            absoluteImageUrl = await freshSignedUrl(imageUrl);
+            absoluteImageUrl = getPublicProxyUrl(imageUrl);
         } else {
             // Mirror external URLs to S3 for persistence
             const s3Url = await mirrorUrlToS3(imageUrl, `social-posts/${req.user._id}/${Date.now()}.png`);
-            if (s3Url) absoluteImageUrl = s3Url;
+            if (s3Url) absoluteImageUrl = getPublicProxyUrl(s3Url);
         }
     }
 
@@ -738,19 +762,18 @@ router.post('/publish', protect, async (req, res) => {
             if (url.startsWith('http')) {
                 const bucket = process.env.AWS_S3_BUCKET || config.aws?.bucket || '';
                 if (url.includes('.amazonaws.com') && bucket && url.includes(bucket)) {
-                    // Our own S3 URL — just freshen the presigned signature
-                    const freshUrl = await freshSignedUrl(url);
-                    carouselUrls.push(freshUrl);
+                    const proxyUrl = getPublicProxyUrl(url);
+                    carouselUrls.push(proxyUrl);
                 } else {
                     // External URL — mirror to S3
                     const s3Url = await mirrorUrlToS3(url, `social-carousel/${req.user._id}/${Date.now()}-${carouselUrls.length}.png`);
-                    carouselUrls.push(s3Url || url);
+                    carouselUrls.push(s3Url ? getPublicProxyUrl(s3Url) : url);
                 }
             } else if (url.startsWith('data:')) {
                 try {
                     const userId = req.user._id;
                     const s3Url = await uploadToS3(url, `social-carousel/${userId}/${Date.now()}-${carouselUrls.length}.png`);
-                    carouselUrls.push(s3Url);
+                    carouselUrls.push(getPublicProxyUrl(s3Url));
                     console.log(`[SOCIAL] Carousel data URI uploaded to S3: ${s3Url.substring(0, 60)}...`);
                 } catch (s3Err) {
                     console.warn(`[SOCIAL] Carousel S3 upload failed, keeping data URI: ${s3Err.message}`);
@@ -772,7 +795,7 @@ router.post('/publish', protect, async (req, res) => {
         console.log(`[SOCIAL] Using provided absolute video URL: ${videoUrl}`);
         const bucket = process.env.AWS_S3_BUCKET || config.aws?.bucket || '';
         if (videoUrl.includes('.amazonaws.com') && bucket && videoUrl.includes(bucket)) {
-            absoluteVideoUrl = await freshSignedUrl(videoUrl);
+            absoluteVideoUrl = getPublicProxyUrl(videoUrl);
         }
     }
 
