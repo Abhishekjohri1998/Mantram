@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio';
 import { setMaxListeners } from 'events';
 import { callMcpTool } from '../mcp/registry.js';
+import { launchPuppeteer } from '../utils/puppeteerHelper.js';
 
 /**
  * Scan a website and extract comprehensive brand DNA using AI Vision + Social Intelligence + MCP Enrichment
@@ -564,10 +565,8 @@ Rules:
  * Returns rendered HTML, text content, navigation links, and keeps browser alive for reuse.
  */
 async function puppeteerExtractContent(url) {
-    const puppeteer = await import('puppeteer');
-    
     console.log('  🌐 Launching Puppeteer for SPA content extraction...');
-    const browser = await puppeteer.default.launch({
+    const browser = await launchPuppeteer({
         headless: true,
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
     });
@@ -742,9 +741,8 @@ async function captureAndAnalyze(url, allImages, selectorLogos, existingBrowser 
     let ownsBrowser = false;
 
     if (!browser) {
-        const puppeteer = await import('puppeteer');
         console.log('  🌐 Launching Puppeteer for screenshot...');
-        browser = await puppeteer.default.launch({
+        browser = await launchPuppeteer({
             headless: true,
             args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
         });
