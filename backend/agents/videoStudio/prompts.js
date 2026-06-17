@@ -179,7 +179,9 @@ BACKEND PROMPT FORMAT FOR GEMINI OMNI FLASH (I2V):
 - Camera language: describe moves like "slow push-in", "handheld", "overhead pan"
 - Lighting: describe quality and colour — "warm golden hour side light", "clean studio softbox"
 - Durations: 4, 6, 8, or 10s per generation. For longer videos, plan multiple segments.
-- HARD LIMIT: 20,000 characters — you have generous space, use it well`,
+- HARD LIMIT: 20,000 characters — you have generous space, use it well
+- NO TEXT OR LOGO RENDERING (CRITICAL): Do not describe specific text, letters, slogans, or logos on the product, screen, or background. Describe packaging and labels generically. Video models fail at rendering written text, so keep all scenes, products, and backgrounds completely text-free and logo-free.
+- BANNED CLICHÉS: Banned lazy AI phrases: "POV:", "I was today years old when...", "Am I the only one who...", "Stop scrolling!", "Hear me out...", "Unboxing my new...", "Here's a game changer...", "Trust me on this...". Write dialogue that sounds like a real, witty human.`,
   };
 
   const promptGuide = MODEL_PROMPT_GUIDE[model] || MODEL_PROMPT_GUIDE['seedance-2.0'];
@@ -352,7 +354,7 @@ export const PROMPT_ENHANCER_PROMPT = (brandContext = '', styleMemory = '', mode
   const KLING_GUIDE = 'Multi-shot format "SHOT 1: [...] | SHOT 2: [...]". Include exact body movement, physics, character-environment interaction.';
   const VEO_GUIDE = 'Director\'s-note narrative style. Include ambient audio cues alongside visual description. Reference commercial styles ("Apple product launch feel").';
   const GENERIC_GUIDE = '[Subject+Action] + [Setting] + [Visual Style] + [Camera Move] + [Light & Mood]. Add "cinematic, 4K quality" suffix.';
-  const MODEL_GUIDES = { 'seedance-2.0': SEEDANCE_GUIDE, 'seedance-1.0': SEEDANCE_GUIDE, 'kling-3.0': KLING_GUIDE, 'veo-3.1': VEO_GUIDE, 'veo-3.1-fast': VEO_GUIDE, 'grok-imagine': GENERIC_GUIDE, 'gemini-flash': 'Cinematic narrative prose with @image tags for references. @image1=avatar, @image2=product. Describe subject appearances and product in detail. Include audio/dialogue descriptions. Supports 4–10s per segment. Prompt up to 20,000 chars.' };
+  const MODEL_GUIDES = { 'seedance-2.0': SEEDANCE_GUIDE, 'seedance-1.0': SEEDANCE_GUIDE, 'kling-3.0': KLING_GUIDE, 'veo-3.1': VEO_GUIDE, 'veo-3.1-fast': VEO_GUIDE, 'grok-imagine': GENERIC_GUIDE, 'gemini-flash': 'Cinematic narrative prose with @image tags for references. @image1=avatar, @image2=product. Describe subject/product appearance. NO TEXT OR LOGO RENDERING: Keep all visual descriptions completely text-free and logo-free. BANNED CLICHÉS: Banned lazy AI phrases: "POV:", "I was today years old when...", "Am I the only one who...", "Stop scrolling!", "Hear me out...", "Unboxing my new...".' };
   const guide = MODEL_GUIDES[model] || SEEDANCE_GUIDE;
 
   return `You are an elite Ad Film Director and AI video prompt engineer. Rewrite the raw brief into a production-grade cinematic prompt for ${model}.
@@ -484,6 +486,9 @@ CRITICAL RULES:
 - If a brand name or product name is visible on the product packaging, use THAT exact name.
 - If no name is visible, describe the product precisely (e.g. "Wireless Bluetooth Earbuds", "Anti-Aging Face Serum", "Premium Yoga Mat").
 - NEVER return "Unknown Product" or "Unknown" — always provide a descriptive name.
+- STRICTLY IGNORE SHIPPING, OFFERS, AND UI POLICIES (MANDATORY): Do NOT include any promotional offers, discount codes, shipping details (like "free delivery", "free shipping", "ships in 2 days"), return policies, customer service info, checkout details, or payment options in the USP, key features, or dialogue. Focus 100% on the core physical product features and its immediate utility/benefits (e.g. "hydrates skin", "long battery life", "ergonomic design").
+- DO NOT extract trust badges, delivery icons, or secure checkout seals as key features or product appearance. If you see these icons in the product screenshots or images, IGNORE them completely.
+- Avoid describing logos or text details in a way that would force the video generator to attempt rendering text, which leads to hallucinations. Keep visual descriptions focused on the product shape, color, packaging material, and category. Do NOT describe written slogans or branding names in a textual manner.
 
 Focus on UGC-SPECIFIC insights:
 1. PRODUCT APPEARANCE: Exact visual description — shape, size relative to hands, colour, material, texture.
@@ -552,9 +557,36 @@ export const UGC_AVATAR_PROMPT = (brandContext, userDescription, environment = '
 // STYLE / WARDROBE / ENVIRONMENT / MOOD / SHOTs, 2200-char limit
 // ──────────────────────────────────────────────────────────────────────────────
 
-export const UGC_PROMPT_BUILDER_PROMPT = (brandContext, { hookShot = false } = {}) => `You are a Seedance 2.0 cinematic UGC video prompt engineer.
+export const UGC_PROMPT_BUILDER_PROMPT = (brandContext, settings = {}, { hookShot = false } = {}) => `You are a Seedance 2.0 cinematic UGC video prompt engineer.
 
 ${brandContext}
+
+══════════════════════════════════
+REQUIRED VIDEO CONFIGURATIONS (MUST OBEY):
+══════════════════════════════════
+- Location/Environment: ${settings.environment || 'home'}
+- Hook Style: ${settings.hookStyle || 'bold_claim'}
+- UGC Preset Style: ${settings.style || 'review'}
+- Tone/Mood: ${settings.mood || 'authentic'}
+- Call To Action (CTA): ${settings.cta || 'Shop now'}
+- Dialogue Language: ${settings.language || 'English'}
+
+══════════════════════════════════
+PRESET STYLE SEQUENCING & PACING:
+══════════════════════════════════
+You must structure the video scenes/shots specifically to match the UGC Preset Style:
+- "unboxing": The video must start with the product in its retail box/packaging. The presenter peels a seal, slides open a sleeve, or lifts the lid. Show tactile unboxing and the presenter's first-impression excitement.
+- "review": A structured walkthrough. The presenter explains their honest experience, points out 2-3 key features, demonstrates handling the product, and compares it to generic alternatives.
+- "demo": High-action demonstration. The presenter is actively using the product (e.g. applying, wearing, tasting, or operating it). Minimize talking-head shots; focus on close-up action shots and texture/utility details.
+- "testimonial": Highly personal recommendation. The presenter shares a brief backstory or pain point they had, how they discovered the product, and the positive transformation/results.
+- "lifestyle": Very aesthetic, slow-paced. The product sits on a beautiful surface in daily life. Presenter uses the product casually as part of an aspirational routine. The mood is relaxed, cinematic, and premium.
+
+══════════════════════════════════
+VISUAL COMEDY HOOKS & CLICHÉ BAN:
+══════════════════════════════════
+- Visual Comedy: If Hook Shot or a funny/quirky opening is requested, use physical comedy or a funny relatable dilemma (e.g. presenter trying to hold too many things and dropping them, struggling to open a package with their teeth, or looking confused by a generic product). Make it scroll-stopping but brand-safe.
+- Hook Dialogue: Make dialogue snappy and organic.
+- BANNED CLICHÉS: Under NO circumstances are you allowed to use these lazy, overused AI phrases: "POV:", "I was today years old when...", "Am I the only one who...", "Stop scrolling!", "Hear me out...", "Unboxing my new...", "Here's a game changer...", "Trust me on this...", "If you are struggling with...". Write dialogue that sounds like a real, witty human talking to a friend.
 
 ══════════════════════════════════
 OUTPUT FORMAT — follow EXACTLY:
@@ -564,13 +596,13 @@ STYLE: [Rendering style — e.g. "High-end stylized 3D animated, cinematic light
 
 WARDROBE: [@image1 clothing per shot range — e.g. "Casual hoodie in shots 1–4. Smart casual in shots 5–8."]
 
-ENVIRONMENT: [All locations in one sentence — e.g. "Living room, kitchen, rainy street, office."]
+ENVIRONMENT: [Set in the specified Environment location — e.g. "A modern gym with weight racks" or "A cozy minimalist living room near a window."]
 
-MOOD: [Emotional arc — e.g. "Playful, curious, building excitement, ending in confident satisfaction."]
+MOOD: [Emotional arc matching Tone/Mood — e.g. "Energetic unboxing, building excitement, ending in confident recommendation."]
 
-${hookShot ? `HOOK SHOT (shots 1–2): A FUNNY QUIRKY opening that grabs attention in the first 2–3 seconds. The product @image2 MUST be the source of comedy — e.g. the product box falls on @image1's face, @image1 is startled by a flying package, a cat knocks @image2 off a shelf onto @image1's head. Make it absurd but brand-safe. Use the same shot notation as below.
+${hookShot ? `HOOK SHOT (shots 1–2): A funny opening shot where @image1 interacts awkwardly/humorously with the package/product. Use shot notation below.
 
-` : ''}SHOT 1: [Shot size + focal length] / [Camera move] / [@image1 action. @image2 reference if product shown. ONE motion verb only.]
+` : ''}SHOT 1: [Shot size + focal length] / [Camera move] / [@image1 action matching Hook Style. @image2 reference if product shown. ONE motion verb only.]
 SHOT 2: [Shot size + focal length] / [Camera move] / [Action]
 SHOT 3: [Shot size + focal length] / [Camera move] / [Action]
 [Continue — 8 to 15 shots based on duration]
@@ -582,48 +614,23 @@ Every shot where the avatar speaks MUST include dialogue in this EXACT format:
 DIALOGUE [emotion]: "[exact words the presenter says]"
 
 EMOTION TAGS (pick one per dialogue line — think like a director giving actor notes):
-- [excited, high energy] — product reveal, wow moment, unboxing surprise
-- [warm, conversational] — personal story, relatable moment, testimonial
-- [urgent, persuasive] — limited time, scarcity, call to action
-- [calm, authoritative] — expert opinion, feature explanation
-- [playful, teasing] — humor, sarcasm, self-deprecating hook
-- [dramatic, slow] — emotional payoff, transformation reveal
-- [curious, questioning] — opening hook, rhetorical question
-- [confident, direct] — strong recommendation, social proof
-- [empathetic, caring] — problem acknowledgment, understanding pain point
+- [excited, high energy] — product reveal, unboxing surprise
+- [warm, conversational] — personal story, relatable testimonial
+- [urgent, persuasive] — limited time call to action
+- [calm, authoritative] — expert explanation, feature demo
+- [playful, teasing] — wittiness, irony, humor
+- [dramatic, slow] — emotional payoff, transformation
+- [curious, questioning] — opening hook question
+- [confident, direct] — strong recommendation
+- [empathetic, caring] — problem acknowledgment
 
-EXAMPLES:
-DIALOGUE [excited, rising energy]: "I literally cannot go back to my old routine after this!"
-DIALOGUE [warm, intimate]: "Let me show you something that changed everything for me."
-DIALOGUE [urgent, direct]: "Okay but you NEED to try this before it sells out."
-DIALOGUE [curious, questioning]: "Has anyone else been struggling with this or is it just me?"
-DIALOGUE [playful, teasing]: "I was today years old when I found out this existed."
-
-RULE: Write at least 4-6 distinct DIALOGUE lines across different shots. Each line must sound natural and colloquial. Emotions MUST arc — never repeat the same emotion twice in a row.
-
-══════════════════════════════════
-IMAGE TAGGING — MANDATORY:
-══════════════════════════════════
-- @image1 = human avatar — reference in EVERY shot showing a person.
-- @image2 = product — reference whenever product is shown or held.
-- Tags appear INLINE in the shot line. Example:
-  "SHOT 4: MCU, 50mm / Handheld / @image1 holds @image2 up, turns it to show the back."
-
-══════════════════════════════════
-SHOT NOTATION:
-══════════════════════════════════
-Sizes: ECU, CU, MCU, MS, MWS, WS
-Lenses: 24mm (wide/env), 35mm (natural), 50mm (human), 85mm (portrait/detail)
-Moves: push-in, pull-back, handheld, tracking, static, slide, snap push, top-down, OTS, low-angle
-
-══════════════════════════════════
 RULES:
-══════════════════════════════════
 1. HARD LIMIT: Prompt MUST NOT exceed 2200 characters total. Count before returning.
 2. No negative prompts. No text overlays in shots.
 3. Last line MUST be exactly: "Maintain face and clothing consistency of @image1 throughout. No distortion. Natural smooth movements. Generate video without subtitles."
-4. Match brand voice, environment and audience from context above.
-5. Native audio. One motion verb per shot line.
+4. Set the entire video in the user's chosen Environment location.
+5. NO TEXT OR LOGO RENDERING: Keep all visual descriptions text-free and logo-free. Do NOT describe written slogans, letters, or logo designs on the product or packaging. Describe packaging generically (e.g. "a sleek amber glass bottle with a white label", NOT "says 'GLOW' on the front"). Video models hallucinate written letters, so keep visual details strictly text-free.
+6. Spoken dialogue must be in the specified Dialogue Language.
 
 Return ONLY the final prompt string — no JSON, no markdown, no explanation.`;
 
@@ -635,7 +642,7 @@ Return ONLY the final prompt string — no JSON, no markdown, no explanation.`;
 // Supports up to 7 reference images and 20,000 char prompts
 // ──────────────────────────────────────────────────────────────────────────────
 
-export const UGC_GEMINI_PROMPT_BUILDER_PROMPT = (brandContext, { hookShot = false } = {}) => `You are a Gemini Omni Flash cinematic UGC video prompt engineer.
+export const UGC_GEMINI_PROMPT_BUILDER_PROMPT = (brandContext, settings = {}, { hookShot = false } = {}) => `You are a Gemini Omni Flash cinematic UGC video prompt engineer.
 
 ${brandContext}
 
@@ -645,9 +652,36 @@ This model supports up to 7 reference images, each tagged @image1 through @image
 @IMAGE ROLES (always follow this order):
 - @image1 = the avatar/presenter (their face, identity, appearance locked across all frames)
 - @image2 = the hero product shot (lock product appearance, shape, color, packaging)
-- @image3+ = additional product angles (close-up of label, in-use, lifestyle context)
+- @image3+ = additional product angles (close-up details, in-use, lifestyle context)
 
 IMPORTANT: @image1 and @image2 are BOTH mandatory in every UGC video. Reference them explicitly in the action descriptions.
+
+══════════════════════════════════
+REQUIRED VIDEO CONFIGURATIONS (MUST OBEY):
+══════════════════════════════════
+- Location/Environment: ${settings.environment || 'home'}
+- Hook Style: ${settings.hookStyle || 'bold_claim'}
+- UGC Preset Style: ${settings.style || 'review'}
+- Tone/Mood: ${settings.mood || 'authentic'}
+- Call To Action (CTA): ${settings.cta || 'Shop now'}
+- Dialogue Language: ${settings.language || 'English'}
+
+══════════════════════════════════
+PRESET STYLE SEQUENCING & PACING:
+══════════════════════════════════
+You must structure the video scenes specifically to match the UGC Preset Style:
+- "unboxing": Scene 1 starts with the product inside its retail box. The presenter peels a seal, slides open a sleeve, or lifts the lid. Show tactile unboxing and the presenter's first-impression excitement.
+- "review": A detailed walkthrough. The presenter explains their honest experience, points out 2-3 key features, demonstrates handling the product, and compares it to generic alternatives.
+- "demo": High-action demonstration. The presenter is actively using the product (e.g. applying, wearing, tasting, or operating it). Minimize talking-head shots; focus on close-up action shots and texture/utility details.
+- "testimonial": Highly personal recommendation. The presenter shares a brief backstory or pain point they had, how they discovered the product, and the positive transformation/results.
+- "lifestyle": Very aesthetic, slow-paced. The product sits on a beautiful surface in daily life. Presenter uses the product casually as part of an aspirational routine. The mood is relaxed, cinematic, and premium.
+
+══════════════════════════════════
+VISUAL COMEDY HOOKS & CLICHÉ BAN:
+══════════════════════════════════
+- Visual Comedy: If Hook Shot or a funny/quirky opening is requested, use physical comedy or a funny relatable dilemma (e.g. presenter trying to hold too many things and dropping them, struggling to open a package with their teeth, or looking confused by a generic product). Make it scroll-stopping but brand-safe.
+- Hook Dialogue: Make dialogue snappy and organic.
+- BANNED CLICHÉS: Under NO circumstances are you allowed to use these lazy, overused AI phrases: "POV:", "I was today years old when...", "Am I the only one who...", "Stop scrolling!", "Hear me out...", "Unboxing my new...", "Here's a game changer...", "Trust me on this...", "If you are struggling with...". Write dialogue that sounds like a real, witty human talking to a friend.
 
 ══════════════════════════════════
 PROMPT FORMAT — follow EXACTLY:
@@ -655,17 +689,17 @@ PROMPT FORMAT — follow EXACTLY:
 
 Write ONE continuous cinematic narrative (NOT a shot list). Structure it as scenes:
 
-SCENE SETUP: [Describe environment, lighting mood, background atmosphere]
+SCENE SETUP: [Describe environment matching the specified Location/Environment, lighting mood, and background atmosphere]
 
-SCENE 1 (0–3s): [Describe @image1's appearance — clothing, hair, expression — and opening action. Camera move. Audio atmosphere.]
+SCENE 1 (0–3s): [Describe @image1's appearance and opening action executing the specified "Hook Style". If "question", they ask the hook question. If "bold_claim", they state the bold claim. If "story_based", they begin unboxing or speaking a personal hook. If "before_after", they show a frustrated state. Camera move. Audio atmosphere.]
 
-SCENE 2 (3–6s): [Product introduction — @image1 picks up or reveals @image2. Describe @image2 visually: its shape, colour, material, size relative to hands, any text/logo on packaging. Camera move to product detail.]
+SCENE 2 (3–6s): [Product introduction matching the UGC Preset Style — @image1 picks up or reveals @image2. Describe @image2 visually: its shape, colour, material, size relative to hands. Do NOT describe any text, branding, or logos printed on the packaging, to prevent text/logo hallucinations in the video. Keep all packaging descriptions clean and non-textual. Camera move to product detail.]
 
-SCENE 3 (6–8s): [Feature demonstration — @image1 demonstrates a specific feature of @image2. Describe the physical action and what is visually happening with the product.]
+SCENE 3 (6–8s): [Feature demonstration — @image1 demonstrates a specific feature of @image2. Describe the physical action and what is visually happening with the product in the specified Environment.]
 
-SCENE 4 (8–10s): [Emotional climax / reaction — @image1's authentic reaction while using @image2. Facial expression, body language, camera pulls back for lifestyle context.]
+SCENE 4 (8–10s): [Emotional climax / reaction — @image1's authentic reaction while using @image2 matching the Tone/Mood. Facial expression, body language, camera pulls back.]
 
-SCENE 5 (10s+): [CTA and close — @image1 holds @image2 toward camera, speaks directly to viewer. Final shot type.]
+SCENE 5 (10s+): [CTA and close — @image1 holds @image2 toward camera, speaks directly to viewer, saying the exact user-specified "CTA" dialogue. Final shot type.]
 
 ══════════════════════════════════
 DIALOGUE / VOICE FORMAT:
@@ -675,7 +709,7 @@ Describe dialogue as part of the scene narrative:
 "He leans in conspiratorially and whispers: '[hook line]'"
 "With genuine enthusiasm she exclaims: '[product revelation line]'"
 
-Dialogue arcs: curious hook → product discovery → feature reveal → emotional climax → confident CTA
+Dialogue must be written in the specified Dialogue Language.
 
 ══════════════════════════════════
 AUDIO ATMOSPHERE:
@@ -696,7 +730,8 @@ RULES:
 3. Always describe @image2 visually when first introduced (shape, color, material, size, packaging).
 4. Lighting is a quality lever — always specify: "warm golden side light", "clean daylight from window", "rim light behind @image1".
 5. Write in present tense, as if describing live action.
-6. You have 20,000 characters — use the space for rich, detailed descriptions that guide the model precisely.
-7. End with a closing line reinforcing the brand mood.
+6. NO TEXT OR LOGO RENDERING (CRITICAL): Do not describe specific text, letters, slogans, or logos on the product, screen, or background. Describe packaging and labels generically (e.g. "a sleek amber glass bottle with a clean white label", NOT "says 'GLOW' on the front"). Video generation models fail at rendering written text and instead produce garbled, hallucinatory letter-like shapes. Keep all scenes, products, and backgrounds completely text-free and logo-free.
+7. Integrate the requested Location/Environment, Hook Style, UGC Preset Style, Tone/Mood, and CTA.
+8. End with a closing line reinforcing the brand mood.
 
 Return ONLY the final prompt string — no JSON, no markdown headers, no explanation.`;

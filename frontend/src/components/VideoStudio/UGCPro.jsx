@@ -416,6 +416,11 @@ export default function UGCPro({ activeBrand, projects = [], projectsLoaded = fa
     // Cleanup polls
     useEffect(() => () => { Object.values(pollRefs.current).forEach(clearInterval) }, [])
 
+    // Reset promptReady when settings change to force a rebuild
+    useEffect(() => {
+        setPromptReady(false)
+    }, [style, mood, environment, hookStyle, hookShot, duration, aspectRatio, language, cta, selectedModel])
+
     const credits = creditEstimate?.credits || 15
 
     // ── Product Analysis (inline — triggered from upper controls) ──
@@ -477,21 +482,22 @@ export default function UGCPro({ activeBrand, projects = [], projectsLoaded = fa
             setPromptReady(true)
         } catch (err) { setError(err.message) }
         setBuildingPrompt(false)
-    }, [activeBrand, productData, productImageUrls, avatarUrl, style, mood, environment, hookStyle, duration, aspectRatio, cta])
+    }, [activeBrand, productData, productImageUrls, avatarUrl, style, mood, environment, hookStyle, hookShot, duration, aspectRatio, language, cta, selectedModel])
 
     // ── Generate Video ──
-    const handleGenerate = useCallback(async () => {
+    const handleGenerate = useCallback(async (forcedPrompt = null) => {
         if (!canCreateVideo) { onUpgradeRequired?.(); return }
         if (!avatarUrl) { setError('Upload or generate an avatar first'); return }
         if (!productData) { setError('Analyze a product first — paste a link or upload images'); return }
         setLoading(true); setError(null)
+        const activePrompt = forcedPrompt !== null ? forcedPrompt : promptText
         const jobId = `ugc-${Date.now()}`
-        const newJob = { id: jobId, requestId: null, prompt: promptText, avatarUrl, progress: 3, status: 'generating', videoUrl: null, error: null }
+        const newJob = { id: jobId, requestId: null, prompt: activePrompt, avatarUrl, progress: 3, status: 'generating', videoUrl: null, error: null }
         setJobs(prev => [newJob, ...prev])
         setPromptReady(false) // Reset after generating so it collapses
         try {
             const data = await apiJson('/video-studio/ugc-pro/generate', {
-                brandId: activeBrand?._id, productData, avatarUrl, productImageUrls, prebuiltPrompt: promptText,
+                brandId: activeBrand?._id, productData, avatarUrl, productImageUrls, prebuiltPrompt: activePrompt,
                 settings: { style, mood, environment, hookStyle, hookShot, duration, aspectRatio, language, cta, model: selectedModel },
             })
             setJobs(prev => prev.map(j => j.id === jobId ? { ...j, requestId: data.requestId, prompt: data.prompt } : j))
@@ -516,7 +522,7 @@ export default function UGCPro({ activeBrand, projects = [], projectsLoaded = fa
             setJobs(prev => prev.filter(j => j.id !== jobId))
         }
         setLoading(false)
-    }, [activeBrand, productData, productImageUrls, avatarUrl, style, mood, environment, hookStyle, duration, aspectRatio, cta])
+    }, [activeBrand, productData, productImageUrls, avatarUrl, style, mood, environment, hookStyle, hookShot, duration, aspectRatio, language, cta, selectedModel, canCreateVideo, onUpgradeRequired, promptText])
 
     async function downloadVideo(url) {
         try {
@@ -811,12 +817,12 @@ export default function UGCPro({ activeBrand, projects = [], projectsLoaded = fa
                                     try {
                                         const data = await apiJson('/video-studio/ugc-pro/build-prompt', {
                                             brandId: activeBrand?._id, productData, avatarUrl, productImageUrls,
-                                            settings: { style, mood, environment, hookStyle, duration, aspectRatio, language, cta, model: selectedModel },
+                                            settings: { style, mood, environment, hookStyle, hookShot, duration, aspectRatio, language, cta, model: selectedModel },
                                         })
                                         setPromptText(data.prompt)
                                         setPromptReady(true)
                                         setBuildingPrompt(false)
-                                        handleGenerate()
+                                        handleGenerate(data.prompt)
                                     } catch (err) {
                                         setError(err.message)
                                         setBuildingPrompt(false)

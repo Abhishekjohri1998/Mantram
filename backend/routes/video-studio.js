@@ -3009,6 +3009,34 @@ router.delete('/ugc-pro/avatars/:id', protect, async (req, res) => {
     }
 });
 
+function sanitizeScrapedText(text) {
+    if (!text) return '';
+    const patterns = [
+        /free\s+delivery/gi,
+        /free\s+shipping/gi,
+        /secure\s+checkout/gi,
+        /satisfaction\s+guaranteed/gi,
+        /easy\s+returns/gi,
+        /30-day\s+money\s+back/gi,
+        /money\s+back\s+guarantee/gi,
+        /add\s+to\s+cart/gi,
+        /buy\s+now/gi,
+        /checkout/gi,
+        /payment\s+methods/gi,
+        /visa,\s+mastercard,\s+paypal/gi,
+        /shipping\s+rates/gi,
+        /track\s+order/gi,
+        /customer\s+support/gi,
+        /trust\s+badge/gi,
+        /certified/gi,
+    ];
+    let sanitized = text;
+    for (const rx of patterns) {
+        sanitized = sanitized.replace(rx, '');
+    }
+    return sanitized.replace(/\n\s*\n+/g, '\n').trim();
+}
+
 // ── POST /api/video-studio/ugc-pro/analyze-product ──
 // MCoT product grounding — URL or text + optional product images
 router.post('/ugc-pro/analyze-product', protect, ugcUpload.array('productImages', 8), async (req, res) => {
@@ -3212,7 +3240,7 @@ router.post('/ugc-pro/analyze-product', protect, ugcUpload.array('productImages'
         // Run MCoT product grounding node — pass scraped text so node skips its own web_search
         const state = await ugcProductGroundingNode({
             productUrl: null, // Already scraped — prevent duplicate fetch inside the node
-            productText: scrapedProductText,
+            productText: sanitizeScrapedText(scrapedProductText),
             productImageUrls,
             brandId,
             userId: req.user._id,
@@ -3397,6 +3425,80 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), aiGe
         console.log(`[UGC Generate] Final prompt @image check — @image1: ${prompt.includes('@image1')}, @image2: ${prompt.includes('@image2')}`);
         console.log(`[UGC Generate] Submitting — ${duration}s, model=${selectedModel}, ${imageUrls.length} images, prompt ${prompt.split(/\s+/).length}w`);
 
+        const isLongForm = (selectedModel === 'gemini-flash' && duration > 10) ||
+                           ((selectedModel === 'seedance-2.0' || selectedModel === 'seedance-2.0-fast') && duration > 15);
+
+        if (isLongForm) {
+            console.log(`[UGC Generate] Routing to LONG-FORM generation: duration=${duration}s, model=${selectedModel}`);
+            const allRefImages = selectedModel === 'gemini-flash' ? imageUrls.slice(0, 7) : imageUrls.slice(0, 9);
+            const longFormRefs = allRefImages.map((url, idx) => ({
+                url,
+                role: idx === 0 ? 'avatar' : 'product'
+            }));
+
+            // Create temporary/skeleton project first so startStoryboardLongForm can auto-persist to it
+            const project = await VideoProject.create({
+                user: req.user._id,
+                brand: brandId,
+                studioMode: 'ugc-pro',
+                status: 'generating',
+                script: prompt,
+                backendPrompt: prompt,
+                input: { images: imageUrls.map(url => ({ url, source: 'existing' })), productData: parsedProduct },
+                generation: {
+                    provider: 'atlascloud',
+                    model: selectedModel,
+                    language: parsedSettings.language || 'English',
+                    bgmPreset: parsedSettings.bgmPreset || req.body.bgmPreset || 'cinematic',
+                    duration,
+                    aspectRatio,
+                    resolution,
+                    progress: 0,
+                    status: 'GENERATING'
+                }
+            });
+
+            const jobId = startStoryboardLongForm({
+                projectId: project._id,
+                userId: req.user._id,
+                imageUrl: imageUrls[0] || null,
+                firstFrameUrl: imageUrls[0] || null,
+                videoPrompt: prompt,
+                totalDuration: duration,
+                format: aspectRatio,
+                resolution,
+                referenceImages: longFormRefs,
+                model: selectedModel,
+                qualityMode: quality === 'high' ? 'quality' : 'fast',
+                voiceoverScript: '', // Will run UGC voiceover pipeline post-generation
+                voiceoverLanguage: parsedSettings.language || 'English',
+                bgmPreset: parsedSettings.bgmPreset || req.body.bgmPreset || 'cinematic',
+            });
+
+            // Update project with jobId
+            project.generation.taskId = jobId;
+            project.generation.requestId = jobId;
+            project.generation.falRequestId = jobId;
+            project.storyboard = {
+                longFormJobId: jobId,
+                status: 'animating',
+                totalDuration: duration,
+            };
+            await project.save();
+
+            return res.json({
+                success: true,
+                projectId: project._id,
+                requestId: jobId,
+                provider: 'atlascloud',
+                model: selectedModel,
+                prompt,
+                imageCount: imageUrls.length,
+                duration,
+                aspectRatio,
+            });
+        }
+
         let genResult;
         let usedProvider;
 
@@ -3465,6 +3567,7 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), aiGe
                 provider: usedProvider,
                 model: selectedModel,
                 language: parsedSettings.language || 'English',
+                bgmPreset: parsedSettings.bgmPreset || req.body.bgmPreset || 'cinematic',
                 taskId: genResult.taskId,
                 requestId: genResult.taskId,
                 duration,
@@ -3505,6 +3608,102 @@ router.get('/ugc-pro/status/:requestId', protect, async (req, res) => {
         const project = await VideoProject.findOne({
             $or: [{ 'generation.falRequestId': requestId }, { 'generation.requestId': requestId }, { 'generation.taskId': requestId }]
         });
+
+        if (requestId.startsWith('sb-lf-')) {
+            const jobStatus = getStoryboardLongFormJobStatus(requestId);
+            if (jobStatus) {
+                if (jobStatus.status === 'FAILED') {
+                    if (project) {
+                        await VideoProject.findByIdAndUpdate(project._id, {
+                            'generation.status': 'FAILED',
+                            'generation.error': jobStatus.error || 'Long-form generation failed',
+                            status: 'failed'
+                        });
+                    }
+                    return res.json({
+                        success: true,
+                        status: 'FAILED',
+                        error: jobStatus.error || 'Long-form generation failed',
+                        progress: jobStatus.progress
+                    });
+                }
+                if (jobStatus.status === 'COMPLETED') {
+                    let finalVideoUrl = jobStatus.videoUrl;
+                    try {
+                        const s3VideoUrl = await ensureS3Url(finalVideoUrl, `ugc-pro/gen-video-${Date.now()}.mp4`);
+                        if (s3VideoUrl) finalVideoUrl = s3VideoUrl;
+                    } catch (mirrorErr) {
+                        console.warn(`[UGC Pro Status] S3 mirror failed: ${mirrorErr.message}`);
+                    }
+
+                    const updatePayload = {
+                        'generation.progress': 100,
+                        'generation.status': 'COMPLETED',
+                        'generation.videoUrl': finalVideoUrl,
+                        status: 'done',
+                        finalVideoUrl
+                    };
+
+                    const updatedProject = await VideoProject.findOneAndUpdate(
+                        { _id: project._id },
+                        { $set: updatePayload },
+                        { returnDocument: 'after' }
+                    );
+
+                    // Trigger Voiceover pipeline if needed
+                    if (updatedProject && updatedProject.generation?.language && !updatedProject.generation?.voiceoverStatus) {
+                        console.log(`🎤 [TTS] Triggering UGC Pro voiceover pipeline for project ${updatedProject._id} (lang: ${updatedProject.generation.language})`);
+                        addVoiceoverToProject(updatedProject).catch(e => console.error(`🎤 [TTS] UGC Pro voiceover failed: ${e.message}`));
+                    }
+
+                    return res.json({
+                        success: true,
+                        status: 'COMPLETED',
+                        videoUrl: finalVideoUrl,
+                        progress: 100
+                    });
+                }
+                // Still in progress
+                if (project) {
+                    await VideoProject.findByIdAndUpdate(project._id, {
+                        'generation.progress': jobStatus.progress || 10,
+                        'generation.status': 'GENERATING'
+                    });
+                }
+                return res.json({
+                    success: true,
+                    status: 'IN_PROGRESS',
+                    progress: jobStatus.progress || 10,
+                    phase: jobStatus.phase,
+                    phaseLabel: jobStatus.phaseLabel,
+                    detail: jobStatus.detail
+                });
+            } else {
+                // Not in memory
+                if (project && project.status === 'done' && project.finalVideoUrl) {
+                    return res.json({
+                        success: true,
+                        status: 'COMPLETED',
+                        videoUrl: project.finalVideoUrl,
+                        progress: 100
+                    });
+                }
+                if (project && project.status === 'failed') {
+                    return res.json({
+                        success: true,
+                        status: 'FAILED',
+                        error: project.generation?.error || 'Failed',
+                        progress: project.generation?.progress || 0
+                    });
+                }
+                return res.json({
+                    success: true,
+                    status: 'IN_PROGRESS',
+                    progress: project?.generation?.progress || 10
+                });
+            }
+        }
+
         const provider = project?.generation?.provider || 'atlascloud';
 
         const result = await getUnifiedGenerationStatus(provider, requestId, project?.generation?.statusUrl, project?.generation?.resultUrl);
@@ -3540,11 +3739,10 @@ router.get('/ugc-pro/status/:requestId', protect, async (req, res) => {
             { returnDocument: 'after' }
         ).catch(e => { console.warn('[UGC Pro Status] DB update failed:', e.message); return null; });
 
-        // 🎤 Trigger async voiceover pipeline for non-English completed videos
+        // 🎤 Trigger async voiceover pipeline for completed videos
         if (result.status === 'COMPLETED' && updatedProject) {
             console.log(`[UGC Pro Status] ✅ DB updated: project=${updatedProject._id}, status=${updatedProject.status}`);
             if (updatedProject.generation?.language &&
-                updatedProject.generation.language.toLowerCase() !== 'english' &&
                 !updatedProject.generation?.voiceoverStatus) {
                 console.log(`🎤 [TTS] Triggering UGC Pro voiceover pipeline for project ${updatedProject._id} (lang: ${updatedProject.generation.language})`);
                 addVoiceoverToProject(updatedProject).catch(e => console.error(`🎤 [TTS] UGC Pro voiceover failed: ${e.message}`));
@@ -4048,27 +4246,56 @@ async function muxVideoWithAudio(videoUrl, audioUrl = null, bgmUrl = null) {
             else console.warn(`⚠️ [FFmpeg] Failed to download BGM, proceeding without it.`);
         }
 
+        // Probe for native audio stream
+        let hasNativeAudio = false;
+        try {
+            const { stdout } = await execFileAsync('ffprobe', [
+                '-v', 'quiet',
+                '-select_streams', 'a',
+                '-show_entries', 'stream=codec_type',
+                '-of', 'csv=p=0',
+                videoPath
+            ]);
+            hasNativeAudio = stdout.trim().includes('audio');
+            console.log(`🎬 [FFmpeg] Probe result hasNativeAudio: ${hasNativeAudio}`);
+        } catch (probeErr) {
+            console.warn(`⚠️ [FFmpeg] ffprobe failed (assuming no native audio):`, probeErr.message);
+        }
+
         const ffmpegArgs = ['-y', '-i', videoPath];
 
-        if (audioUrl && fs.existsSync(audioPath) && bgmUrl && fs.existsSync(bgmPath)) {
-            // Both Voiceover and BGM
-            ffmpegArgs.push('-i', audioPath);
-            ffmpegArgs.push('-stream_loop', '-1', '-i', bgmPath);
-            ffmpegArgs.push('-filter_complex', '[1:a]volume=1.5[vo];[2:a]volume=0.15[bgm];[vo][bgm]amix=inputs=2:duration=longest[aout]');
-            ffmpegArgs.push('-map', '0:v:0', '-map', '[aout]');
-        } else if (audioUrl && fs.existsSync(audioPath)) {
-            // Only Voiceover
-            ffmpegArgs.push('-i', audioPath);
-            ffmpegArgs.push('-map', '0:v:0', '-map', '1:a:0');
-            ffmpegArgs.push('-filter:a', 'volume=1.5');
-        } else if (bgmUrl && fs.existsSync(bgmPath)) {
-            // Only BGM
-            ffmpegArgs.push('-stream_loop', '-1', '-i', bgmPath);
-            ffmpegArgs.push('-map', '0:v:0', '-map', '1:a:0');
-            ffmpegArgs.push('-filter:a', 'volume=0.20');
+        if (hasNativeAudio) {
+            // Video has native audio. Preserve it and mix with voiceover if available.
+            if (audioUrl && fs.existsSync(audioPath)) {
+                ffmpegArgs.push('-i', audioPath);
+                ffmpegArgs.push('-filter_complex', '[0:a]volume=0.8[bg];[1:a]volume=1.5[vo];[bg][vo]amix=inputs=2:duration=longest[aout]');
+                ffmpegArgs.push('-map', '0:v:0', '-map', '[aout]');
+            } else {
+                console.log(`🎬 [FFmpeg] Preserving native audio, no voiceover to mix.`);
+                return videoUrl;
+            }
         } else {
-            // No audio to mux, just return the original video URL
-            return videoUrl;
+            // Video has no native audio (silent)
+            if (audioUrl && fs.existsSync(audioPath) && bgmUrl && fs.existsSync(bgmPath)) {
+                // Both Voiceover and BGM
+                ffmpegArgs.push('-i', audioPath);
+                ffmpegArgs.push('-stream_loop', '-1', '-i', bgmPath);
+                ffmpegArgs.push('-filter_complex', '[1:a]volume=1.5[vo];[2:a]volume=0.15[bgm];[vo][bgm]amix=inputs=2:duration=longest[aout]');
+                ffmpegArgs.push('-map', '0:v:0', '-map', '[aout]');
+            } else if (audioUrl && fs.existsSync(audioPath)) {
+                // Only Voiceover
+                ffmpegArgs.push('-i', audioPath);
+                ffmpegArgs.push('-map', '0:v:0', '-map', '1:a:0');
+                ffmpegArgs.push('-filter:a', 'volume=1.5');
+            } else if (bgmUrl && fs.existsSync(bgmPath)) {
+                // Only BGM
+                ffmpegArgs.push('-stream_loop', '-1', '-i', bgmPath);
+                ffmpegArgs.push('-map', '0:v:0', '-map', '1:a:0');
+                ffmpegArgs.push('-filter:a', 'volume=0.20');
+            } else {
+                // No audio to mux, just return the original video URL
+                return videoUrl;
+            }
         }
 
         ffmpegArgs.push('-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-shortest', '-movflags', '+faststart', outputPath);
@@ -4286,7 +4513,7 @@ router.get('/ugc-pro/qads/v2/status/:requestId', protect, async (req, res) => {
                 // 🎤 Trigger async voiceover pipeline for completed videos
                 // Fire-and-forget: the response returns immediately with the raw video.
                 // The muxed video (with voiceover) replaces it once TTS+FFmpeg completes.
-                if (result.status === 'COMPLETED' && updatedProject.generation?.language && updatedProject.generation.language.toLowerCase() !== 'english' && !updatedProject.generation?.voiceoverStatus) {
+                if (result.status === 'COMPLETED' && updatedProject.generation?.language && !updatedProject.generation?.voiceoverStatus) {
                     console.log(`🎤 [TTS] Triggering async voiceover pipeline for project ${updatedProject._id} (lang: ${updatedProject.generation.language})`);
                     addVoiceoverToProject(updatedProject).catch(e => console.error(`🎤 [TTS] Background voiceover failed: ${e.message}`));
                 }
@@ -4661,6 +4888,7 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
                     provider: genResult.provider || 'atlascloud',
                     model: finalModel, // Ensure the selected final model is saved
                     language: parsedSettings.language || 'English',
+                    bgmPreset: parsedSettings.bgmPreset || req.body.bgmPreset || 'cinematic',
                     falRequestId: genResult.requestId || genResult.taskId || genResult.falRequestId,
                     taskId: genResult.requestId || genResult.taskId || genResult.falRequestId,
                     requestId: genResult.requestId || genResult.taskId || genResult.falRequestId,
@@ -7929,6 +8157,7 @@ async function generateAnimateVideoPrompt({
     firstFrameIsAvatar = false, // true when avatar is used as first frame (no product images)
     structuredPlan = null,     // 4-section storyboard plan from DB (new)
     includeBranding = true,    // when false: strip all brand CTA, logo, brand context
+    model = 'seedance-2.0',    // default model
 }) {
     // Enforce branding toggle
     if (!includeBranding) {
@@ -8035,7 +8264,28 @@ The environment (${structuredPlan.environmentFingerprint}) must remain visually 
 
     const openingInstruction = 'Use the attached storyboard image (@image2) as the VISUAL STYLE REFERENCE ONLY. Do NOT open the video with this storyboard grid — the video must open with @image1.';
 
-    const systemPrompt = `You are a world-class AI Film Director specializing in writing video generation prompts for Seedance / Atlas video AI models.
+    const isGeminiFlash = model === 'gemini-flash';
+
+    const systemPrompt = isGeminiFlash
+        ? `You are a world-class AI Film Director specializing in writing video generation prompts for Google Gemini Omni Flash Image-to-Video.
+
+Your task: Write a single, continuous cinematic narrative prose prompt (NOT a shot list) that will animate an approved storyboard into a high-end commercial video.
+
+CRITICAL PROMPT RULES:
+1. MUST start with: "${openingInstruction}"
+2. The video OPENS with @image1 (${firstFrameIsAvatar ? 'the presenter/avatar' : 'the product image'}) as the first frame.
+3. Use @imageN tags precisely. The mapping is:
+${tagMap.map(t => `   ${t}`).join('\n')}
+4. Write ONE continuous cinematic narrative prose describing the scene-by-scene action. Use camera terms: slow push-in, handheld, overhead pan, rack-focus.
+5. MANDATORY DIALOGUES: Write all spoken dialogues / voiceover in ${dialogueLanguage} script directly inside the prompt.
+6. Specify timing for the cuts in the narrative prose.
+7. Describe product interaction: how the product is handled, held, or shown.
+${brandingRule}
+9. 300–600 words. Extremely specific. Directly executable by Gemini Omni Flash.
+10. Return ONLY the raw video prompt text. No JSON, no markdown, no explanation.
+11. NO TEXT OR LOGO RENDERING (CRITICAL): Do not describe specific text, letters, slogans, or logos on the product, screen, or background. Describe packaging and labels generically (e.g. "a sleek amber glass bottle with a clean white label", NOT "says 'GLOW' on the front"). Video generation models fail at rendering written text and instead produce garbled, hallucinatory letter-like shapes. Keep all scenes, products, and backgrounds completely text-free and logo-free.
+12. CRITICAL DESIGN AND COLOR FIDELITY: You must explicitly instruct the video AI model to preserve the original product design, shape, colors, branding, labels, and packaging details exactly as shown in the reference image. Under no circumstances should the product's colors, branding, or design elements be altered, simplified, or stylized. The brand colors must only be applied to the environment, background, or graphics, never to recolor or color-shift the product itself.`
+        : `You are a world-class AI Film Director specializing in writing video generation prompts for Seedance / Atlas video AI models.
 
 Your task: Write a single, richly detailed, cinematic VIDEO PROMPT that will animate an approved storyboard into a high-end commercial video.
 
@@ -8325,6 +8575,7 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                 firstFrameIsAvatar,
                 structuredPlan: dbStructuredPlan,
                 includeBranding: dbIncludeBranding,  // respect brand toggle
+                model, // selected model
             });
             console.log(`[Storyboard Animate] Video prompt (first 120): ${finalVideoPrompt.substring(0, 120)}...`);
             if (projectId) {

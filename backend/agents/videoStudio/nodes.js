@@ -1195,7 +1195,7 @@ async function _buildGeminiFlashUGCPrompt(state) {
         `- Visual Appearance: ${product.productAppearance || product.texture || 'as shown in reference image'}`,
         `- How It Is Held/Used On Camera: ${product.productHandling || 'held in hands'}`,
         `- Problem It Solves: ${product.problemSolved || ''}`,
-        `- Ideal Environment: ${product.idealEnvironment || settings.environment || 'home'}`,
+        `- Product Natural Context: ${product.idealEnvironment || 'home'}`,
         product.tagline ? `- Product Tagline: ${product.tagline}` : '',
         '',
         `GENERATION SETTINGS:`,
@@ -1203,6 +1203,7 @@ async function _buildGeminiFlashUGCPrompt(state) {
         `- Mood: ${settings.mood || 'authentic'}`,
         `- Environment: ${settings.environment || product.idealEnvironment || 'home'}`,
         `- Hook Shot: ${hookShot ? 'YES — open with a quirky/funny moment involving the product' : 'NO'}`,
+        `- Opening Hook Style: ${settings.hookStyle || 'bold_claim'}`,
         `- Aspect Ratio: ${settings.aspectRatio || '9:16'}`,
         `- CTA: ${settings.cta || 'Shop now'}`,
         `- Spoken Language: ${settings.language || 'English'}`,
@@ -1219,9 +1220,10 @@ async function _buildGeminiFlashUGCPrompt(state) {
     ].filter(Boolean).join('\n');
 
     const result = await agentUtils.callAgentText(
-        UGC_GEMINI_PROMPT_BUILDER_PROMPT(brandContext, { hookShot }),
+        UGC_GEMINI_PROMPT_BUILDER_PROMPT(brandContext, settings, { hookShot }),
         userPrompt,
         0.45, 4096,
+        { provider: 'anthropic' } // Route to high-end Claude model for quality prompt construction
     );
 
     let prompt = typeof result === 'string' ? result : (result?.raw || result?.text || JSON.stringify(result));
@@ -1317,9 +1319,10 @@ async function _buildSeedanceUGCPrompt(state) {
     ].filter(Boolean).join('\n');
 
     const result = await agentUtils.callAgentText(
-        UGC_PROMPT_BUILDER_PROMPT(brandContext, { hookShot }),
+        UGC_PROMPT_BUILDER_PROMPT(brandContext, settings, { hookShot }),
         userPrompt,
         0.4, 2048,
+        { provider: 'anthropic' } // Route to high-end Claude model for quality prompt construction
     );
 
     // callAgent may return parsed JSON or raw string
