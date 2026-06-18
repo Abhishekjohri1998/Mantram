@@ -2239,6 +2239,114 @@ Return ONLY the brief text — no JSON, no bullet points. Write it as a clear in
     });
 });
 
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /agent/v2/chat — NLP Intent Engine
+// User sends any free-form message mid-pipeline; AI classifies intent and
+// returns { intent, action, params, agentResponse } so the frontend can route
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/agent/v2/chat', protect, async (req, res) => {
+    try {
+        const { sessionId, stage, message, planContext = {}, storyboardContext = {}, analysisContext = {} } = req.body;
+        if (!message?.trim()) return res.status(400).json({ success: false, error: 'No message provided' });
+
+        const { callAgent } = await import('../agents/shared/agentUtils.js');
+
+        // ── Load session for context ─────────────────────────────────────────
+        let sessionDoc = null;
+        if (sessionId) {
+            const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
+            sessionDoc = await VideoAgentSession.findById(sessionId).lean();
+        }
+
+        const brandName = sessionDoc?.brandName || planContext?.brandName || 'the brand';
+        const currentPlan = sessionDoc?.plan || planContext || {};
+        const currentStoryboard = sessionDoc?.storyboard || storyboardContext || {};
+        const currentAnalysis = sessionDoc?.analysis || analysisContext || {};
+
+        const MODEL_IDS = ['seedance-2.0', 'kling-3.0', 'veo-3.1', 'veo-3.1-fast', 'grok-imagine', 'gemini-flash'];
+
+        const systemPrompt = `You are Mantram's AI Video Director — an expert creative director and AI video strategist.
+
+You are having a conversation with a user who is creating a video ad. The pipeline has distinct stages:
+- analyze: Brief analyzed, awaiting plan generation
+- plan: Creative plan shown, awaiting ref image generation  
+- refs-review: Reference images shown, awaiting user approval
+- storyboard: Storyboard building or shown, awaiting model selection
+- model: Model selected, awaiting generation
+- generate: Video generating or done
+
+CURRENT STATE:
+- Stage: ${stage}
+- Brand: ${brandName}
+- Plan title: ${currentPlan.title || 'not yet created'}
+- Duration: ${currentPlan.duration || 'unknown'}s
+- Ratio: ${currentPlan.ratio || 'unknown'}
+- Video type: ${currentPlan.videoType || 'unknown'}
+- Recommended model: ${currentPlan.modelRecommendation || 'seedance-2.0'}
+- Style: ${currentPlan.styleGuide || 'unknown'}
+- Scene count: ${currentStoryboard.cuts?.length || 'not created yet'}
+
+AVAILABLE MODELS: ${MODEL_IDS.join(', ')}
+
+INTENT CLASSIFICATION RULES:
+- APPROVE: User is happy, agrees, wants to proceed — "looks good", "yes", "perfect", "let's go", "great", "approve", "proceed", "next", "continue", "go ahead", "fire", "do it", "nice", "love it", emoji only like 👍✅
+- MODIFY_PLAN: User wants to change something about the plan — duration, ratio, type, style, audience, etc.
+- SWITCH_MODEL: User mentions a specific model name or says "use X instead"
+- ADD_CONTEXT: User wants to add more info to the brief — product details, brand info, references
+- ASK_QUESTION: User is asking something, confused, wants explanation
+- START_OVER: User wants to reset and start fresh — "start over", "reset", "different product", "scratch"
+- GENERATE_NOW: User explicitly wants to skip to generation — "just generate", "make the video now", "skip"
+- AMBIGUOUS: Message is unclear, cannot classify
+
+Extract parameters when relevant:
+- For MODIFY_PLAN: extract { duration, ratio, videoType, style, audience } — only include what changed
+- For SWITCH_MODEL: extract { model } — map to one of: ${MODEL_IDS.join(', ')}
+- For ADD_CONTEXT: extract { additionalContext } — the new info to add
+
+Write agentResponse as a real, warm creative director:
+- For APPROVE: excited acknowledgment + describe what you're doing next
+- For MODIFY_PLAN: confirm the change + describe adjustment  
+- For SWITCH_MODEL: explain why that model is good/trade-offs
+- For ASK_QUESTION: answer naturally and helpfully
+- For START_OVER: acknowledge and confirm reset
+- Keep it SHORT — 1-2 sentences max. No bullet lists. First person. Warm, expert, not robotic.
+
+EXAMPLES:
+User "looks amazing!": { intent: "APPROVE", agentResponse: "Love it! Generating your reference images now — character, product, and set design." }
+User "make it 60 seconds": { intent: "MODIFY_PLAN", params: { duration: 60 }, agentResponse: "60 seconds — gives us room for a proper narrative arc. Rebuilding the plan now." }
+User "use Kling for this": { intent: "SWITCH_MODEL", params: { model: "kling-3.0" }, agentResponse: "Kling 3.0 it is — great choice for cinematic multi-shot work. Rewriting the prompt for Kling's syntax." }
+User "what's the difference between models?": { intent: "ASK_QUESTION", agentResponse: "Seedance 2.0 is fastest and great for most ads. Kling 3.0 gives the most cinematic quality. Veo 3.1 adds native audio. Grok is fastest for short reels." }
+User "actually make it vertical for Instagram": { intent: "MODIFY_PLAN", params: { ratio: "9:16" }, agentResponse: "Switching to 9:16 vertical — perfect for Instagram Reels and TikTok. Adjusting the scene compositions." }
+
+Return ONLY valid JSON: { "intent": "...", "params": {}, "agentResponse": "..." }`;
+
+        const userPrompt = `User message: "${message}"
+
+What is the intent? Return the JSON.`;
+
+        let result;
+        try {
+            result = await callAgent(systemPrompt, userPrompt, 0.3, 512);
+        } catch (err) {
+            console.warn('[VideoAgent/chat] Intent classification failed:', err.message);
+            result = { intent: 'AMBIGUOUS', params: {}, agentResponse: "I got that! Could you be a bit more specific so I can take the right action?" };
+        }
+
+        // Ensure result has required fields
+        const intent = result?.intent || 'AMBIGUOUS';
+        const params = result?.params || {};
+        const agentResponse = result?.agentResponse || "Got it! What would you like to do next?";
+
+        console.log(`[VideoAgent/chat] stage=${stage} msg="${message.substring(0,40)}" → intent=${intent}`);
+
+        res.json({ success: true, intent, params, agentResponse });
+
+    } catch (error) {
+        console.error('[VideoAgent/chat] Error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
 router.post('/compile', protect, async (req, res) => {
     const fs = await import('fs');
     const path = await import('path');
