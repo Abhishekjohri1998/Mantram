@@ -1080,8 +1080,8 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
                             }))
                             if (status === 'done' || status === 'failed') {
                                 clearInterval(pollRefs.current[vid])
-                                // 🎤 For non-English languages, keep polling briefly for voiceover mux
-                                if (status === 'done' && language && language.toLowerCase() !== 'english') {
+                                // 🎤 Keep polling briefly for voiceover/BGM muxing
+                                if (status === 'done' && language) {
                                     setVideoJobs(prev => ({ ...prev, [vid]: { ...prev[vid], voiceoverStatus: 'processing' } }))
                                     let voPollCount = 0
                                     const maxVoPolls = 12 // 60 seconds max (12 x 5s)

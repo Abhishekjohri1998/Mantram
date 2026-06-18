@@ -160,7 +160,7 @@ function EntryPanel({ entry, onClose, onReschedule }) {
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
-export default function BrandCalendar() {
+export default function BrandCalendar({ embedded = false }) {
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
     const { activeBrand } = useBrand()
@@ -245,11 +245,9 @@ export default function BrandCalendar() {
         })
     }
 
-    return (
-        <DashboardLayout title="Brand Calendar" subtitle="One unified calendar — every studio, every post">
-            <SEOHead title="Brand Calendar — Mantram AI" noIndex={true} />
-
-            <div className="p-4 lg:p-6 max-w-7xl mx-auto space-y-5">
+    const calendarContent = (
+        <>
+            <div className={embedded ? "space-y-5" : "p-4 lg:p-6 max-w-7xl mx-auto space-y-5"}>
 
                 {/* ── Stats row ── */}
                 <div className="grid grid-cols-3 gap-3">
@@ -462,6 +460,17 @@ export default function BrandCalendar() {
                     to   { opacity:1; transform:translateY(0); }
                 }
             `}</style>
+        </>
+    )
+
+    if (embedded) {
+        return calendarContent
+    }
+
+    return (
+        <DashboardLayout title="Brand Calendar" subtitle="One unified calendar — every studio, every post">
+            <SEOHead title="Brand Calendar — Mantram AI" noIndex={true} />
+            {calendarContent}
         </DashboardLayout>
     )
 }

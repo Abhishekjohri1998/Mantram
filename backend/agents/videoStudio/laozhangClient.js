@@ -293,6 +293,21 @@ export async function laozhangGptImageWithRefs(prompt, imageUrls = [], { model =
     let refMimeType = 'image/png';
     for (const url of imageUrls) {
         if (!url) continue;
+        if (url.startsWith('data:')) {
+            try {
+                const match = url.match(/^data:([^;]+);base64,(.+)$/);
+                if (match) {
+                    refMimeType = match[1];
+                    refBuffer = Buffer.from(match[2], 'base64');
+                    console.log(`   ✅ Parsed base64 data URI directly (${Math.round(refBuffer.length / 1024)}KB)`);
+                    break;
+                }
+            } catch (e) {
+                console.warn(`   ⚠️ Base64 parse error: ${e.message}`);
+            }
+            continue;
+        }
+
         try {
             const r = await fetch(url, fetchOptions({
                 headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' }

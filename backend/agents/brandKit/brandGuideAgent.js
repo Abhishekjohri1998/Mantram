@@ -480,6 +480,7 @@ export async function generateBrandGuide({ brandId, brief, briefBrand, imageMode
         assets: [{
             name: 'Brand Style Guide',
             assetSubType: 'brand-guide',
+            htmlContent: html,
             hostedUrl,
             format: 'html',
             thumbnailUrl: null,

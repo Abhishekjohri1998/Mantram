@@ -64,5 +64,34 @@
   - The API privacy level for v2 is `PUBLIC_TO_EVERYONE`, not `PUBLIC` (which was an older value and gets rejected).
   - Verify account permissions and visibility settings dynamically via the creator info query endpoint (`/v2/post/publish/creator_info/query/`) to see supported configurations.
 
+### Brand Kit Studio — Identity System & Safe Credit Routing (Sprint 8)
+- **Feature**: Identity System boards, data URI upload handling, visual consistency pipeline, and secure credit deduction routing.
+- **Goal**: Enable users to upload existing logos or generate new ones, produce visually unified identity system boards (logo variations, palette swatches, type specimens) via `gpt-image-2`, and ensure all marks, stamps, and collateral mockups look like direct visual derivatives of the primary brand logo.
+- **Workflow**:
+  - `identityAgent.js` maps `existingLogoUrl` (supporting user uploads and pre-existing database `brand.dna.logo.url`) to Claude Art Director to engineer hyper-specific prompts.
+  - **Visual Consistency Pipeline**: If no logo exists, the system runs in two stages:
+    1. Generates the primary `identity-system-light` board via text-to-image.
+    2. Mirrors the board to S3, extracts the URL, and uses it as the reference image (`lightBoardRefUrl`) to generate the remaining 4 assets (`identity-system-dark`, `identity-collateral`, `logo-icon-mark`, `brand-stamp`) in parallel.
+  - Image generation utilizes `laozhangGptImageWithRefs` (with image reference) or `laozhangImageGenerate` (without reference).
+  - In `laozhangClient.js`, `data:` URIs are parsed directly in-memory to base64 buffers rather than fetched, preventing network failures when using base64 uploaded files.
+  - The `/wizard/generate` route is protected by verifying `identityResult`'s success before deducting credits from the user's account.
+- **Learnings / Gotchas**:
+  - Generating multiple visual identity assets in parallel from pure text leads to wild stylistic drift (completely different logo shapes and motifs). Generating the primary light system board first and passing it as a reference image to subsequent generations ensures absolute brand alignment.
+  - Pre-parsing data URIs locally in memory avoids network exceptions and prevents fallback to lower-quality models.
+  - If a brand already has a pre-existing logo in the database DNA, the agent must resolve it as the default `activeLogoUrl` (even if not passed in the request body) to prevent generating a new logo from scratch.
 
-
+### Brand Kit Studio — Identity Context Propagation to All Studios (Sprint 8 follow-up)
+- **Problem**: Stationery, Brand Guide, and Collection were generating assets completely disconnected from the brand's generated identity. They used plain text-to-image with no logo reference, causing every section to look like a different brand.
+- **Root Cause (4 bugs)**:
+  1. `runArtDirector()` resolved `activeLogoUrl` from DB/request internally but **never returned it** to callers — so stationery/collection had no access to it.
+  2. `stationeryAgent.js` always called `laozhangImageGenerate()` (text-only) — never the reference-image mode.
+  3. `collectionAgent.js` same problem — `laozhangImageGenerate()` only.
+  4. Wizard ran identity + stationery + guide in `Promise.allSettled()` **simultaneously** — stationery started generating before the logo even existed.
+- **Fix Architecture**:
+  - `artDirectorAgent.js` — Added `activeLogoUrl` to the return object so every caller can use it.
+  - `stationeryAgent.js` — Now uses `laozhangGptImageWithRefs(prompt, [activeLogoUrl])` when a logo exists; graceful text-only fallback when not.
+  - `collectionAgent.js` — Same pattern: reference-image mode when logo available.
+  - `brandGuideAgent.js` — Accepts `existingLogoUrl`, passes it to Art Director, and renders the actual brand identity image in the HTML Logo Usage section (not a blank placeholder).
+  - `brand-kit.js` (Wizard) — **Sequential pipeline**: identity runs first → `logo-icon-mark` URL extracted → stationery + guide run in parallel, both receiving the logo URL as `existingLogoUrl`.
+- **Key Pattern**: Every agent now follows: `existingLogoUrl (caller override)` → `resolvedLogoUrl (from artDirector/DB)` → `null (text-only fallback)`. This ensures the brand identity is always the visual source-of-truth.
+- **Verification**: 14/14 automated checks passed, server restarted cleanly.

@@ -1,3 +1,16 @@
+/**
+ * VideoAgent — AI-Directed Smart Chat
+ *
+ * Architecture:
+ *   - Single `messages[]` array drives the entire chat history
+ *   - User can type ANYTHING at any stage — NLP intent engine classifies it
+ *   - Intent routes to pipeline actions (APPROVE, MODIFY_PLAN, SWITCH_MODEL, etc.)
+ *   - Stage-based cards render inline in the chat as rich interactive elements
+ *   - Input bar always visible — 3 separate file inputs (no dynamic accept changes)
+ *
+ * Backend: POST /agent/v2/chat → { intent, params, agentResponse }
+ */
+
 import { useState, useEffect, useRef } from 'react'
 import VideoHoverActions from './VideoHoverActions'
 
@@ -13,958 +26,1019 @@ async function api(path, opts = {}) {
     return data
 }
 
-// Quick-start templates
-const QUICK_PROMPTS = [
-    { icon: '🛍️', label: 'Product Ad', prompt: 'Create a 30-second product ad with close-up shots, lifestyle usage, and a strong call-to-action ending' },
-    { icon: '📱', label: 'Social Reel', prompt: 'Create a vertical 15s social media reel with trendy transitions and engaging hook' },
-    { icon: '🎥', label: 'Brand Story', prompt: 'Create a 1-minute brand story film with emotional narrative, cinematic visuals, and voiceover' },
-    { icon: '🚀', label: 'Launch Video', prompt: 'Create a product launch teaser video with reveal moments, dramatic lighting, and excitement' },
-    { icon: '📖', label: 'Explainer', prompt: 'Create a 45-second explainer video that educates viewers about the product features with clear visuals' },
-    { icon: '🎯', label: 'Testimonial', prompt: 'Create an authentic testimonial-style video with warm lighting and real-world product usage shots' },
+// ── Model reference ───────────────────────────────────────────────────────────
+const MODELS = [
+    { id: 'seedance-2.0',  name: 'Seedance 2.0', icon: '🎬', tier: 'Pro',     tagline: 'Best overall + fast',        maxDur: 120, color: '#14b8a6' },
+    { id: 'kling-3.0',     name: 'Kling 3.0',    icon: '👑', tier: 'Premium', tagline: 'Cinematic + multi-shot',     maxDur: 60,  color: '#f59e0b' },
+    { id: 'veo-3.1',       name: 'Veo 3.1',      icon: '🎤', tier: 'Ultra',   tagline: 'Native audio + realistic',   maxDur: 30,  color: '#8b5cf6' },
+    { id: 'veo-3.1-fast',  name: 'Veo Fast',     icon: '⚡', tier: 'Premium', tagline: 'Fast Veo + audio',           maxDur: 30,  color: '#6d28d9' },
+    { id: 'grok-imagine',  name: 'Grok Video',   icon: '🤖', tier: 'Fast',    tagline: 'Fastest for reels',          maxDur: 15,  color: '#ef4444' },
+    { id: 'gemini-flash',  name: 'Gemini Flash', icon: '✨', tier: 'Pro',     tagline: 'Motion graphics + animated', maxDur: 30,  color: '#3b82f6' },
 ]
 
-const MODEL_INFO = {
-    'kling-3.0': { name: 'Kling 3.0', icon: '👑', tier: 'Premium' },
-    'veo-3.1': { name: 'Veo 3.1', icon: '🎬', tier: 'Ultra' },
-    'seedance-2.0': { name: 'Seedance 2.0', icon: '🎥', tier: 'Pro' },
-    'hunyuan': { name: 'Hunyuan', icon: '🎨', tier: 'Draft' },
-    'grok-imagine': { name: 'Grok', icon: '🤖', tier: 'Fast' },
-    'happyhorse-1.0': { name: 'HappyHorse 1.0', icon: '🐴', tier: 'Pro' },
-    'gemini-flash': { name: 'Gemini Flash Video', icon: '⚡', tier: 'Pro' },
-}
+const STAGE_ORDER = ['analyze', 'plan', 'refs', 'refs-review', 'storyboard', 'model', 'generate', 'done']
 
-export default function VideoAgent({ activeBrand, canCreateVideo = true, onUpgradeRequired }) {
-    // Chat
-    const [messages, setMessages] = useState([{
-        role: 'agent', timestamp: Date.now(),
-        content: `🎬 Hey! I'm your Video Agent — describe the video you want and I'll handle everything.\n\n→ I know your brand, products, and images\n→ I'll write the script, pick scenes, generate each clip\n→ Add voiceover, music, and compile into final video\n\nSelect a product below or just type your vision!`,
-    }])
-    const [input, setInput] = useState('')
-
-    // Products & Brand Images
-    const [products, setProducts] = useState([])
-    const [brandImages, setBrandImages] = useState([])
-    const [selectedProduct, setSelectedProduct] = useState(null)
-    const [showProductPicker, setShowProductPicker] = useState(false)
-    const [refImages, setRefImages] = useState([])
-    const [characterPhoto, setCharacterPhoto] = useState(null) // { url, name }
-    const [audioFile, setAudioFile] = useState(null) // { url, name, file }
-    const [characterDesc, setCharacterDesc] = useState('') // User-defined character descriptions
-    const [showCharDesc, setShowCharDesc] = useState(false)
-    const fileRef = useRef(null)
-    const charFileRef = useRef(null)
-    const audioFileRef = useRef(null)
-
-    // Settings
-    const [voEnabled, setVoEnabled] = useState(true)
-    const [voProvider, setVoProvider] = useState('minimax')
-    const [musicEnabled, setMusicEnabled] = useState(false)
-    const [textOverlaysEnabled, setTextOverlaysEnabled] = useState(true)
-    const [overlayLanguage, setOverlayLanguage] = useState('english')
-    const [showSettingsPanel, setShowSettingsPanel] = useState(false)
-    const [overrideQuality, setOverrideQuality] = useState('')
-    const [overrideAspect, setOverrideAspect] = useState('')
-    const [videoModel, setVideoModel] = useState('auto') // auto, kling-3.0, veo-3.1, seedance-2.0, hunyuan, grok-imagine
-
-    // Generation state
-    const [generating, setGenerating] = useState(false)
-    const [pipeline, setPipeline] = useState(null)
-    const [sceneStatuses, setSceneStatuses] = useState({})
-    const [isThinking, setIsThinking] = useState(false)
-    const [currentSessionId, setCurrentSessionId] = useState(null)
-    const [generatingFrames, setGeneratingFrames] = useState(false)
-
-    const chatEndRef = useRef(null)
-    const pollRef = useRef(null)
-
-    // Auto-scroll
-    useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
-    useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
-
-    // Load products when brand changes
-    useEffect(() => {
-        if (!activeBrand?._id) { setProducts([]); setBrandImages([]); return }
-        api(`/video-studio/agent/products?brandId=${activeBrand._id}`)
-            .then(data => {
-                setProducts(data.products || [])
-                setBrandImages(data.brandImages || [])
-            })
-            .catch(err => console.warn('Failed to load products:', err))
-    }, [activeBrand?._id])
-
-    // ── Upload reference images (store File, create object URL for preview) ──
-    function handleImageUpload(e) {
-        const files = Array.from(e.target.files || [])
-        files.forEach(file => {
-            const objectUrl = URL.createObjectURL(file)
-            setRefImages(prev => [...prev.slice(-4), { url: objectUrl, name: file.name, file }])
-        })
-        e.target.value = ''
-    }
-
-    // ── Upload character/model photo (store File, create object URL for preview) ──
-    function handleCharacterUpload(e) {
-        const file = e.target.files?.[0]
-        if (!file) return
-        const objectUrl = URL.createObjectURL(file)
-        setCharacterPhoto({ url: objectUrl, name: file.name, file })
-        e.target.value = ''
-    }
-
-    // ── Upload audio file (VO, music, etc.) ──
-    function handleAudioUpload(e) {
-        const file = e.target.files?.[0]
-        if (!file) return
-        // Revoke old object URL to prevent memory leak
-        if (audioFile?.url) URL.revokeObjectURL(audioFile.url)
-        const objectUrl = URL.createObjectURL(file)
-        setAudioFile({ url: objectUrl, name: file.name, file })
-        setVoEnabled(false)
-        setMusicEnabled(false)
-        e.target.value = ''
-    }
-
-    // ── Send prompt to agentic pipeline ──
-    async function handleSend(promptOverride) {
-        const prompt = promptOverride || input.trim()
-        if (!prompt || isThinking || generating) return
-        if (!canCreateVideo) { onUpgradeRequired?.(); return }
-
-        setInput('')
-        setMessages(prev => [...prev, {
-            role: 'user', content: prompt, timestamp: Date.now(),
-            product: selectedProduct,
-            images: [...refImages],
-        }])
-        setIsThinking(true)
-
-        try {
-            // Upload all files to S3 first (no base64)
-            const uploadFile = async (file, name) => {
-                const fd = new FormData(); fd.append('file', file, name)
-                const upRes = await fetch(`${API_BASE}/video-studio/agent/upload`, {
-                    method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('mantram_token')}` }, body: fd,
-                })
-                const upData = await upRes.json()
-                return upData.url || ''
-            }
-
-            // Upload ref images
-            const uploadedRefs = []
-            for (const img of refImages) {
-                if (img.file) {
-                    try { const url = await uploadFile(img.file, img.name || 'ref.png'); if (url) uploadedRefs.push(url) } catch (e) { console.warn('Ref upload error:', e) }
-                }
-            }
-
-            // Upload character photo
-            let charPhotoUrl = ''
-            if (characterPhoto?.file) {
-                try { charPhotoUrl = await uploadFile(characterPhoto.file, characterPhoto.name || 'character.png') } catch (e) { console.warn('Char upload error:', e) }
-            }
-
-            // Upload audio file
-            let audioUrl = ''
-            if (audioFile?.file) {
-                try {
-                    console.log('🎧 Uploading audio:', audioFile.name, audioFile.file.size, 'bytes')
-                    audioUrl = await uploadFile(audioFile.file, audioFile.name || 'audio.mp3')
-                    console.log('🎧 Audio uploaded:', audioUrl ? 'OK' : 'FAILED')
-                } catch (e) { console.warn('Audio upload error:', e) }
-            }
-
-            // Step 1: Get storyboard only (no video gen yet)
-            const result = await api('/video-studio/agent/create', {
-                method: 'POST',
-                body: JSON.stringify({
-                    prompt,
-                    productId: selectedProduct?._id || '',
-                    referenceImages: uploadedRefs,
-                    characterPhoto: charPhotoUrl || undefined,
-                    audioFileUrl: audioUrl || undefined,
-                    characterDescriptions: characterDesc.trim() || undefined,
-                    brandId: activeBrand?._id || '',
-                    videoModel,
-                    voiceover: { enabled: audioUrl ? false : voEnabled, provider: voProvider, voiceId: voProvider === 'minimax' ? 'moss_en_hd' : 'anushka', speed: 1.0, langCode: overlayLanguage === 'hindi' ? 'hi-IN' : overlayLanguage === 'tamil' ? 'ta-IN' : 'en-IN' },
-                    music: { enabled: audioUrl ? false : musicEnabled, mood: '' },
-                    textOverlays: { enabled: textOverlaysEnabled, brandName: activeBrand?.name || '', language: overlayLanguage },
-                    aspectRatio: overrideAspect || '',
-                    qualityMode: overrideQuality || '',
-                }),
-            })
-
-            setPipeline(result)
-            setCurrentSessionId(result.sessionId)
-            setIsThinking(false)
-
-            // Show storyboard for approval (NO video gen yet)
-            const modelInfo = MODEL_INFO[result.pipeline?.model] || { name: result.pipeline?.model, icon: '🎥' }
-            const sceneList = (result.storyboard?.scenes || [])
-                .map(s => `Scene ${s.sceneNumber}: ${s.voiceoverText || s.visualPrompt?.substring(0, 80) || '...'}`)
-                .join('\n→ ')
-            const overlayList = (result.textOverlays || [])
-                .map((o, i) => `  Scene ${i + 1}: "${o.text}" (${o.position})`)
-                .join('\n')
-
-            setMessages(prev => [...prev, {
-                role: 'agent', timestamp: Date.now(),
-                type: 'storyboard-review',
-                sessionId: result.sessionId,
-                content: `🧠 AI Storyboard Ready for Review!\n\n📋 "${result.pipeline?.title}"\n→ ${result.pipeline?.totalScenes} scenes, ~${result.pipeline?.totalDuration}s total\n→ Model: ${modelInfo.icon} ${modelInfo.name}\n→ Aspect: ${result.pipeline?.aspectRatio}\n${result.pipeline?.characterRefUsed ? '👤 Character ref sheet generated for consistency' : ''}\n${result.pipeline?.reasoning ? `💡 ${result.pipeline.reasoning}` : ''}\n${result.audioFile?.transcript ? `\n🎧 Audio Transcript:\n"${result.audioFile.transcript.substring(0, 300)}${result.audioFile.transcript.length > 300 ? '...' : ''}"` : ''}\n\n🎬 Scenes:\n→ ${sceneList}\n${overlayList ? `\n📝 Text Overlays:\n${overlayList}` : ''}\n${result.storyboard?.voiceoverScript ? `\n🎙️ Voiceover Script:\n"${result.storyboard.voiceoverScript.substring(0, 300)}${result.storyboard.voiceoverScript.length > 300 ? '...' : ''}"` : ''}`,
-                pipeline: result,
-            }])
-
-            setRefImages([])
-
-        } catch (err) {
-            setIsThinking(false)
-            setMessages(prev => [...prev, {
-                role: 'agent', timestamp: Date.now(), isError: true,
-                content: `❌ Error: ${err.message}\n\nTry rephrasing your prompt or check your credits.`,
-            }])
-        }
-    }
-
-    // ── Approve storyboard → generate first frames ──
-    async function handleApproveFirstFrames(sessionId) {
-        if (!canCreateVideo) { onUpgradeRequired?.(); return }
-        setGeneratingFrames(true)
-        setMessages(prev => [...prev, {
-            role: 'user', content: '✅ Storyboard approved! Generate preview frames...', timestamp: Date.now(),
-        }])
-        setIsThinking(true)
-
-        try {
-            const result = await api('/video-studio/agent/first-frames', {
-                method: 'POST',
-                body: JSON.stringify({ sessionId }),
-            })
-
-            setIsThinking(false)
-            setGeneratingFrames(false)
-
-            const framesList = (result.frames || []).map(f =>
-                f.status === 'done'
-                    ? `✅ Scene ${f.sceneNumber}: Preview ready`
-                    : `❌ Scene ${f.sceneNumber}: ${f.error || 'Failed'}`
-            ).join('\n')
-
-            setMessages(prev => [...prev, {
-                role: 'agent', timestamp: Date.now(),
-                type: 'frames-review',
-                sessionId,
-                frames: result.frames || [],
-                content: `🖼️ First Frame Previews Generated!\n\n${framesList}\n\nReview the frames above. If you're happy, approve to start video generation.`,
-            }])
-        } catch (err) {
-            setIsThinking(false)
-            setGeneratingFrames(false)
-            setMessages(prev => [...prev, {
-                role: 'agent', timestamp: Date.now(), isError: true,
-                content: `❌ Frame generation failed: ${err.message}`,
-            }])
-        }
-    }
-
-    // ── Approve frames → generate actual videos ──
-    async function handleApproveGenerate(sessionId) {
-        if (!canCreateVideo) { onUpgradeRequired?.(); return }
-        setMessages(prev => [...prev, {
-            role: 'user', content: '✅ Frames approved! Start generating videos...', timestamp: Date.now(),
-        }])
-        setIsThinking(true)
-
-        try {
-            const result = await api('/video-studio/agent/generate', {
-                method: 'POST',
-                body: JSON.stringify({ sessionId, selectedModel: videoModel !== 'auto' ? videoModel : undefined }),
-            })
-
-            setPipeline(prev => ({ ...prev, ...result }))
-            setIsThinking(false)
-
-            const modelInfo = MODEL_INFO[result.pipeline?.model] || { name: result.pipeline?.model, icon: '🎥' }
-
-            setMessages(prev => [...prev, {
-                role: 'agent', timestamp: Date.now(),
-                content: `🎬 Video Generation Started!\n\n→ ${result.scenes?.filter(s => s.projectId).length} scenes submitted\n→ Model: ${modelInfo.icon} ${modelInfo.name}\n${result.voiceover?.url ? '🎙️ Voiceover generating...' : ''}\n${result.music?.url ? '🎵 Music generating...' : ''}\n${result.audioFile?.url ? '🎧 Using your uploaded audio as soundtrack' : ''}\n\n⏳ Generating scene clips now...`,
-                pipeline: result,
-            }])
-
-            setGenerating(true)
-            startScenePolling(result.scenes || [])
-        } catch (err) {
-            setIsThinking(false)
-            setMessages(prev => [...prev, {
-                role: 'agent', timestamp: Date.now(), isError: true,
-                content: `❌ Video generation failed: ${err.message}`,
-            }])
-        }
-    }
-
-    // ── Poll each scene's generation status ──
-    function startScenePolling(scenes) {
-        const projectIds = scenes.filter(s => s.projectId).map(s => s.projectId)
-        if (!projectIds.length) { setGenerating(false); return }
-
-        const initialStatuses = {}
-        projectIds.forEach(id => { initialStatuses[id] = { status: 'generating', progress: 5 } })
-        setSceneStatuses(initialStatuses)
-
-        pollRef.current = setInterval(async () => {
-            let hasChanges = false
-
-            // Use functional update to always read latest state
-            setSceneStatuses(prev => {
-                const updated = { ...prev }
-                const fetchPromises = projectIds.map(async id => {
-                    if (updated[id]?.status === 'done' || updated[id]?.status === 'failed') return
-                    try {
-                        const res = await api(`/video-studio/${id}/status`)
-                        const proj = res.project
-                        if (proj.generation?.videoUrl || proj.status === 'done' || proj.status === 'critique') {
-                            updated[id] = { status: 'done', videoUrl: `${API_BASE}/video-studio/${id}/video`, progress: 100 }
-                            hasChanges = true
-                        } else if (proj.status === 'failed' || proj.status === 'error') {
-                            updated[id] = { status: 'failed', progress: 0, error: proj.errorMessage || 'Failed' }
-                            hasChanges = true
-                        } else {
-                            const newProgress = proj.generation?.progress || Math.min((updated[id]?.progress || 5) + 3, 90)
-                            updated[id] = { status: 'generating', progress: newProgress }
-                        }
-                    } catch { /* retry next tick */ }
-                })
-
-                // We can't await inside functional setState, so we'll use a workaround
-                return updated
-            })
-
-            // Separate check for completion to avoid stale refs
-            const checkCompletion = async () => {
-                const currentStatuses = {}
-                for (const id of projectIds) {
-                    try {
-                        const res = await api(`/video-studio/${id}/status`)
-                        const proj = res.project
-                        if (proj.generation?.videoUrl || proj.status === 'done' || proj.status === 'critique') {
-                            currentStatuses[id] = { status: 'done', videoUrl: `${API_BASE}/video-studio/${id}/video`, progress: 100 }
-                        } else if (proj.status === 'failed' || proj.status === 'error') {
-                            currentStatuses[id] = { status: 'failed', progress: 0, error: proj.errorMessage || 'Failed' }
-                        } else {
-                            currentStatuses[id] = { status: 'generating', progress: proj.generation?.progress || 10 }
-                        }
-                    } catch {
-                        currentStatuses[id] = { status: 'generating', progress: 10 }
-                    }
-                }
-
-                setSceneStatuses(currentStatuses)
-
-                const vals = Object.values(currentStatuses)
-                if (vals.every(v => v.status === 'done' || v.status === 'failed')) {
-                    clearInterval(pollRef.current)
-                    pollRef.current = null
-
-                    const successScenes = vals.filter(v => v.status === 'done')
-                    const failedCount = vals.filter(v => v.status === 'failed').length
-                    setMessages(prev => [...prev, {
-                        role: 'agent', timestamp: Date.now(),
-                        content: `✅ ${successScenes.length}/${vals.length} scene clips generated!\n\n${successScenes.length > 1 ? '🔗 Click "Compile Final Video" below to stitch all clips with voiceover and music.' : '🎬 Your video is ready!'}\n\n${failedCount > 0 ? `⚠️ ${failedCount} scene(s) failed — try regenerating or using a different model.` : ''}`,
-                        completedScenes: Object.entries(currentStatuses).filter(([, v]) => v.status === 'done').map(([id, v]) => ({ id, videoUrl: v.videoUrl })),
-                        showCompile: successScenes.length > 1,
-                    }])
-                    setGenerating(false)
-                }
-            }
-
-            await checkCompletion()
-        }, 6000)
-    }
-
-    // ── Download ──
-    async function handleDownload(url, name) {
-        try {
-            const resp = await fetch(url, { headers: { Authorization: `Bearer ${localStorage.getItem('mantram_token')}` } })
-            const blob = await resp.blob()
-            const blobUrl = URL.createObjectURL(blob)
-            const a = document.createElement('a'); a.href = blobUrl; a.download = `${name}.mp4`
-            document.body.appendChild(a); a.click()
-            setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(blobUrl) }, 100)
-        } catch { window.open(url, '_blank') }
-    }
-
-    // ── Compile all scenes into final video ──
-    async function handleCompile(completedScenes) {
-        if (!completedScenes?.length) return
-        setGenerating(true)
-        setMessages(prev => [...prev, {
-            role: 'agent', timestamp: Date.now(),
-            content: '🎬 Compiling final video... Stitching clips + voiceover + music via FFmpeg.',
-        }])
-
-        try {
-            const clips = completedScenes.map((sc, i) => ({
-                videoUrl: sc.videoUrl,
-                title: `Scene ${i + 1}`,
-            }))
-
-            const compileBody = {
-                clips,
-                voiceover: pipeline?.voiceover?.url && !pipeline.voiceover.url.startsWith('fal-pending:') ? { audioUrl: pipeline.voiceover.url } : undefined,
-                music: pipeline?.music?.url && !pipeline.music.url.startsWith('fal-pending:') ? { audioUrl: pipeline.music.url, volume: 0.3 } : undefined,
-                brandId: activeBrand?._id || '',
-            }
-
-            // If user uploaded audio, use it instead of VO/music
-            if (pipeline?.audioFile?.url) {
-                compileBody.voiceover = { audioUrl: pipeline.audioFile.url }
-                compileBody.music = undefined
-            }
-
-            const result = await api('/video-studio/compile', {
-                method: 'POST',
-                body: JSON.stringify(compileBody),
-            })
-
-            setMessages(prev => [...prev, {
-                role: 'agent', timestamp: Date.now(),
-                content: result.compiled
-                    ? `✅ Final video compiled successfully!\n\n🎬 ${result.totalClips} clips stitched into one video with ${pipeline?.voiceover?.url ? 'voiceover' : ''} ${pipeline?.music?.url ? '+ music' : ''}.`
-                    : `⚠️ FFmpeg not available on server. Clips returned separately.\n${result.message}`,
-                compiledVideo: result.compiled ? { url: result.videoUrl } : null,
-                completedScenes: result.compiled ? [{ id: 'compiled', videoUrl: result.videoUrl }] : result.clipUrls?.map((u, i) => ({ id: `clip-${i}`, videoUrl: u })),
-            }])
-        } catch (err) {
-            setMessages(prev => [...prev, {
-                role: 'agent', timestamp: Date.now(), isError: true,
-                content: `❌ Compile failed: ${err.message}`,
-            }])
-        }
-        setGenerating(false)
-    }
-
+// ── Chat bubble components ────────────────────────────────────────────────────
+function AgentAvatar() {
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 fade-up" style={{ minHeight: '75vh' }}>
-
-            {/* ══════════ LEFT — Chat ══════════ */}
-            <div className="lg:col-span-8 flex flex-col" style={{ maxHeight: '80vh' }}>
-
-                {/* Header */}
-                <div className="glass-panel rounded-2xl p-4 border border-[var(--sys-border)]/[0.08] mb-3">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #14b8a6, #06b6d4, #8b5cf6)' }}>
-                            <span className="material-symbols-outlined text-[var(--sys-text)] text-xl">smart_display</span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <h2 className="text-lg font-bold text-[var(--sys-text)]">Video Agent</h2>
-                            <p className="text-[10px] text-[var(--sys-text-muted)] truncate">Prompt-driven • Brand-aware • Multi-scene • AI Compiled</p>
-                        </div>
-                        <button onClick={() => setShowSettingsPanel(!showSettingsPanel)}
-                            className={`p-2 rounded-xl transition-all cursor-pointer ${showSettingsPanel ? 'bg-[var(--sys-surface)] text-[var(--sys-primary)]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-white/[0.05]'}`}>
-                            <span className="material-symbols-outlined text-lg">tune</span>
-                        </button>
-                    </div>
-
-                    {showSettingsPanel && (
-                        <div className="mt-3 pt-3 border-t border-[var(--sys-border)]/[0.05] grid grid-cols-2 md:grid-cols-3 gap-2">
-                            <div>
-                                <label className="text-[10px] text-[var(--sys-text-muted)] mb-1 block">Quality</label>
-                                <select value={overrideQuality} onChange={e => setOverrideQuality(e.target.value)}
-                                    className="w-full bg-white/[0.04] border border-[var(--sys-border)]/[0.08] rounded-lg px-2 py-1.5 text-xs text-[var(--sys-text)] appearance-none cursor-pointer">
-                                    <option value="">AI Picks</option>
-                                    <option value="draft">🎨 Draft (cheapest)</option>
-                                    <option value="fast">⚡ Fast</option>
-                                    <option value="quality">✨ Quality</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-[10px] text-[var(--sys-text-muted)] mb-1 block">Aspect</label>
-                                <select value={overrideAspect} onChange={e => setOverrideAspect(e.target.value)}
-                                    className="w-full bg-white/[0.04] border border-[var(--sys-border)]/[0.08] rounded-lg px-2 py-1.5 text-xs text-[var(--sys-text)] appearance-none cursor-pointer">
-                                    <option value="">Auto</option>
-                                    <option value="16:9">16:9 Landscape</option>
-                                    <option value="9:16">9:16 Portrait</option>
-                                    <option value="1:1">1:1 Square</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-[10px] text-[var(--sys-text-muted)] mb-1 block">Voiceover</label>
-                                <select value={voEnabled ? voProvider : 'off'} onChange={e => {
-                                    if (e.target.value === 'off') { setVoEnabled(false) }
-                                    else { setVoEnabled(true); setVoProvider(e.target.value) }
-                                }}
-                                    className="w-full bg-white/[0.04] border border-[var(--sys-border)]/[0.08] rounded-lg px-2 py-1.5 text-xs text-[var(--sys-text)] appearance-none cursor-pointer">
-                                    <option value="minimax">🎙️ MiniMax</option>
-                                    <option value="sarvam">🇮🇳 Sarvam</option>
-                                    <option value="off">No VO</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-[10px] text-[var(--sys-text-muted)] mb-1 block">🎵 AI Music</label>
-                                <select value={musicEnabled ? 'on' : 'off'} onChange={e => setMusicEnabled(e.target.value === 'on')}
-                                    className="w-full bg-white/[0.04] border border-[var(--sys-border)]/[0.08] rounded-lg px-2 py-1.5 text-xs text-[var(--sys-text)] appearance-none cursor-pointer">
-                                    <option value="on">Generate Music</option>
-                                    <option value="off">No Music</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-[10px] text-[var(--sys-text-muted)] mb-1 block">📝 Text Overlays</label>
-                                <select value={textOverlaysEnabled ? overlayLanguage : 'off'} onChange={e => {
-                                    if (e.target.value === 'off') { setTextOverlaysEnabled(false) }
-                                    else { setTextOverlaysEnabled(true); setOverlayLanguage(e.target.value) }
-                                }}
-                                    className="w-full bg-white/[0.04] border border-[var(--sys-border)]/[0.08] rounded-lg px-2 py-1.5 text-xs text-[var(--sys-text)] appearance-none cursor-pointer">
-                                    <option value="english">English</option>
-                                    <option value="hindi">हिन्दी Hindi</option>
-                                    <option value="tamil">தமிழ் Tamil</option>
-                                    <option value="bengali">বাংলা Bengali</option>
-                                    <option value="telugu">తెలుగు Telugu</option>
-                                    <option value="off">No Overlays</option>
-                                </select>
-                            </div>
-                            <div className="flex items-end">
-                                <button onClick={() => { setOverrideQuality(''); setOverrideAspect(''); setVoEnabled(true); setVoProvider('minimax'); setMusicEnabled(false); setTextOverlaysEnabled(true); setOverlayLanguage('english') }}
-                                    className="w-full px-2 py-1.5 text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] border border-[var(--sys-border)]/[0.08] rounded-lg hover:bg-white/[0.04] transition-all cursor-pointer">
-                                    Reset
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Chat Messages */}
-                <div className="flex-1 overflow-y-auto pr-1 space-y-3 mb-3" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.06) transparent' }}>
-
-                    {/* Quick Start (only before first user message) */}
-                    {messages.filter(m => m.role === 'user').length === 0 && (
-                        <div className="grid grid-cols-3 gap-2 mb-2">
-                            {QUICK_PROMPTS.map((qp, i) => (
-                                <button key={i} onClick={() => handleSend(qp.prompt)}
-                                    className="p-3 rounded-xl border border-[var(--sys-border)]/[0.06] bg-white/[0.02] hover:border-[var(--sys-border)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer text-left group">
-                                    <div className="text-lg mb-1">{qp.icon}</div>
-                                    <div className="text-xs font-bold text-[var(--sys-text)] group-hover:text-[var(--sys-primary)] transition-colors">{qp.label}</div>
-                                    <div className="text-[10px] text-[var(--sys-text-muted)] mt-0.5 line-clamp-2">{qp.prompt.substring(0, 55)}...</div>
-                                </button>
-                            ))}
-                        </div>
-                    )}
-
-                    {messages.map((msg, i) => (
-                        <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-[85%] rounded-2xl p-3.5 ${
-                                msg.role === 'user' ? 'bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-[var(--sys-border)] text-[var(--sys-text)]'
-                                    : msg.isError ? 'bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-primary)]'
-                                    : 'bg-white/[0.04] border border-[var(--sys-border)]/[0.06] text-[var(--sys-text-muted)]'}`}>
-
-                                {msg.role === 'agent' && (
-                                    <div className="flex items-center gap-1.5 mb-2">
-                                        <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #14b8a6, #8b5cf6)' }}>
-                                            <span className="material-symbols-outlined text-[var(--sys-text)]" style={{ fontSize: '12px' }}>smart_display</span>
-                                        </div>
-                                        <span className="text-[10px] font-bold text-[var(--sys-primary)]">Video Agent</span>
-                                    </div>
-                                )}
-
-                                {/* Product tag */}
-                                {msg.product && (
-                                    <div className="flex items-center gap-2 mb-2 p-2 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)]">
-                                        {msg.product.images?.[0] && (
-                                            <img src={msg.product.images[0].url} alt="" className="w-8 h-8 rounded-lg object-cover" />
-                                        )}
-                                        <div>
-                                            <p className="text-[10px] font-bold text-[var(--sys-primary)]">🛍️ {msg.product.title}</p>
-                                            {msg.product.price?.amount && <p className="text-[9px] text-[var(--sys-text-muted)]">{msg.product.price.currency} {msg.product.price.amount}</p>}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Ref images */}
-                                {msg.images && msg.images.length > 0 && (
-                                    <div className="flex gap-1.5 mb-2">
-                                        {msg.images.map((img, j) => (
-                                            <div key={j} className="w-12 h-12 rounded-lg overflow-hidden border border-[var(--sys-border)]/[0.1]">
-                                                <img src={img.url} alt="" className="w-full h-full object-cover" />
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-
-                                <div className="text-xs whitespace-pre-line leading-relaxed">{msg.content}</div>
-
-                                {/* Storyboard approval buttons */}
-                                {msg.type === 'storyboard-review' && !generating && !generatingFrames && (
-                                    <div className="mt-3 flex flex-wrap gap-2">
-                                        <button onClick={() => handleApproveFirstFrames(msg.sessionId)}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-primary)] text-[11px] font-bold hover:bg-[var(--sys-surface)] cursor-pointer transition-colors border border-[var(--sys-border)]">
-                                            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>image</span>
-                                            ✅ Approve & Generate Previews
-                                        </button>
-                                        <button onClick={() => handleApproveGenerate(msg.sessionId)}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--sys-primary-dim)] video-highlight-text text-[11px] font-bold hover:bg-[var(--sys-primary-dim)] cursor-pointer transition-colors border border-[var(--sys-primary)]">
-                                            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>fast_forward</span>
-                                            ⚡ Skip to Video Gen
-                                        </button>
-                                    </div>
-                                )}
-
-                                {/* First frame previews */}
-                                {msg.type === 'frames-review' && msg.frames && (
-                                    <>
-                                        <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                            {msg.frames.filter(f => f.imageUrl).map((f, j) => (
-                                                <div key={j} className="rounded-xl overflow-hidden border border-[var(--sys-border)]/[0.08] bg-black relative group">
-                                                    <img src={f.imageUrl} alt={`Scene ${f.sceneNumber} preview`} className="w-full aspect-video object-cover" />
-                                                    <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 p-1.5">
-                                                        <span className="text-[10px] text-[var(--sys-text)]/80 font-bold">Scene {f.sceneNumber}</span>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        {!generating && (
-                                            <div className="mt-3 flex gap-2">
-                                                <button onClick={() => handleApproveGenerate(msg.sessionId)}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-primary)] text-[11px] font-bold hover:bg-[var(--sys-surface)] cursor-pointer transition-colors border border-[var(--sys-border)]">
-                                                    <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>movie</span>
-                                                    ✅ Approve & Generate Videos
-                                                </button>
-                                                <button onClick={() => handleApproveFirstFrames(msg.sessionId)}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-primary)] text-[11px] font-bold hover:bg-[var(--sys-surface)] cursor-pointer transition-colors border border-[var(--sys-border)]">
-                                                    <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>refresh</span>
-                                                    🔁 Regenerate Frames
-                                                </button>
-                                            </div>
-                                        )}
-                                    </>
-                                )}
-
-                                {/* Completed scene videos */}
-                                {msg.completedScenes && msg.completedScenes.length > 0 && (
-                                    <div className="mt-3 space-y-2">
-                                        {msg.completedScenes.map((sc, j) => (
-                                            <div key={j} className="rounded-xl overflow-hidden border border-[var(--sys-border)]/[0.08] bg-black relative has-vha">
-                                                <div style={{ aspectRatio: '16/9' }}>
-                                                    <video src={sc.videoUrl} controls className="w-full h-full block" />
-                                                </div>
-                                                <VideoHoverActions videoUrl={sc.videoUrl} />
-                                                <div className="flex items-center justify-between p-2 relative z-10">
-                                                    <span className="text-[10px] text-[var(--sys-text-muted)]">{sc.id === 'compiled' ? '🎬 Final Video' : `Scene ${j + 1}`}</span>
-                                                    <button onClick={() => handleDownload(sc.videoUrl, sc.id === 'compiled' ? 'final-video' : `scene-${j + 1}`)}
-                                                        className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-primary)] text-[10px] font-bold hover:bg-[var(--sys-surface)] cursor-pointer">
-                                                        <span className="material-symbols-outlined" style={{ fontSize: '11px' }}>download</span> Download
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))}
-
-                                        {/* Compile button */}
-                                        {msg.showCompile && !generating && (
-                                            <button onClick={() => handleCompile(msg.completedScenes)}
-                                                className="w-full mt-2 py-2.5 rounded-xl font-bold text-sm text-[var(--sys-text)] cursor-pointer transition-all hover:scale-[1.02]"
-                                                style={{ background: 'linear-gradient(135deg, #14b8a6, #06b6d4, #8b5cf6)' }}>
-                                                🎬 Compile Final Video
-                                            </button>
-                                        )}
-                                    </div>
-                                )}
-
-                                <div className="text-[9px] text-[var(--sys-text-muted)] mt-1.5">
-                                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-
-                    {/* Thinking */}
-                    {isThinking && (
-                        <div className="flex justify-start">
-                            <div className="bg-white/[0.04] border border-[var(--sys-border)]/[0.06] rounded-2xl p-3.5 flex items-center gap-2">
-                                <div className="flex gap-1">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--sys-surface)] animate-bounce" style={{ animationDelay: '0ms' }} />
-                                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--sys-surface)] animate-bounce" style={{ animationDelay: '150ms' }} />
-                                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--sys-primary)] animate-bounce" style={{ animationDelay: '300ms' }} />
-                                </div>
-                                <span className="text-xs text-[var(--sys-text-muted)]">AI writing storyboard, selecting models...</span>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Scene generation progress */}
-                    {generating && Object.keys(sceneStatuses).length > 0 && (
-                        <div className="flex justify-start">
-                            <div className="w-full max-w-[85%] bg-white/[0.04] border border-[var(--sys-border)] rounded-2xl p-4">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <span className="material-symbols-outlined text-[var(--sys-primary)] text-lg animate-spin">progress_activity</span>
-                                    <span className="text-xs font-bold text-[var(--sys-text)]">Generating scenes...</span>
-                                </div>
-                                <div className="space-y-2">
-                                    {Object.entries(sceneStatuses).map(([id, st], idx) => (
-                                        <div key={id} className="flex items-center gap-2">
-                                            <span className="text-[10px] text-[var(--sys-text-muted)] w-14 flex-shrink-0">Scene {idx + 1}</span>
-                                            <div className="flex-1 h-2 rounded-full bg-white/[0.06] overflow-hidden">
-                                                <div className="h-full rounded-full transition-all duration-700"
-                                                    style={{
-                                                        width: `${st.progress || 0}%`,
-                                                        background: st.status === 'done' ? '#10b981' : st.status === 'failed' ? '#ef4444' : 'linear-gradient(90deg, #14b8a6, #8b5cf6)',
-                                                    }} />
-                                            </div>
-                                            <span className="text-[10px] w-8 text-right" style={{ color: st.status === 'done' ? '#10b981' : st.status === 'failed' ? '#ef4444' : '#94a3b8' }}>
-                                                {st.status === 'done' ? '✓' : st.status === 'failed' ? '✗' : `${st.progress || 0}%`}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    <div ref={chatEndRef} />
-                </div>
-
-                {/* Selected Product, Character Photo, Audio & Ref Images */}
-                {(selectedProduct || refImages.length > 0 || characterPhoto || audioFile) && (
-                    <div className="flex items-center gap-2 mb-2 flex-wrap px-1">
-                        {selectedProduct && (
-                            <div className="flex items-center gap-1.5 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-lg px-2 py-1 group">
-                                {selectedProduct.images?.[0] && <img src={selectedProduct.images[0].url} alt="" className="w-6 h-6 rounded object-cover" />}
-                                <span className="text-[10px] text-[var(--sys-primary)] font-medium">{selectedProduct.title}</span>
-                                <button onClick={() => setSelectedProduct(null)} className="text-[var(--sys-primary)] hover:text-[var(--sys-primary)] cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity" style={{ fontSize: '10px' }}>✕</button>
-                            </div>
-                        )}
-                        {characterPhoto && (
-                            <div className="flex items-center gap-1.5 bg-[var(--sys-primary-dim)] border border-[var(--sys-primary)] rounded-lg px-2 py-1 group">
-                                <img src={characterPhoto.url} alt="" className="w-6 h-6 rounded-full object-cover" />
-                                <span className="text-[10px] video-highlight-text font-medium">👤 Character</span>
-                                <button onClick={() => setCharacterPhoto(null)} className="video-highlight-text hover:text-[var(--sys-primary)] cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity" style={{ fontSize: '10px' }}>✕</button>
-                            </div>
-                        )}
-                        {audioFile && (
-                            <div className="flex items-center gap-1.5 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-lg px-2 py-1 group">
-                                <span className="text-sm">🎧</span>
-                                <span className="text-[10px] text-[var(--sys-primary)] font-medium truncate max-w-[100px]">{audioFile.name}</span>
-                                <button onClick={() => { setAudioFile(null); setVoEnabled(true) }} className="text-[var(--sys-primary)] hover:text-[var(--sys-primary)] cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity" style={{ fontSize: '10px' }}>✕</button>
-                            </div>
-                        )}
-                        {refImages.map((img, i) => (
-                            <div key={i} className="relative group">
-                                <div className="w-8 h-8 rounded-lg overflow-hidden border border-[var(--sys-border)]/[0.1]">
-                                    <img src={img.url} alt="" className="w-full h-full object-cover" />
-                                </div>
-                                <button onClick={() => setRefImages(prev => prev.filter((_, j) => j !== i))}
-                                    className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[var(--sys-surface)] text-[var(--sys-text)] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" style={{ fontSize: '7px' }}>×</button>
+        <div className="w-7 h-7 rounded-xl flex-shrink-0 flex items-center justify-center text-sm mt-0.5"
+            style={{ background: 'linear-gradient(135deg,#14b8a6,#8b5cf6)' }}>🤖</div>
+    )
+}
+function AgentBubble({ children }) {
+    return (
+        <div className="flex items-start gap-2 mb-3">
+            <AgentAvatar />
+            <div className="flex-1 min-w-0">{children}</div>
+        </div>
+    )
+}
+function UserBubble({ text, media }) {
+    return (
+        <div className="flex justify-end mb-3">
+            <div className="max-w-[80%]">
+                {media?.length > 0 && (
+                    <div className="flex gap-1 justify-end mb-1 flex-wrap">
+                        {media.map((m, i) => (
+                            <div key={i} className="w-12 h-12 rounded-xl overflow-hidden border border-[var(--sys-border)]/[0.1] bg-[var(--sys-surface)] flex items-center justify-center">
+                                {m.preview ? <img src={m.preview} alt="" className="w-full h-full object-cover" /> : <span className="text-lg">{m.type === 'video' ? '🎥' : '🎵'}</span>}
                             </div>
                         ))}
                     </div>
                 )}
-
-                {/* Character Description (collapsible) */}
-                <div className="mb-2 px-1">
-                    <button onClick={() => setShowCharDesc(!showCharDesc)}
-                        className={`text-[10px] flex items-center gap-1 mb-1 cursor-pointer transition-colors ${characterDesc.trim() ? 'video-highlight-text' : 'text-[var(--sys-text-muted)] hover:video-highlight-text'}`}>
-                        <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>{showCharDesc ? 'expand_less' : 'group'}</span>
-                        {characterDesc.trim() ? `👤 Characters defined (${characterDesc.trim().split('\n').filter(Boolean).length})` : 'Define characters (optional)'}
-                    </button>
-                    {showCharDesc && (
-                        <textarea value={characterDesc}
-                            onChange={e => setCharacterDesc(e.target.value)}
-                            placeholder="Describe your characters, e.g.:\n• Hero: 25-year-old woman, long black hair, red dress, confident\n• Villain: Tall man in dark suit, scar on left cheek\n• Narrator: Warm, friendly grandmother figure"
-                            className="w-full bg-white/[0.03] border border-[var(--sys-primary)] rounded-xl px-3 py-2 text-[11px] text-[var(--sys-text-muted)] placeholder:text-[var(--sys-text-muted)] resize-none focus:outline-none focus:border-[var(--sys-primary)]"
-                            rows={3} />
-                    )}
-                </div>
-
-                {/* Input */}
-                <div className="glass-panel rounded-2xl border border-[var(--sys-border)]/[0.08] p-3 flex items-end gap-2">
-                    <button onClick={() => setShowProductPicker(!showProductPicker)}
-                        className={`p-2 rounded-xl transition-all cursor-pointer flex-shrink-0 ${showProductPicker ? 'bg-[var(--sys-surface)] text-[var(--sys-primary)]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-primary)] hover:bg-[var(--sys-surface)]'}`}
-                        title="Select product from brand catalog">
-                        <span className="material-symbols-outlined text-lg">shopping_bag</span>
-                    </button>
-                    <button onClick={() => charFileRef.current?.click()}
-                        className={`p-2 rounded-xl transition-all cursor-pointer flex-shrink-0 ${characterPhoto ? 'bg-[var(--sys-primary-dim)] video-highlight-text' : 'text-[var(--sys-text-muted)] hover:video-highlight-text hover:bg-[var(--sys-primary-dim)]'}`}
-                        title="Upload model/character photo for consistency">
-                        <span className="material-symbols-outlined text-lg">face</span>
-                    </button>
-                    <button onClick={() => audioFileRef.current?.click()}
-                        className={`p-2 rounded-xl transition-all cursor-pointer flex-shrink-0 ${audioFile ? 'bg-[var(--sys-surface)] text-[var(--sys-primary)]' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-primary)] hover:bg-[var(--sys-surface)]'}`}
-                        title="Upload audio (VO/music) — video syncs to this">
-                        <span className="material-symbols-outlined text-lg">headphones</span>
-                    </button>
-                    <button onClick={() => fileRef.current?.click()}
-                        className="p-2 rounded-xl text-[var(--sys-text-muted)] hover:text-[var(--sys-primary)] hover:bg-[var(--sys-surface)] transition-all cursor-pointer flex-shrink-0"
-                        title="Upload reference images for style blending">
-                        <span className="material-symbols-outlined text-lg">add_photo_alternate</span>
-                    </button>
-
-                    {/* Model selector */}
-                    <div className="relative flex-shrink-0">
-                        <select value={videoModel} onChange={e => setVideoModel(e.target.value)}
-                            className="appearance-none bg-white/[0.05] border border-[var(--sys-border)]/[0.08] rounded-lg text-[10px] text-[var(--sys-text-muted)] pl-2 pr-6 py-1.5 cursor-pointer hover:bg-white/[0.08] focus:outline-none focus:border-[var(--sys-border)] transition-colors"
-                            title="Select video model">
-                            <option value="auto" className="bg-[var(--sys-surface)]">🤖 Auto (Best)</option>
-                            <option value="kling-3.0" className="bg-[var(--sys-surface)]">👑 Kling 3.0</option>
-                            <option value="veo-3.1" className="bg-[var(--sys-surface)]">🎬 Veo 3.1</option>
-                            <option value="seedance-2.0" className="bg-[var(--sys-surface)]">🎥 Seedance 2.0</option>
-                            <option value="hunyuan" className="bg-[var(--sys-surface)]">🎨 Hunyuan (Draft)</option>
-                            <option value="grok-imagine" className="bg-[var(--sys-surface)]">🤖 Grok (Fast)</option>
-                            <option value="gemini-flash" className="bg-[var(--sys-surface)]">⚡ Gemini Flash</option>
-                        </select>
-                        <span className="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 text-[var(--sys-text-muted)] pointer-events-none" style={{ fontSize: '12px' }}>expand_more</span>
-                    </div>
-                    <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} />
-                    <input ref={charFileRef} type="file" accept="image/*" className="hidden" onChange={handleCharacterUpload} />
-                    <input ref={audioFileRef} type="file" accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac" className="hidden" onChange={handleAudioUpload} />
-
-                    <textarea value={input} onChange={e => setInput(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
-                        placeholder="Describe your video... (e.g., 'Create a 30s ad for our protein powder with VO')"
-                        className="flex-1 bg-transparent text-[var(--sys-text)] text-sm placeholder:text-[var(--sys-text-muted)] resize-none focus:outline-none min-h-[40px] max-h-[100px]"
-                        rows={1} disabled={generating} style={{ lineHeight: '1.5' }} />
-
-                    <button onClick={() => handleSend()} disabled={!input.trim() || isThinking || generating}
-                        className="p-2.5 rounded-xl transition-all cursor-pointer flex-shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
-                        style={{ background: input.trim() ? 'linear-gradient(135deg, #14b8a6, #06b6d4)' : 'rgba(255,255,255,0.04)' }}>
-                        <span className="material-symbols-outlined text-[var(--sys-text)] text-lg">send</span>
-                    </button>
-                </div>
-
-                {/* Product Picker Dropdown */}
-                {showProductPicker && (
-                    <div className="glass-panel rounded-2xl border border-[var(--sys-border)]/[0.08] p-4 mt-2 max-h-[40vh] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.06) transparent' }}>
-                        <div className="flex items-center justify-between mb-3">
-                            <h4 className="text-xs font-bold text-[var(--sys-text)]">Select Product from Brand Catalog</h4>
-                            <button onClick={() => setShowProductPicker(false)} className="text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">
-                                <span className="material-symbols-outlined text-sm">close</span>
-                            </button>
-                        </div>
-
-                        {products.length === 0 ? (
-                            <p className="text-xs text-[var(--sys-text-muted)] text-center py-4">No products found. Add products in Brand DNA → Products.</p>
-                        ) : (
-                            <div className="grid grid-cols-2 gap-2">
-                                {products.map(p => (
-                                    <button key={p._id} onClick={() => { setSelectedProduct(p); setShowProductPicker(false) }}
-                                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                                            selectedProduct?._id === p._id ? 'border-[var(--sys-border)] bg-[var(--sys-surface)]' : 'border-[var(--sys-border)]/[0.06] bg-white/[0.02] hover:border-[var(--sys-border)] hover:bg-[var(--sys-surface)]'
-                                        }`}>
-                                        <div className="flex items-start gap-2">
-                                            {p.images?.[0] ? (
-                                                <img src={p.images[0].url} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
-                                            ) : (
-                                                <div className="w-10 h-10 rounded-lg bg-white/[0.06] flex items-center justify-center flex-shrink-0">
-                                                    <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-lg">image</span>
-                                                </div>
-                                            )}
-                                            <div className="min-w-0">
-                                                <p className="text-xs font-bold text-[var(--sys-text)] truncate">{p.title}</p>
-                                                {p.category && <p className="text-[10px] text-[var(--sys-text-muted)]">{p.category}</p>}
-                                                {p.price?.amount > 0 && <p className="text-[10px] text-[var(--sys-primary)]">{p.price.currency} {p.price.amount}</p>}
-                                            </div>
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-
-                        {/* Brand Images section */}
-                        {brandImages.length > 0 && (
-                            <>
-                                <h4 className="text-xs font-bold text-[var(--sys-text)] mt-4 mb-2">Brand Images</h4>
-                                <div className="flex gap-2 flex-wrap">
-                                    {brandImages.slice(0, 12).map((img, i) => (
-                                        <button key={i} onClick={() => { setRefImages(prev => [...prev.slice(-4), { url: img.url, name: img.alt }]); setShowProductPicker(false) }}
-                                            className="w-14 h-14 rounded-lg overflow-hidden border border-[var(--sys-border)]/[0.06] hover:border-[var(--sys-border)] transition-all cursor-pointer group relative">
-                                            <img src={img.url} alt={img.alt} className="w-full h-full object-cover" />
-                                            <div className="absolute inset-0 bg-[var(--sys-surface)] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <span className="material-symbols-outlined text-[var(--sys-text)] text-sm">add</span>
-                                            </div>
-                                        </button>
-                                    ))}
-                                </div>
-                            </>
-                        )}
+                {text && (
+                    <div className="px-3 py-2 rounded-2xl rounded-tr-sm text-xs text-[var(--sys-text)]"
+                        style={{ background: 'linear-gradient(135deg,rgba(20,184,166,0.15),rgba(139,92,246,0.15))', border: '1px solid rgba(20,184,166,0.2)' }}>
+                        {text}
                     </div>
                 )}
             </div>
-
-            {/* ══════════ RIGHT — How It Works + Status ══════════ */}
-            <div className="lg:col-span-4 space-y-4">
-
-                {/* Agentic Pipeline */}
-                <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]/[0.08]">
-                    <h3 className="text-sm font-bold text-[var(--sys-text)] flex items-center gap-2 mb-3">
-                        <span className="material-symbols-outlined text-[var(--sys-primary)] text-lg">auto_awesome</span>
-                        Agentic Pipeline
-                    </h3>
-                    <div className="space-y-2.5">
-                        {[
-                            { icon: 'chat', color: '#14b8a6', label: '1. Describe', desc: 'Type your creative vision in natural language' },
-                            { icon: 'face', color: '#a78bfa', label: '2. Character Ref', desc: 'Gemini generates reference sheet for consistency' },
-                            { icon: 'shopping_bag', color: '#f59e0b', label: '3. Product + Brand', desc: 'Auto-loads products, images, brand DNA' },
-                            { icon: 'movie_edit', color: '#06b6d4', label: '4. AI Storyboard', desc: 'Scenes with VO script + text overlays' },
-                            { icon: 'smart_display', color: '#8b5cf6', label: '5. Multi-Scene Gen', desc: 'Each scene with character consistency' },
-                            { icon: 'mic', color: '#ec4899', label: '6. Voiceover', desc: 'MiniMax/Sarvam TTS with vernacular support' },
-                            { icon: 'music_note', color: '#f97316', label: '7. AI Music', desc: 'AI-generated background music' },
-                            { icon: 'text_fields', color: '#22d3ee', label: '8. Text Overlays', desc: 'Brand name, CTA, price in any language' },
-                            { icon: 'movie_creation', color: '#10b981', label: '9. Compile', desc: 'FFmpeg stitches clips + VO + music + text' },
-                        ].map((step, i) => (
-                            <div key={i} className="flex items-start gap-2.5">
-                                <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0"
-                                    style={{ background: `${step.color}15`, border: `1px solid ${step.color}25` }}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: '12px', color: step.color }}>{step.icon}</span>
-                                </div>
-                                <div>
-                                    <p className="text-[11px] font-bold text-[var(--sys-text)]">{step.label}</p>
-                                    <p className="text-[10px] text-[var(--sys-text-muted)] leading-tight">{step.desc}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+        </div>
+    )
+}
+function AgentText({ text }) {
+    return (
+        <AgentBubble>
+            <div className="px-3 py-2.5 rounded-2xl rounded-tl-sm text-xs text-[var(--sys-text)] leading-relaxed glass-panel border border-[var(--sys-border)]/[0.08]">
+                {text}
+            </div>
+        </AgentBubble>
+    )
+}
+function TypingDots() {
+    return (
+        <AgentBubble>
+            <div className="px-3 py-2.5 rounded-2xl rounded-tl-sm glass-panel border border-[var(--sys-border)]/[0.08] inline-block">
+                <div className="flex gap-1 items-center">
+                    {[0, 150, 300].map(d => (
+                        <div key={d} className="w-1.5 h-1.5 rounded-full bg-[var(--sys-text-muted)] animate-bounce" style={{ animationDelay: `${d}ms` }} />
+                    ))}
                 </div>
+            </div>
+        </AgentBubble>
+    )
+}
 
-                {/* Current Pipeline Status */}
-                {pipeline && (
-                    <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]/[0.08]">
-                        <h3 className="text-sm font-bold text-[var(--sys-text)] flex items-center gap-2 mb-3">
-                            <span className="material-symbols-outlined video-highlight-text text-lg">analytics</span>
-                            Pipeline Status
-                        </h3>
-                        <div className="space-y-2 text-xs">
-                            <div className="flex justify-between"><span className="text-[var(--sys-text-muted)]">Title</span><span className="text-[var(--sys-text)] font-medium truncate ml-2">{pipeline.pipeline?.title}</span></div>
-                            <div className="flex justify-between"><span className="text-[var(--sys-text-muted)]">Scenes</span><span className="text-[var(--sys-text)]">{pipeline.pipeline?.totalScenes}</span></div>
-                            <div className="flex justify-between"><span className="text-[var(--sys-text-muted)]">Duration</span><span className="text-[var(--sys-text)]">~{pipeline.pipeline?.totalDuration}s</span></div>
-                            <div className="flex justify-between"><span className="text-[var(--sys-text-muted)]">Model</span><span className="text-[var(--sys-text)]">{MODEL_INFO[pipeline.pipeline?.model]?.icon} {MODEL_INFO[pipeline.pipeline?.model]?.name || pipeline.pipeline?.model}</span></div>
-                            <div className="flex justify-between"><span className="text-[var(--sys-text-muted)]">Voiceover</span><span className="text-[var(--sys-text)]">{pipeline.voiceover?.provider || 'None'}{pipeline.voiceover?.url?.startsWith('fal-pending:') ? ' (generating...)' : ''}</span></div>
-                            {pipeline.pipeline?.characterRefUsed && <div className="flex justify-between"><span className="text-[var(--sys-text-muted)]">Character</span><span className="video-highlight-text">👤 Ref sheet active</span></div>}
-                            {pipeline.audioFile && <div className="flex justify-between"><span className="text-[var(--sys-text-muted)]">Audio</span><span className="text-[var(--sys-primary)]">🎧 User audio {pipeline.audioFile.transcript ? '(transcribed ✓)' : '(base track)'}</span></div>}
-                            {pipeline.music?.url && <div className="flex justify-between"><span className="text-[var(--sys-text-muted)]">Music</span><span className="text-[var(--sys-primary)]">🎵 {pipeline.music.mood || 'AI Generated'}{pipeline.music.url?.startsWith('fal-pending:') ? ' (generating...)' : ''}</span></div>}
-                            {pipeline.textOverlays?.length > 0 && <div className="flex justify-between"><span className="text-[var(--sys-text-muted)]">Overlays</span><span className="text-[var(--sys-primary)]">📝 {pipeline.textOverlays.length} text layers</span></div>}
-                            {pipeline.productUsed && <div className="flex justify-between"><span className="text-[var(--sys-text-muted)]">Product</span><span className="text-[var(--sys-primary)]">📦 {pipeline.productUsed.imagesCount} images</span></div>}
-                        </div>
+// ── Inline action button ──────────────────────────────────────────────────────
+function QuickBtn({ icon, label, onClick, disabled, primary, danger }) {
+    let cls = 'flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all border disabled:opacity-40 disabled:cursor-not-allowed '
+    if (primary) cls += 'text-white border-transparent hover:opacity-90'
+    else if (danger) cls += 'text-red-400 border-red-500/20 bg-red-500/[0.06] hover:bg-red-500/[0.12]'
+    else cls += 'text-[var(--sys-text-muted)] border-[var(--sys-border)]/[0.1] hover:border-[var(--sys-border)] hover:text-[var(--sys-text)]'
+    return (
+        <button onClick={onClick} disabled={disabled} className={cls}
+            style={primary ? { background: 'linear-gradient(135deg,#14b8a6,#8b5cf6)' } : {}}>
+            {icon && <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>{icon}</span>}
+            {label}
+        </button>
+    )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN COMPONENT
+// ─────────────────────────────────────────────────────────────────────────────
+export default function VideoAgent({ activeBrand, canCreateVideo = true, onUpgradeRequired }) {
+
+    // ── Chat state ────────────────────────────────────────────────────────────
+    const [messages, setMessages] = useState([
+        { id: 'welcome', type: 'text', role: 'agent', text: "Hey! I'm your AI Video Director 🎬 Drop a brief, upload a product photo, share a competitor ad, or record a voice brief — I'll handle the rest." }
+    ])
+    const [inputText, setInputText]     = useState('')
+    const [attachments, setAttachments] = useState([])  // [{id,name,type,preview,url,analyzing}]
+    const [isTyping, setIsTyping]       = useState(false)
+    const [inputDisabled, setInputDisabled] = useState(false)
+
+    // ── Pipeline state ────────────────────────────────────────────────────────
+    const [stage, setStage]           = useState('idle')
+    const [sessionId, setSid]         = useState(null)
+    const [analysis, setAnalysis]     = useState(null)
+    const [plan, setPlan]             = useState(null)
+    const [refs, setRefs]             = useState(null)
+    const [storyboard, setStoryboard] = useState(null)
+    const [modelSel, setModelSel]     = useState(null)
+    const [selectedModel, setSelectedModel] = useState('seedance-2.0')
+    const [selectedRes, setSelectedRes]     = useState('1080p')
+    const [genResult, setGenResult]         = useState(null)
+    const [sceneStatuses, setSceneStatuses] = useState({})
+    const [compiledVideo, setCompiledVideo] = useState(null)
+    const [generating, setGenerating]       = useState(false)
+    const [products, setProducts]           = useState([])
+    const [selProduct, setSelProduct]       = useState(null)
+    const [showProducts, setShowProducts]   = useState(false)
+
+    // ── Refs ──────────────────────────────────────────────────────────────────
+    const bottomRef  = useRef(null)
+    const pollRef    = useRef(null)
+    const taRef      = useRef(null)
+    const imgInput   = useRef(null)
+    const vidInput   = useRef(null)
+    const audInput   = useRef(null)
+
+    // ── Load products ─────────────────────────────────────────────────────────
+    useEffect(() => {
+        if (!activeBrand?._id) return
+        api(`/video-studio/agent/products?brandId=${activeBrand._id}`)
+            .then(d => setProducts(d.products || []))
+            .catch(() => {})
+    }, [activeBrand?._id])
+
+    useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, isTyping])
+    useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
+
+    // Auto-resize textarea
+    useEffect(() => {
+        const ta = taRef.current
+        if (ta) { ta.style.height = 'auto'; ta.style.height = `${Math.min(ta.scrollHeight, 120)}px` }
+    }, [inputText])
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // MESSAGE HELPERS
+    // ─────────────────────────────────────────────────────────────────────────
+    function push(msg) {
+        setMessages(prev => [...prev, { id: `${Date.now()}-${Math.random()}`, ...msg }])
+    }
+    function pushAgent(text) { push({ type: 'text', role: 'agent', text }) }
+    function pushUser(text, media) { push({ type: 'text', role: 'user', text, media }) }
+    function pushCard(cardType, data) { push({ type: 'card', cardType, data }) }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // MEDIA UPLOAD
+    // ─────────────────────────────────────────────────────────────────────────
+    async function handleFileChange(e, fileType) {
+        const files = Array.from(e.target.files || [])
+        if (!files.length) return
+        e.target.value = ''
+
+        for (const file of files) {
+            const isImg = file.type.startsWith('image/')
+            const isVid = file.type.startsWith('video/')
+            const preview = (isImg || isVid) ? URL.createObjectURL(file) : null
+            const aid = `att-${Date.now()}-${Math.random()}`
+
+            setAttachments(prev => [...prev, { id: aid, name: file.name, type: fileType, preview, url: '', analyzing: true, file }])
+
+            try {
+                const fd = new FormData()
+                fd.append('file', file, file.name)
+                if (activeBrand?._id) fd.append('brandId', activeBrand._id)
+                const token = localStorage.getItem('mantram_token')
+                const resp = await fetch(`${API_BASE}/video-studio/agent/v2/analyze-media`, {
+                    method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd,
+                })
+                const data = await resp.json()
+                setAttachments(prev => prev.map(a => a.id === aid
+                    ? { ...a, analyzing: false, url: data.mediaUrl || a.preview || '', preview: data.thumbnailUrl || a.preview || '' }
+                    : a
+                ))
+                if (data.generatedBrief && !inputText.trim()) {
+                    setInputText(data.generatedBrief)
+                    pushAgent(`I analyzed your ${fileType} 👀 Here's a brief I drafted — edit it if you like, then hit send:\n\n"${data.generatedBrief}"`)
+                }
+            } catch (err) {
+                console.warn('[VideoAgent] Media analyze failed:', err.message)
+                setAttachments(prev => prev.map(a => a.id === aid ? { ...a, analyzing: false } : a))
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // CENTRAL MESSAGE HANDLER — entry point for ALL user input
+    // ─────────────────────────────────────────────────────────────────────────
+    async function handleSend() {
+        const msg = inputText.trim()
+        const media = [...attachments]
+        if (!msg && media.length === 0) return
+        if (!canCreateVideo && stage !== 'idle') { onUpgradeRequired?.(); return }
+
+        setInputText('')
+        setAttachments([])
+        pushUser(msg, media.map(a => ({ type: a.type, preview: a.preview })))
+
+        if (stage === 'idle') {
+            // ── START PIPELINE ────────────────────────────────────────────
+            if (!canCreateVideo) { onUpgradeRequired?.(); return }
+            setInputDisabled(true)
+            setIsTyping(true)
+            try {
+                const imageAttachments = media
+                    .filter(a => (a.type === 'image' || a.type === 'video') && (a.url || a.preview))
+                    .map(a => ({ url: a.url || a.preview, label: a.name, source: a.type }))
+
+                const result = await api('/video-studio/agent/v2/start', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        brief: msg || 'Create a compelling video ad',
+                        images: imageAttachments,
+                        brandId: activeBrand?._id || '',
+                        productId: selProduct?._id || null,
+                    }),
+                })
+                setSid(result.sessionId)
+                setAnalysis(result.analysis)
+                setSelectedModel(result.analysis?.modelRecommendation || 'seedance-2.0')
+                setStage('analyze')
+                setIsTyping(false)
+                pushAgent(`Got it! I've analyzed your brief — here's what I'm picking up 👇`)
+                pushCard('analysis', result.analysis)
+            } catch (err) {
+                setIsTyping(false)
+                pushAgent(`Hmm, something went wrong: ${err.message}. Try again?`)
+            } finally {
+                setInputDisabled(false)
+            }
+            return
+        }
+
+        // ── IN-PIPELINE: classify intent ──────────────────────────────────
+        setIsTyping(true)
+        setInputDisabled(true)
+        try {
+            const result = await api('/video-studio/agent/v2/chat', {
+                method: 'POST',
+                body: JSON.stringify({
+                    sessionId, stage, message: msg,
+                    planContext: plan,
+                    storyboardContext: storyboard,
+                    analysisContext: analysis,
+                }),
+            })
+
+            const { intent, params, agentResponse } = result
+            setIsTyping(false)
+
+            // Show agent response first (personality layer)
+            pushAgent(agentResponse)
+
+            // Route to action
+            switch (intent) {
+                case 'APPROVE':       await advanceStage(); break
+                case 'MODIFY_PLAN':   await doModifyPlan(params); break
+                case 'SWITCH_MODEL':  handleSwitchModel(params?.model); break
+                case 'ADD_CONTEXT':   await doReanalyze(msg); break
+                case 'START_OVER':    setTimeout(resetAll, 1200); break
+                case 'GENERATE_NOW':  await doGenerateNow(); break
+                case 'ASK_QUESTION':  break  // already answered by agentResponse
+                case 'AMBIGUOUS':     break  // already responded
+                default:              break
+            }
+        } catch (err) {
+            setIsTyping(false)
+            pushAgent(`Something went wrong — ${err.message}. Try again?`)
+        } finally {
+            setInputDisabled(false)
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // STAGE ADVANCEMENT — what APPROVE does at each stage
+    // ─────────────────────────────────────────────────────────────────────────
+    async function advanceStage() {
+        switch (stage) {
+            case 'analyze':    await doGeneratePlan({}); break
+            case 'plan':       await doGenerateRefs(); break
+            case 'refs-review': await doApproveRefs(); break
+            case 'storyboard': await doSelectModel(selectedModel); break
+            case 'model':      await doGenerate(); break
+            case 'generate':   break
+            default:           break
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // PIPELINE ACTIONS
+    // ─────────────────────────────────────────────────────────────────────────
+    async function doGeneratePlan(overrides = {}) {
+        setInputDisabled(true); setIsTyping(true)
+        try {
+            const result = await api('/video-studio/agent/v2/plan', {
+                method: 'POST',
+                body: JSON.stringify({
+                    sessionId,
+                    durationOverride: overrides.duration || null,
+                    ratioOverride: overrides.ratio || null,
+                    videoTypeOverride: overrides.videoType || null,
+                }),
+            })
+            setPlan(result.plan)
+            setSelectedModel(result.plan?.modelRecommendation || selectedModel)
+            setStage('plan')
+            setIsTyping(false)
+            pushAgent(`Creative plan locked in — "${result.plan?.title}" ✨ Take a look, then I'll generate your reference images.`)
+            pushCard('plan', result.plan)
+        } catch (err) {
+            setIsTyping(false)
+            pushAgent(`Plan generation hit a snag: ${err.message}`)
+        } finally { setInputDisabled(false) }
+    }
+
+    async function doModifyPlan(params = {}) {
+        // Re-run plan with overrides
+        await doGeneratePlan(params)
+    }
+
+    async function doGenerateRefs() {
+        setInputDisabled(true); setIsTyping(true)
+        pushAgent('Generating reference images — character, product, and set mood 🎨 This takes about 30 seconds...')
+        try {
+            const result = await api('/video-studio/agent/v2/generate-refs', {
+                method: 'POST',
+                body: JSON.stringify({ sessionId }),
+            })
+            setRefs(result.refs)
+            setStage(result.autoApproved ? 'storyboard' : 'refs-review')
+            setIsTyping(false)
+            if (result.autoApproved) {
+                pushAgent('References auto-approved ✅ Building your storyboard now...')
+                pushCard('refs', result.refs)
+                await doBuildStoryboard()
+            } else {
+                pushAgent('Here are your reference images 👇 Hover to regenerate any, or approve to lock them in.')
+                pushCard('refs', result.refs)
+            }
+        } catch (err) {
+            setIsTyping(false)
+            pushAgent(`Reference image generation failed: ${err.message}`)
+        } finally { setInputDisabled(false) }
+    }
+
+    async function doApproveRefs() {
+        setInputDisabled(true); setIsTyping(true)
+        try {
+            await api('/video-studio/agent/v2/approve-refs', {
+                method: 'POST',
+                body: JSON.stringify({ sessionId, approvedRefs: refs }),
+            })
+            setStage('storyboard')
+            setIsTyping(false)
+            pushAgent('References locked! Building the full storyboard now 🎬')
+            await doBuildStoryboard()
+        } catch (err) {
+            setIsTyping(false)
+            pushAgent(`Approval failed: ${err.message}`)
+        } finally { setInputDisabled(false) }
+    }
+
+    async function doBuildStoryboard() {
+        setIsTyping(true)
+        try {
+            const result = await api('/video-studio/agent/v2/storyboard', {
+                method: 'POST',
+                body: JSON.stringify({ sessionId }),
+            })
+            setStoryboard(result.storyboard)
+            setStage('model')
+            setIsTyping(false)
+            const recModel = plan?.modelRecommendation || selectedModel
+            pushAgent(`Storyboard done — ${result.storyboard?.cuts?.length || 0} cuts mapped out 🎞️ I'm recommending **${recModel}** for this. You can switch if you prefer, or just say "generate"!`)
+            pushCard('storyboard', result.storyboard)
+        } catch (err) {
+            setIsTyping(false)
+            pushAgent(`Storyboard build failed: ${err.message}`)
+        }
+    }
+
+    function handleSwitchModel(modelId) {
+        const m = MODELS.find(x => x.id === modelId)
+        if (m) {
+            setSelectedModel(m.id)
+            // Update the last storyboard card's selected model
+            pushCard('modelSwitch', { model: m })
+        }
+    }
+
+    async function doSelectModel(model = selectedModel) {
+        setInputDisabled(true); setIsTyping(true)
+        try {
+            const result = await api('/video-studio/agent/v2/select-model', {
+                method: 'POST',
+                body: JSON.stringify({ sessionId, model, resolution: selectedRes, qualityMode: 'fast' }),
+            })
+            setModelSel(result.modelSelection)
+            setStage('generate')
+            setIsTyping(false)
+            pushAgent(`Prompt written for ${model} ✅ Ready to generate your ${plan?.duration}s ${plan?.ratio} video. Say "generate" or hit the button below!`)
+            pushCard('readyToGenerate', result.modelSelection)
+        } catch (err) {
+            setIsTyping(false)
+            pushAgent(`Model setup failed: ${err.message}`)
+        } finally { setInputDisabled(false) }
+    }
+
+    async function doGenerate() {
+        if (!canCreateVideo) { onUpgradeRequired?.(); return }
+        setInputDisabled(true); setIsTyping(true)
+        try {
+            const result = await api('/video-studio/agent/v2/generate', {
+                method: 'POST',
+                body: JSON.stringify({ sessionId }),
+            })
+            setGenResult(result)
+            setStage('generating')
+            setGenerating(true)
+            setIsTyping(false)
+            pushAgent(`Generation kicked off! 🚀 I'll update you as each scene completes.`)
+            pushCard('generating', { result, plan, isLongForm: result.isLongForm })
+
+            if (result.isLongForm) {
+                pollLongForm(result.longFormJobId || result.projectId)
+            } else {
+                const ids = {}
+                ;(result.scenes || []).forEach(s => {
+                    if (s.projectId) ids[s.projectId] = { status: 'generating', progress: 5 }
+                })
+                setSceneStatuses(ids)
+                if (Object.keys(ids).length) startPolling(Object.keys(ids))
+                else setGenerating(false)
+            }
+        } catch (err) {
+            setIsTyping(false)
+            setGenerating(false)
+            pushAgent(`Generation failed: ${err.message}`)
+        } finally { setInputDisabled(false) }
+    }
+
+    async function doGenerateNow() {
+        // Skip straight to generate regardless of current stage
+        if (stage === 'model' || stage === 'storyboard') {
+            if (!modelSel) await doSelectModel()
+            else await doGenerate()
+        } else if (stage === 'generate') {
+            await doGenerate()
+        }
+    }
+
+    async function doReanalyze(additionalContext) {
+        // Add context to brief and re-run analysis
+        setInputDisabled(true); setIsTyping(true)
+        try {
+            const result = await api('/video-studio/agent/v2/start', {
+                method: 'POST',
+                body: JSON.stringify({
+                    brief: `${analysis?.summary || ''}\n\nAdditional context: ${additionalContext}`,
+                    images: [],
+                    brandId: activeBrand?._id || '',
+                    productId: selProduct?._id || null,
+                }),
+            })
+            setSid(result.sessionId)
+            setAnalysis(result.analysis)
+            setPlan(null); setRefs(null); setStoryboard(null); setModelSel(null)
+            setStage('analyze')
+            setIsTyping(false)
+            pushAgent('Re-analyzed with your new context 🧠 Updated plan incoming:')
+            pushCard('analysis', result.analysis)
+        } catch (err) {
+            setIsTyping(false)
+            pushAgent(`Re-analysis failed: ${err.message}`)
+        } finally { setInputDisabled(false) }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // POLLING
+    // ─────────────────────────────────────────────────────────────────────────
+    function startPolling(ids) {
+        pollRef.current = setInterval(async () => {
+            const updated = {}
+            let allDone = true
+            for (const id of ids) {
+                try {
+                    const r = await api(`/video-studio/${id}/status`)
+                    const proj = r.project
+                    if (proj.generation?.videoUrl || ['done','completed','critique'].includes(proj.status)) {
+                        updated[id] = { status: 'done', videoUrl: `${API_BASE}/video-studio/${id}/video`, progress: 100 }
+                    } else if (['failed','error'].includes(proj.status)) {
+                        updated[id] = { status: 'failed', progress: 0 }
+                    } else {
+                        updated[id] = { status: 'generating', progress: proj.generation?.progress || 15 }
+                        allDone = false
+                    }
+                } catch { updated[id] = { status: 'generating', progress: 15 }; allDone = false }
+            }
+            setSceneStatuses(updated)
+            if (allDone) {
+                clearInterval(pollRef.current)
+                setGenerating(false)
+                setStage('done')
+                const doneUrls = Object.values(updated).filter(s => s.status === 'done').map(s => s.videoUrl)
+                if (doneUrls.length > 0) {
+                    pushAgent(`Your video${doneUrls.length > 1 ? 's are' : ' is'} ready! 🎉 Download below or create another one.`)
+                    pushCard('videos', { videoUrls: doneUrls, plan })
+                }
+            }
+        }, 6000)
+    }
+
+    function pollLongForm(jobId) {
+        let tries = 0
+        pollRef.current = setInterval(async () => {
+            if (++tries > 90) { clearInterval(pollRef.current); setGenerating(false); return }
+            try {
+                const r = await api(`/video-studio/storyboard/${jobId}/long-form-status`)
+                if (r.status === 'done' || r.finalVideoUrl) {
+                    clearInterval(pollRef.current)
+                    setCompiledVideo(r.finalVideoUrl)
+                    setGenerating(false)
+                    setStage('done')
+                    pushAgent('Your long-form video is ready! 🎬 Full cut compiled below.')
+                    pushCard('videos', { videoUrls: [r.finalVideoUrl], plan, isCompiled: true })
+                }
+            } catch { /* retry */ }
+        }, 8000)
+    }
+
+    async function handleRegenerateRef(refType, refIndex) {
+        try {
+            const result = await api(`/video-studio/agent/v2/${sessionId}/regenerate-ref`, {
+                method: 'POST',
+                body: JSON.stringify({ refType, refIndex }),
+            })
+            setRefs(prev => {
+                const key = `${refType}Refs`
+                const updated = { ...prev, [key]: [...(prev[key] || [])] }
+                updated[key][refIndex] = result.ref
+                return updated
+            })
+        } catch (err) { pushAgent(`Couldn't regenerate that image: ${err.message}`) }
+    }
+
+    async function handleDownload(url, name) {
+        try {
+            const r = await fetch(url, { headers: { Authorization: `Bearer ${localStorage.getItem('mantram_token')}` } })
+            const blob = await r.blob()
+            const a = document.createElement('a')
+            a.href = URL.createObjectURL(blob); a.download = `${name}.mp4`
+            document.body.appendChild(a); a.click()
+            setTimeout(() => document.body.removeChild(a), 100)
+        } catch { window.open(url, '_blank') }
+    }
+
+    function resetAll() {
+        setStage('idle'); setSid(null); setAnalysis(null); setPlan(null)
+        setRefs(null); setStoryboard(null); setModelSel(null); setGenResult(null)
+        setSceneStatuses({}); setCompiledVideo(null); setGenerating(false)
+        setInputText(''); setAttachments([]); setSelProduct(null)
+        if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+        setMessages([{
+            id: 'welcome-reset', type: 'text', role: 'agent',
+            text: "All clear! What's the next video we're making? 🎬"
+        }])
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // CARD RENDERERS
+    // ─────────────────────────────────────────────────────────────────────────
+
+    function renderAnalysisCard(data) {
+        return (
+            <div className="glass-panel rounded-2xl rounded-tl-sm p-4 border border-[var(--sys-border)]/[0.08]">
+                <p className="text-xs text-[var(--sys-text-muted)] leading-relaxed mb-3">{data.summary}</p>
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                    {[data.contentType, data.brandCategory, data.detectedStyle, ...(data.toneKeywords || []).slice(0, 2)].filter(Boolean).map((t, i) => (
+                        <span key={i} className="px-2 py-0.5 rounded-full text-[10px] font-medium text-[var(--sys-primary)] border border-[var(--sys-primary)]/20 bg-[var(--sys-primary)]/[0.06]">{t}</span>
+                    ))}
+                    <span className="px-2 py-0.5 rounded-full text-[10px] text-amber-400 border border-amber-500/20 bg-amber-500/[0.06]">⏱ {data.suggestedDuration}s</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] text-amber-400 border border-amber-500/20 bg-amber-500/[0.06]">{data.suggestedRatio}</span>
+                </div>
+                {stage === 'analyze' && (
+                    <div className="flex gap-2">
+                        <QuickBtn primary icon="auto_awesome" label="Build Creative Plan" onClick={() => { pushUser('Looks great, build the plan!'); doGeneratePlan({}) }} />
+                        <QuickBtn icon="tune" label="Customize" onClick={() => pushAgent("Sure! Tell me what to change — duration, format, style, or video type and I'll adjust the plan.")} />
                     </div>
                 )}
+            </div>
+        )
+    }
 
-                {/* Capabilities */}
-                <div className="glass-panel rounded-2xl p-5 border border-[var(--sys-border)]/[0.08]">
-                    <h3 className="text-sm font-bold text-[var(--sys-text)] flex items-center gap-2 mb-3">
-                        <span className="material-symbols-outlined text-[var(--sys-primary)] text-lg">bolt</span>
-                        What Makes This Different
-                    </h3>
+    function renderPlanCard(data) {
+        return (
+            <div className="glass-panel rounded-2xl rounded-tl-sm p-4 border border-[var(--sys-primary)]/20 bg-[var(--sys-primary)]/[0.02]">
+                <p className="text-sm font-bold text-[var(--sys-primary)] mb-1">{data.title}</p>
+                <p className="text-[10px] text-[var(--sys-text-muted)] italic mb-2">{data.hookStrategy}</p>
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                    {[`⏱ ${data.duration}s`, `📐 ${data.ratio}`, `🎬 ${data.videoType}`, `💡 ${data.modelRecommendation}`].map((t, i) => (
+                        <span key={i} className="px-2 py-0.5 rounded-full text-[10px] text-[var(--sys-primary)] border border-[var(--sys-primary)]/20 bg-[var(--sys-primary)]/[0.06]">{t}</span>
+                    ))}
+                </div>
+                <div className="space-y-1 mb-3">
+                    {(data.scenePlan || []).map((sc, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                            <span className="text-[9px] font-bold text-[var(--sys-primary)] w-20 shrink-0">{sc.role}</span>
+                            <div className="flex-1 h-1 rounded-full bg-[var(--sys-primary)]/10">
+                                <div className="h-full rounded-full bg-[var(--sys-primary)]/40" style={{ width: `${(sc.duration / (data.duration || 30)) * 100}%` }} />
+                            </div>
+                            <span className="text-[9px] text-[var(--sys-text-muted)] w-6 text-right">{sc.duration}s</span>
+                        </div>
+                    ))}
+                </div>
+                <p className="text-[10px] text-[var(--sys-text-muted)] italic mb-3">{data.styleGuide}</p>
+                {stage === 'plan' && (
+                    <div className="flex gap-2 flex-wrap">
+                        <QuickBtn primary icon="image_search" label="Generate Refs" onClick={() => { pushUser('Approved! Generate references.'); doGenerateRefs() }} />
+                        <QuickBtn icon="edit" label="Change duration" onClick={() => pushAgent("What duration do you want? Just type it — like '45 seconds' or '1 minute'.")} />
+                        <QuickBtn icon="aspect_ratio" label="Change ratio" onClick={() => pushAgent("Which ratio? 9:16 for vertical, 16:9 for landscape, 1:1 for square, or 4:5 for feed.")} />
+                    </div>
+                )}
+            </div>
+        )
+    }
+
+    function renderRefsCard(data) {
+        const refSections = [
+            { key: 'characterRefs', label: '👤 Character', type: 'character' },
+            { key: 'productRefs',   label: '📦 Product',   type: 'product' },
+            { key: 'locationRefs',  label: '🎨 Location',  type: 'location' },
+        ].filter(({ key }) => data[key]?.length > 0)
+
+        return (
+            <div className="glass-panel rounded-2xl rounded-tl-sm p-4 border border-[var(--sys-border)]/[0.08]">
+                {refSections.map(({ key, label, type }) => (
+                    <div key={key} className="mb-3">
+                        <p className="text-[10px] font-bold text-[var(--sys-text-muted)] mb-2">{label}</p>
+                        <div className="flex gap-2 flex-wrap">
+                            {data[key].map((ref, idx) => (
+                                <div key={idx} className="relative group rounded-xl overflow-hidden border border-[var(--sys-border)]/[0.1]" style={{ width: 100, height: 75 }}>
+                                    <img src={ref.url} alt={ref.label} className="w-full h-full object-cover" />
+                                    <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                                        <button onClick={() => handleRegenerateRef(type, idx)}
+                                            className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white cursor-pointer" title="Regenerate">
+                                            <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>refresh</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ))}
+                {stage === 'refs-review' && (
+                    <div className="flex gap-2 mt-2">
+                        <QuickBtn icon="refresh" label="Redo All" onClick={() => { pushUser('Regenerate all refs please.'); doGenerateRefs() }} />
+                        <QuickBtn primary icon="check_circle" label="Approve Refs ✅" onClick={() => { pushUser('These refs look great! Approve.'); doApproveRefs() }} />
+                    </div>
+                )}
+            </div>
+        )
+    }
+
+    function renderStoryboardCard(data) {
+        return (
+            <div className="glass-panel rounded-2xl rounded-tl-sm p-4 border border-[var(--sys-border)]/[0.08]">
+                {data.posterUrl && (
+                    <div className="rounded-xl overflow-hidden border border-[var(--sys-border)]/[0.1] mb-3" style={{ aspectRatio: '16/9' }}>
+                        <img src={data.posterUrl} alt="Storyboard" className="w-full h-full object-cover" />
+                    </div>
+                )}
+                {data.environmentFingerprint && (
+                    <p className="text-[10px] text-[var(--sys-text-muted)] italic mb-2">📍 {data.environmentFingerprint}</p>
+                )}
+                <div className="space-y-1 max-h-28 overflow-y-auto mb-3">
+                    {(data.cuts || []).map((cut, i) => (
+                        <div key={i} className="flex items-start gap-2 p-1.5 rounded-lg bg-white/[0.02]">
+                            <span className="text-[9px] font-bold text-[var(--sys-primary)] px-1.5 py-0.5 rounded bg-[var(--sys-primary)]/10 shrink-0">C{cut.id || i + 1}</span>
+                            <span className="text-[10px] text-[var(--sys-text-muted)] flex-1 line-clamp-2">{cut.scene}</span>
+                            <span className="text-[9px] text-[var(--sys-text-muted)] shrink-0">{cut.duration}s</span>
+                        </div>
+                    ))}
+                </div>
+                {data.colorPalette?.length > 0 && (
+                    <div className="flex items-center gap-1.5 mb-3">
+                        <span className="text-[10px] text-[var(--sys-text-muted)]">Palette:</span>
+                        {data.colorPalette.slice(0, 6).map((c, i) => (
+                            <div key={i} className="w-4 h-4 rounded-full border border-white/10" style={{ background: c }} title={c} />
+                        ))}
+                    </div>
+                )}
+                {/* Model picker embedded in storyboard card */}
+                {stage === 'model' && (
+                    <>
+                        <div className="border-t border-[var(--sys-border)]/[0.06] pt-3 mb-3">
+                            <p className="text-[10px] text-[var(--sys-text-muted)] mb-2 font-bold">Choose your AI engine:</p>
+                            <div className="grid grid-cols-2 gap-1.5 mb-2">
+                                {MODELS.map(m => (
+                                    <button key={m.id} onClick={() => setSelectedModel(m.id)}
+                                        className={`p-2 rounded-xl border text-left cursor-pointer transition-all ${selectedModel === m.id ? 'border-[var(--sys-primary)] bg-[var(--sys-primary)]/[0.08]' : 'border-[var(--sys-border)]/[0.08] hover:border-[var(--sys-border)]'}`}>
+                                        <div className="flex items-center gap-1.5 mb-0.5">
+                                            <span className="text-sm">{m.icon}</span>
+                                            <span className="text-[10px] font-bold text-[var(--sys-text)] flex-1 truncate">{m.name}</span>
+                                            {m.id === plan?.modelRecommendation && <span className="text-[8px] px-1 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">AI Pick</span>}
+                                            {selectedModel === m.id && <span className="material-symbols-outlined text-[var(--sys-primary)] shrink-0" style={{ fontSize: '12px' }}>check_circle</span>}
+                                        </div>
+                                        <p className="text-[9px] text-[var(--sys-text-muted)]">{m.tagline} • max {m.maxDur}s</p>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            <QuickBtn primary icon="movie" label={`Generate ${plan?.duration}s Video 🎬`} onClick={() => { pushUser(`Let's generate with ${selectedModel}!`); doSelectModel(selectedModel) }} />
+                        </div>
+                    </>
+                )}
+            </div>
+        )
+    }
+
+    function renderReadyCard(data) {
+        return (
+            <div className="glass-panel rounded-2xl rounded-tl-sm p-4 border border-[var(--sys-primary)]/20 bg-[var(--sys-primary)]/[0.02]">
+                <p className="text-xs font-bold text-[var(--sys-text)] mb-2">🎬 All systems go!</p>
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                    {[`🤖 ${data.model}`, `📺 ${data.resolution}`, `⏱ ${plan?.duration}s`, `📐 ${plan?.ratio}`].map((t, i) => (
+                        <span key={i} className="px-2 py-0.5 rounded-full text-[10px] text-[var(--sys-primary)] border border-[var(--sys-primary)]/20 bg-[var(--sys-primary)]/[0.06]">{t}</span>
+                    ))}
+                </div>
+                {data.finalPrompt && (
+                    <div className="p-2 rounded-lg bg-black/20 border border-[var(--sys-border)]/[0.06] mb-3">
+                        <p className="text-[9px] text-[var(--sys-text-muted)] font-bold mb-1">FINAL PROMPT</p>
+                        <p className="text-[10px] text-[var(--sys-text-muted)] leading-relaxed line-clamp-4">{data.finalPrompt}</p>
+                    </div>
+                )}
+                {stage === 'generate' && (
+                    <QuickBtn primary icon="rocket_launch" label="🚀 Generate Now!" onClick={() => { pushUser('Generate it!'); doGenerate() }} />
+                )}
+            </div>
+        )
+    }
+
+    function renderGeneratingCard({ result, plan: p, isLongForm }) {
+        return (
+            <div className="glass-panel rounded-2xl rounded-tl-sm p-4 border border-[var(--sys-border)]/[0.08]">
+                {isLongForm ? (
+                    <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[var(--sys-primary)] animate-spin text-base">progress_activity</span>
+                        <div>
+                            <p className="text-xs font-bold text-[var(--sys-text)]">Long-form generation running...</p>
+                            <p className="text-[10px] text-[var(--sys-text-muted)]">Generating {Math.ceil((p?.duration || 30) / 10)} segments. Sit tight — 5-15 mins.</p>
+                        </div>
+                    </div>
+                ) : (
                     <div className="space-y-2">
-                        {[
-                            { q: '👤 Character Consistency', a: 'Gemini generates reference sheets to maintain faces across all scenes' },
-                            { q: '📝 Text Overlays', a: 'Brand name, CTA, price burned into video in any language' },
-                            { q: '🎵 AI Music', a: 'Background music auto-generated matching the video mood' },
-                            { q: '🛍️ Products', a: 'Auto-uses product images as first frames in scenes' },
-                            { q: '🎙️ Voiceover', a: 'AI script + MiniMax/Sarvam TTS with vernacular support' },
-                            { q: '🎬 Multi-scene', a: 'Long videos break into 5-15s scenes with character consistency' },
-                            { q: '🤖 7 AI Models', a: 'Kling 3.0, Veo 3.1, Seedance 2.0, Hunyuan, Grok' },
-                        ].map((item, i) => (
-                            <div key={i} className="p-2 rounded-lg bg-white/[0.02] border border-[var(--sys-border)]/[0.04]">
-                                <p className="text-[10px] font-bold text-[var(--sys-primary)]">{item.q}</p>
-                                <p className="text-[10px] text-[var(--sys-text-muted)]">{item.a}</p>
+                        <p className="text-xs font-bold text-[var(--sys-text)] mb-2 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-[var(--sys-primary)] animate-spin text-sm">progress_activity</span>
+                            Rendering scenes...
+                        </p>
+                        {Object.entries(sceneStatuses).map(([id, st], idx) => (
+                            <div key={id} className="flex items-center gap-2">
+                                <span className="text-[10px] text-[var(--sys-text-muted)] w-14 shrink-0">Scene {idx + 1}</span>
+                                <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                                    <div className="h-full rounded-full transition-all duration-700" style={{
+                                        width: `${st.progress || 0}%`,
+                                        background: st.status === 'done' ? '#10b981' : st.status === 'failed' ? '#ef4444' : 'linear-gradient(90deg,#14b8a6,#8b5cf6)',
+                                    }} />
+                                </div>
+                                <span className="text-[9px] shrink-0" style={{ color: st.status === 'done' ? '#10b981' : st.status === 'failed' ? '#ef4444' : '#94a3b8' }}>
+                                    {st.status === 'done' ? '✅' : st.status === 'failed' ? '❌' : `${st.progress || 0}%`}
+                                </span>
                             </div>
                         ))}
                     </div>
+                )}
+            </div>
+        )
+    }
+
+    function renderVideosCard({ videoUrls, plan: p, isCompiled }) {
+        return (
+            <div className="space-y-3">
+                {videoUrls.map((url, i) => (
+                    <div key={i} className="rounded-2xl overflow-hidden border border-[var(--sys-primary)]/20 bg-black relative has-vha">
+                        <video src={url} controls className="w-full block" />
+                        <VideoHoverActions videoUrl={url} />
+                        <div className="flex items-center justify-between px-3 py-2">
+                            <span className="text-[10px] font-bold text-[var(--sys-primary)]">
+                                {isCompiled ? `Final — ${p?.duration}s` : `Scene ${i + 1}`}
+                            </span>
+                            <button onClick={() => handleDownload(url, isCompiled ? 'final-video' : `scene-${i + 1}`)}
+                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-[var(--sys-primary)] border border-[var(--sys-primary)]/30 cursor-pointer hover:bg-[var(--sys-primary)]/[0.08] transition-all">
+                                <span className="material-symbols-outlined" style={{ fontSize: '11px' }}>download</span> Download
+                            </button>
+                        </div>
+                    </div>
+                ))}
+                <QuickBtn icon="add_circle" label="Create Another Video" onClick={() => { pushUser('Create another video!'); resetAll() }} />
+            </div>
+        )
+    }
+
+    function renderModelSwitchCard({ model }) {
+        return (
+            <div className="glass-panel rounded-xl rounded-tl-sm p-3 border border-[var(--sys-border)]/[0.08] flex items-center gap-2">
+                <span className="text-lg">{model.icon}</span>
+                <div>
+                    <p className="text-xs font-bold text-[var(--sys-text)]">{model.name} selected</p>
+                    <p className="text-[10px] text-[var(--sys-text-muted)]">{model.tagline}</p>
+                </div>
+                <span className="material-symbols-outlined text-[var(--sys-primary)] ml-auto" style={{ fontSize: '16px' }}>check_circle</span>
+            </div>
+        )
+    }
+
+    // ── Master card dispatcher ────────────────────────────────────────────────
+    function renderCard(msg) {
+        switch (msg.cardType) {
+            case 'analysis':        return renderAnalysisCard(msg.data)
+            case 'plan':            return renderPlanCard(msg.data)
+            case 'refs':            return renderRefsCard(msg.data)
+            case 'storyboard':      return renderStoryboardCard(msg.data)
+            case 'readyToGenerate': return renderReadyCard(msg.data)
+            case 'generating':      return renderGeneratingCard(msg.data)
+            case 'videos':          return renderVideosCard(msg.data)
+            case 'modelSwitch':     return renderModelSwitchCard(msg.data)
+            default:                return null
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // RENDER
+    // ─────────────────────────────────────────────────────────────────────────
+    return (
+        <div className="flex flex-col" style={{ height: '78vh' }}>
+
+            {/* ── Header breadcrumb ──────────────────────────────────────── */}
+            <div className="flex-shrink-0 flex items-center gap-2 pb-3">
+                <div className="flex items-center gap-1.5">
+                    <div className="w-6 h-6 rounded-lg flex items-center justify-center text-xs" style={{ background: 'linear-gradient(135deg,#14b8a6,#8b5cf6)' }}>🤖</div>
+                    <span className="text-xs font-bold text-[var(--sys-text)]">AI Video Director</span>
+                    <span className="text-[10px] text-[var(--sys-text-muted)] ml-1">• {activeBrand?.name || 'No brand'}</span>
+                </div>
+                {stage !== 'idle' && (
+                    <button onClick={() => { pushUser('Start over please.'); setTimeout(resetAll, 800) }}
+                        className="ml-auto flex items-center gap-1 px-2 py-1 rounded-full text-[10px] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] border border-[var(--sys-border)]/[0.08] cursor-pointer transition-all">
+                        <span className="material-symbols-outlined" style={{ fontSize: '10px' }}>restart_alt</span> New
+                    </button>
+                )}
+            </div>
+
+            {/* ── Chat stream ───────────────────────────────────────────── */}
+            <div className="flex-1 overflow-y-auto space-y-0 pr-1">
+                {messages.map(msg => {
+                    if (msg.role === 'user') return <UserBubble key={msg.id} text={msg.text} media={msg.media} />
+                    if (msg.type === 'text' && msg.role === 'agent') return <AgentText key={msg.id} text={msg.text} />
+                    if (msg.type === 'card') return (
+                        <AgentBubble key={msg.id}>{renderCard(msg)}</AgentBubble>
+                    )
+                    return null
+                })}
+                {isTyping && <TypingDots />}
+
+                {/* Live generation progress overlay (updates existing card) */}
+                {generating && Object.keys(sceneStatuses).length > 0 && (
+                    <AgentBubble>
+                        <div className="glass-panel rounded-2xl rounded-tl-sm p-4 border border-[var(--sys-border)]/[0.08]">
+                            <p className="text-xs font-bold text-[var(--sys-text)] mb-2 flex items-center gap-2">
+                                <span className="material-symbols-outlined text-[var(--sys-primary)] animate-spin text-sm">progress_activity</span>
+                                Rendering...
+                            </p>
+                            {Object.entries(sceneStatuses).map(([id, st], idx) => (
+                                <div key={id} className="flex items-center gap-2 mb-1">
+                                    <span className="text-[10px] text-[var(--sys-text-muted)] w-14 shrink-0">Scene {idx + 1}</span>
+                                    <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                                        <div className="h-full rounded-full transition-all duration-700" style={{
+                                            width: `${st.progress || 0}%`,
+                                            background: st.status === 'done' ? '#10b981' : 'linear-gradient(90deg,#14b8a6,#8b5cf6)',
+                                        }} />
+                                    </div>
+                                    <span className="text-[9px]" style={{ color: st.status === 'done' ? '#10b981' : '#94a3b8' }}>
+                                        {st.status === 'done' ? '✅' : `${st.progress || 0}%`}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </AgentBubble>
+                )}
+
+                <div ref={bottomRef} />
+            </div>
+
+            {/* ── Generated brief preview ───────────────────────────────── */}
+            {stage === 'idle' && attachments.some(a => a.analyzing) && (
+                <div className="flex-shrink-0 flex items-center gap-2 px-3 py-2 mb-2 rounded-xl border border-[var(--sys-primary)]/20 bg-[var(--sys-primary)]/[0.04]">
+                    <span className="material-symbols-outlined text-[var(--sys-primary)] animate-spin text-sm">progress_activity</span>
+                    <span className="text-[11px] text-[var(--sys-text-muted)]">Analyzing your media...</span>
+                </div>
+            )}
+
+            {/* ── Attachment previews ───────────────────────────────────── */}
+            {attachments.length > 0 && (
+                <div className="flex-shrink-0 flex gap-2 pb-2 overflow-x-auto">
+                    {attachments.map(a => (
+                        <div key={a.id} className="relative shrink-0 w-14 h-14 rounded-xl overflow-hidden border border-[var(--sys-border)]/[0.1] bg-[var(--sys-surface)]">
+                            {a.preview && a.type !== 'audio'
+                                ? <img src={a.preview} alt="" className="w-full h-full object-cover" />
+                                : <div className="w-full h-full flex items-center justify-center text-2xl">{a.type === 'audio' ? '🎵' : '📷'}</div>
+                            }
+                            {a.analyzing && (
+                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                    <span className="material-symbols-outlined text-white animate-spin text-sm">progress_activity</span>
+                                </div>
+                            )}
+                            <button onClick={() => setAttachments(p => p.filter(x => x.id !== a.id))}
+                                className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/70 text-white text-[9px] flex items-center justify-center cursor-pointer">✕</button>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* ── Input bar — always visible ────────────────────────────── */}
+            <div className="flex-shrink-0 glass-panel rounded-2xl border border-[var(--sys-border)]/[0.1] overflow-hidden">
+                {selProduct && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[var(--sys-border)]/[0.06]">
+                        {selProduct.images?.[0] && <img src={selProduct.images[0].url} alt="" className="w-5 h-5 rounded object-cover" />}
+                        <span className="text-[10px] text-[var(--sys-primary)] flex-1 truncate">{selProduct.title}</span>
+                        <button onClick={() => setSelProduct(null)} className="text-[10px] text-[var(--sys-text-muted)] cursor-pointer">✕</button>
+                    </div>
+                )}
+                <textarea ref={taRef} value={inputText} onChange={e => setInputText(e.target.value)} rows={1}
+                    disabled={inputDisabled}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
+                    placeholder={
+                        stage === 'idle' ? "Describe your video, or upload an image / video / audio brief..." :
+                        stage === 'analyze' ? "Say 'looks good' or ask to change duration, ratio, style..." :
+                        stage === 'plan' ? "Approve, or ask to change anything — '45 seconds', 'make it more cinematic'..." :
+                        stage === 'refs-review' ? "Approve refs, or say 'regenerate character'..." :
+                        stage === 'model' ? "Say which model, or 'use kling', or just 'generate'..." :
+                        "Talk to me..."
+                    }
+                    className="w-full bg-transparent px-4 pt-3 pb-1 text-sm text-[var(--sys-text)] placeholder:text-[var(--sys-text-muted)]/50 resize-none outline-none leading-relaxed disabled:opacity-50" />
+
+                <div className="flex items-center gap-1 px-3 pb-2 pt-1">
+                    {/* 3 separate file inputs — no dynamic .accept changes */}
+                    <input ref={imgInput} type="file" accept="image/*" multiple className="hidden" onChange={e => handleFileChange(e, 'image')} />
+                    <input ref={vidInput} type="file" accept="video/*"            className="hidden" onChange={e => handleFileChange(e, 'video')} />
+                    <input ref={audInput} type="file" accept="audio/*"            className="hidden" onChange={e => handleFileChange(e, 'audio')} />
+
+                    <button onClick={() => imgInput.current.click()} disabled={inputDisabled}
+                        className="p-1.5 rounded-lg text-[var(--sys-text-muted)] hover:text-[var(--sys-primary)] hover:bg-[var(--sys-primary)]/[0.06] cursor-pointer transition-all disabled:opacity-40"
+                        title="Upload image or product photo">
+                        <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>add_photo_alternate</span>
+                    </button>
+                    <button onClick={() => vidInput.current.click()} disabled={inputDisabled}
+                        className="p-1.5 rounded-lg text-[var(--sys-text-muted)] hover:text-[var(--sys-primary)] hover:bg-[var(--sys-primary)]/[0.06] cursor-pointer transition-all disabled:opacity-40"
+                        title="Upload reference video">
+                        <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>video_camera_back</span>
+                    </button>
+                    <button onClick={() => audInput.current.click()} disabled={inputDisabled}
+                        className="p-1.5 rounded-lg text-[var(--sys-text-muted)] hover:text-[var(--sys-primary)] hover:bg-[var(--sys-primary)]/[0.06] cursor-pointer transition-all disabled:opacity-40"
+                        title="Upload voice brief">
+                        <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>mic</span>
+                    </button>
+
+                    {products.length > 0 && (
+                        <div className="relative">
+                            <button onClick={() => setShowProducts(!showProducts)} disabled={inputDisabled}
+                                className="p-1.5 rounded-lg text-[var(--sys-text-muted)] hover:text-[var(--sys-primary)] hover:bg-[var(--sys-primary)]/[0.06] cursor-pointer transition-all disabled:opacity-40"
+                                title="Select product">
+                                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>inventory_2</span>
+                            </button>
+                            {showProducts && (
+                                <div className="absolute bottom-full left-0 mb-2 w-52 glass-panel rounded-xl border border-[var(--sys-border)]/[0.1] overflow-hidden z-20 max-h-40 overflow-y-auto">
+                                    {products.map(p => (
+                                        <button key={p._id} onClick={() => { setSelProduct(p); setShowProducts(false) }}
+                                            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-white/[0.04] cursor-pointer text-left transition-all">
+                                            {p.images?.[0] && <img src={p.images[0].url} alt="" className="w-7 h-7 rounded object-cover" />}
+                                            <span className="text-xs text-[var(--sys-text)] truncate">{p.title}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="flex-1" />
+
+                    {/* Stage hint */}
+                    {stage !== 'idle' && (
+                        <span className="text-[9px] text-[var(--sys-text-muted)] hidden sm:block opacity-60">
+                            {stage === 'analyze' && 'Type anything to adjust or approve'}
+                            {stage === 'plan' && 'Type to modify or approve'}
+                            {stage === 'refs-review' && 'Approve or request changes'}
+                            {stage === 'model' && 'Pick model or just say generate'}
+                        </span>
+                    )}
+
+                    <button onClick={handleSend} disabled={inputDisabled || (!inputText.trim() && attachments.length === 0)}
+                        className="w-8 h-8 rounded-xl flex items-center justify-center text-white cursor-pointer transition-all hover:opacity-90 disabled:opacity-30"
+                        style={{ background: 'linear-gradient(135deg,#14b8a6,#8b5cf6)' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>arrow_upward</span>
+                    </button>
                 </div>
             </div>
         </div>

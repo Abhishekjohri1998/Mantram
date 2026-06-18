@@ -17,7 +17,7 @@
  * Plus: Campaign tagline, launch copy, 5 social captions — all via Claude
  */
 
-import { laozhangImageGenerate } from '../videoStudio/laozhangClient.js';
+import { laozhangImageGenerate, laozhangGptImageWithRefs } from '../videoStudio/laozhangClient.js';
 import { callAgent, callAgentText } from '../shared/agentUtils.js';
 import { runArtDirector } from './artDirectorAgent.js';
 import { mirrorUrlToS3 } from '../../utils/s3.js';
@@ -95,23 +95,33 @@ export async function generateProductCollection({
     scopeLabel = 'New Collection',
     scope = 'campaign',
     imageModel,
+    existingLogoUrl = null,
 }) {
     const slug = uuidv4().substring(0, 8);
 
     console.log(`🚀 [Collection] Running Art Director for ${collectionType}...`);
 
-    const { artStrategy, prompts, brandContext, brand } = await runArtDirector({
+    const { artStrategy, prompts, brandContext, brand, products, activeLogoUrl: resolvedLogoUrl } = await runArtDirector({
         brandId,
         brief: `${collectionType} launch: ${brief}`,
         scope: 'campaign',
         assetType: 'product-collection',
         assetSpecs: COLLECTION_ASSETS.map(a => a.subType),
         briefBrand,
+        existingLogoUrl,
     });
 
     const colors = brand?.dna?.colors || briefBrand?.colors || [];
     const brandName = brand?.name || briefBrand?.name || 'Brand';
     const primaryColor = colors[0]?.hex || '#2B4BEE';
+
+    // Use caller-provided logo, or the one resolved from Brand DB by Art Director
+    const activeLogoUrl = existingLogoUrl || resolvedLogoUrl || null;
+    if (activeLogoUrl) {
+        console.log(`🚀 [Collection] Brand identity reference found — using for visual grounding: ${activeLogoUrl}`);
+    } else {
+        console.log(`🚀 [Collection] No brand identity reference — generating from color/strategy context only.`);
+    }
 
     // Stage 2: Generate campaign copy (parallel with images)
     console.log(`🚀 [Collection] Generating campaign copy + visuals in parallel...`);
@@ -120,27 +130,41 @@ export async function generateProductCollection({
         generateCollectionCopy(artStrategy, brand, briefBrand, brief, collectionType, scopeLabel),
         Promise.allSettled(
             COLLECTION_ASSETS.map(async (asset) => {
-                const fallbackPrompt = buildFallbackPrompt(asset.subType, brandName, brief, artStrategy, primaryColor);
-                const prompt = prompts?.[asset.subType] || fallbackPrompt;
-
-                const fullPrompt = `${prompt}. Brand color: ${primaryColor}. ${artStrategy.designMovement} aesthetic. No text, letters, or typography in the image. Ultra high resolution, premium brand photography.`;
+                const fallbackPrompt = buildFallbackPrompt(asset.subType, brandName, brief, artStrategy, primaryColor, products);
+                const logoRef = activeLogoUrl
+                    ? ` Reference the provided brand identity system image — extract the logo, color palette, and visual language and apply them to this ${asset.name} campaign visual.`
+                    : '';
+                const basePrompt = prompts?.[asset.subType] || fallbackPrompt;
+                const fullPrompt = `${basePrompt}${logoRef}. Brand color: ${primaryColor}. ${artStrategy.designMovement} aesthetic. No text, letters, or typography in the image. Ultra high resolution, premium brand photography.`;
 
                 try {
-                    const result = await laozhangImageGenerate(fullPrompt, {
-                        model: imageModel || GPT_IMAGE_MODEL,
-                        size: asset.size,
-                    });
-                    let imageUrl = result?.imageUrl || null;
+                    let imageUrl = null;
+                    if (activeLogoUrl) {
+                        // Use brand identity as visual reference for on-brand campaign imagery
+                        console.log(`🚀 [Collection] Using identity reference for ${asset.subType}...`);
+                        const result = await laozhangGptImageWithRefs(fullPrompt, [activeLogoUrl], {
+                            model: imageModel || GPT_IMAGE_MODEL,
+                            size: asset.size,
+                        });
+                        imageUrl = result?.imageUrl || null;
+                    } else {
+                        const result = await laozhangImageGenerate(fullPrompt, {
+                            model: imageModel || GPT_IMAGE_MODEL,
+                            size: asset.size,
+                        });
+                        imageUrl = result?.imageUrl || null;
+                    }
+
                     if (imageUrl) {
                         try {
                             const s3Url = await mirrorUrlToS3(imageUrl, `brand-kit/${brandId || 'anon'}/${slug}-collection-${asset.subType}.png`);
                             if (s3Url) imageUrl = s3Url;
                         } catch (_) {}
                     }
-                    return { ...asset, imageUrl, prompt, format: 'image', thumbnailUrl: imageUrl };
+                    return { ...asset, imageUrl, prompt: fullPrompt, format: 'image', thumbnailUrl: imageUrl };
                 } catch (err) {
                     console.error(`❌ Collection image failed for ${asset.subType}:`, err.message);
-                    return { ...asset, imageUrl: null, prompt, format: 'image' };
+                    return { ...asset, imageUrl: null, prompt: fullPrompt, format: 'image' };
                 }
             })
         )
@@ -165,15 +189,27 @@ export async function generateProductCollection({
     };
 }
 
-function buildFallbackPrompt(subType, brandName, brief, artStrategy, primaryColor) {
+function buildFallbackPrompt(subType, brandName, brief, artStrategy, primaryColor, products = []) {
     const movement = artStrategy?.designMovement || 'contemporary premium';
     const mood = (artStrategy?.moodKeywords || ['premium', 'modern']).slice(0, 3).join(', ');
+    const category = artStrategy?.brandCategory || '';
+    const stylingRules = (artStrategy?.categoryStylingRules || []).join(', ');
+    
+    // Add product specific context
+    let productContext = '';
+    if (products.length > 0) {
+        const topProducts = products.slice(0, 2).map(p => p.title).join(' and ');
+        productContext = `, featuring ${topProducts}`;
+    }
+
+    const categoryText = category ? ` in ${category} style. Category rules: ${stylingRules}` : '';
+
     const maps = {
-        'campaign-hero': `Wide cinematic hero banner, product launch announcement, ${movement} design, dramatic composition, soft gradient background in brand colors, editorial photography quality, ${mood} mood, product center-frame with generous space`,
-        'story-cover': `Vertical story format 9:16, bold visual impact for mobile screen, dramatic close-up or minimal product scene, ${movement} aesthetic, ${mood} energy, brand color accent, shallow depth of field`,
-        'instagram-square': `Square format product shot, clean minimal composition, product hero with lifestyle context, ${movement} visual language, perfect studio lighting, ${mood} mood`,
-        'price-card': `Clean pricing announcement graphic, bold typographic hierarchy (no actual text), brand colors, premium minimal layout, product silhouette or abstract visual, ${movement} style`,
-        'lifestyle-hero': `Premium lifestyle product photography, real context environment, natural light, ${movement} aesthetic, ${mood} feel, product naturally integrated into scene, editorial quality`,
+        'campaign-hero': `Wide cinematic hero banner, product launch announcement${productContext}, ${movement} design, dramatic composition, soft gradient background in brand colors, editorial photography quality, ${mood} mood, product center-frame with generous space${categoryText}`,
+        'story-cover': `Vertical story format 9:16, bold visual impact for mobile screen, dramatic close-up or minimal product scene${productContext}, ${movement} aesthetic, ${mood} energy, brand color accent, shallow depth of field${categoryText}`,
+        'instagram-square': `Square format product shot${productContext}, clean minimal composition, product hero with lifestyle context, ${movement} visual language, perfect studio lighting, ${mood} mood${categoryText}`,
+        'price-card': `Clean pricing announcement graphic, bold typographic hierarchy (no actual text), brand colors, premium minimal layout, product silhouette or abstract visual, ${movement} style${categoryText}`,
+        'lifestyle-hero': `Premium lifestyle product photography${productContext}, real context environment, natural light, ${movement} aesthetic, ${mood} feel, product naturally integrated into scene, editorial quality${categoryText}`,
     };
-    return maps[subType] || `Professional product campaign visual, ${movement} style, brand colors, premium quality`;
+    return maps[subType] || `Professional product campaign visual${productContext}, ${movement} style, brand colors, premium quality${categoryText}`;
 }

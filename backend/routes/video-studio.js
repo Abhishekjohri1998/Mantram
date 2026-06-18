@@ -1338,6 +1338,1015 @@ router.post('/agent/generate', protect, requireCredits('videoGenerate'), aiGener
     }
 });
 
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ██╗   ██╗██████╗      ██╗    ███╗   ███╗ ██████╗ ██████╗ ███████╗
+// ██║   ██║╚════██╗    ██╔╝    ████╗ ████║██╔═══██╗██╔══██╗██╔════╝
+// ██║   ██║ █████╔╝   ██╔╝     ██╔████╔██║██║   ██║██║  ██║█████╗
+// ╚██╗ ██╔╝██╔═══╝   ██╔╝      ██║╚██╔╝██║██║   ██║██║  ██║██╔══╝
+//  ╚████╔╝ ███████╗ ██╔╝       ██║ ╚═╝ ██║╚██████╔╝██████╔╝███████╗
+//   ╚═══╝  ╚══════╝╚═╝        ╚═╝     ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝
+//
+// 5-Stage Sequential Video Agent — Stage-Gated Pipeline
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/video-studio/agent/v2/start          — Stage 1: Analyze inputs
+// POST /api/video-studio/agent/v2/plan           — Stage 2: Generate creative plan
+// POST /api/video-studio/agent/v2/generate-refs  — Stage 3: Generate ref images
+// POST /api/video-studio/agent/v2/approve-refs   — Stage 3 Gate: Approve refs
+// POST /api/video-studio/agent/v2/storyboard     — Stage 4: Build storyboard
+// POST /api/video-studio/agent/v2/select-model   — Stage 5: Model select + prompt
+// POST /api/video-studio/agent/v2/generate       — Stage 6: Generate video
+// GET  /api/video-studio/agent/v2/:sessionId     — Get session state
+// POST /api/video-studio/agent/v2/:sessionId/regenerate-ref — Regenerate a single ref
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Helper: strict stage gate validation
+async function requireAgentStage(res, session, requiredStage, gateFlag = null) {
+    const stageOrder = ['analyze', 'plan', 'refs', 'storyboard', 'model', 'generate', 'done'];
+    const currentIdx = stageOrder.indexOf(session.stage);
+    const requiredIdx = stageOrder.indexOf(requiredStage);
+    if (currentIdx < requiredIdx) {
+        res.status(400).json({
+            success: false,
+            error: `Stage gate blocked: session is at '${session.stage}', needs '${requiredStage}'`,
+            currentStage: session.stage,
+            requiredStage,
+        });
+        return false;
+    }
+    if (gateFlag && !session[gateFlag]) {
+        res.status(400).json({
+            success: false,
+            error: `Approval gate not passed: '${gateFlag}' must be true before proceeding`,
+            gateFlag,
+        });
+        return false;
+    }
+    return true;
+}
+
+
+// ── Stage 1: Analyze ──────────────────────────────────────────────────────────
+router.post('/agent/v2/start', protect, async (req, res) => {
+    try {
+        const { brief, images, videoUrl, brandId, productId } = req.body;
+        if (!brief?.trim() && (!images || images.length === 0)) {
+            return res.status(400).json({ success: false, error: 'A brief or at least one image is required' });
+        }
+
+        const { analyzeInputs } = await import('../agents/videoStudio/videoAgentDirector.js');
+        const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
+
+        // Load product data if productId provided
+        let productData = null;
+        let productImages = [];
+        if (productId) {
+            const Product = (await import('../models/Product.js')).default;
+            productData = await Product.findById(productId).lean();
+            if (productData) {
+                productImages = (productData.images || []).filter(i => i.url).map(i => i.url);
+            }
+        }
+
+        console.log(`🤖 [VideoAgent V2] Stage 1: Analyzing... brand=${brandId} product=${productId} images=${(images||[]).length}`);
+
+        const analysis = await analyzeInputs({
+            brief: brief?.trim() || '',
+            images: images || [],
+            videoUrl: videoUrl || '',
+            brandId: brandId || null,
+            productId: productId || null,
+            productData,
+        });
+
+        // Create session
+        const sessionId = `vas_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+        const session = await VideoAgentSession.create({
+            sessionId,
+            user: req.user._id,
+            brand: brandId || null,
+            stage: 'plan', // advance to next stage
+            input: {
+                brief: brief?.trim() || '',
+                images: (images || []).map(img => ({ url: img.url, label: img.label || '', source: img.source || 'upload' })),
+                videoUrl: videoUrl || '',
+                productId: productId || null,
+                productImages,
+            },
+            analysis,
+            messages: [
+                { role: 'agent', type: 'analysis', content: analysis.summary, timestamp: Date.now() }
+            ],
+        });
+
+        res.json({ success: true, sessionId, analysis, stage: 'plan' });
+    } catch (error) {
+        console.error('[VideoAgent V2] Stage 1 error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ── Stage 2: Generate Creative Plan ─────────────────────────────────────────
+router.post('/agent/v2/plan', protect, async (req, res) => {
+    try {
+        const { sessionId, durationOverride, ratioOverride, videoTypeOverride } = req.body;
+        if (!sessionId) return res.status(400).json({ success: false, error: 'sessionId required' });
+
+        const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
+        const session = await VideoAgentSession.findOne({ sessionId, user: req.user._id });
+        if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
+
+        const { generatePlan } = await import('../agents/videoStudio/videoAgentDirector.js');
+
+        console.log(`🤖 [VideoAgent V2] Stage 2: Generating plan... session=${sessionId}`);
+
+        const plan = await generatePlan({
+            analysis: session.analysis,
+            brief: session.input.brief,
+            brandId: session.brand?.toString() || null,
+        });
+
+        // Apply user overrides
+        if (durationOverride) plan.duration = Number(durationOverride);
+        if (ratioOverride) plan.ratio = ratioOverride;
+        if (videoTypeOverride) plan.videoType = videoTypeOverride;
+
+        await VideoAgentSession.findOneAndUpdate(
+            { sessionId },
+            {
+                plan,
+                stage: 'refs',
+                $push: { messages: { role: 'agent', type: 'plan', content: `Creative plan ready: "${plan.title}" — ${plan.duration}s ${plan.ratio} ${plan.videoType}`, timestamp: Date.now() } }
+            }
+        );
+
+        res.json({ success: true, sessionId, plan, stage: 'refs' });
+    } catch (error) {
+        console.error('[VideoAgent V2] Stage 2 error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ── Stage 3: Generate Reference Images ───────────────────────────────────────
+router.post('/agent/v2/generate-refs', protect, async (req, res) => {
+    try {
+        const { sessionId } = req.body;
+        if (!sessionId) return res.status(400).json({ success: false, error: 'sessionId required' });
+
+        const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
+        const session = await VideoAgentSession.findOne({ sessionId, user: req.user._id });
+        if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
+
+        if (!await requireAgentStage(res, session, 'refs')) return;
+
+        const { generateReferenceImages } = await import('../agents/videoStudio/videoAgentDirector.js');
+
+        console.log(`🤖 [VideoAgent V2] Stage 3: Generating refs... session=${sessionId} char=${session.plan?.refsNeeded?.character} product=${session.plan?.refsNeeded?.product}`);
+
+        const refs = await generateReferenceImages({
+            plan: session.plan,
+            analysis: session.analysis,
+            brief: session.input.brief,
+            uploadedImages: session.input.images || [],
+            characterPhoto: session.input.characterPhoto || '',
+            productImages: session.input.productImages || [],
+            brandId: session.brand?.toString() || null,
+        });
+
+        // If no refs needed at all, auto-approve and advance
+        const needsAnyRef = session.plan?.refsNeeded?.character || session.plan?.refsNeeded?.product || session.plan?.refsNeeded?.location;
+        const autoApprove = !needsAnyRef || (refs.characterRefs.length === 0 && refs.productRefs.length === 0 && refs.locationRefs.length === 0);
+
+        await VideoAgentSession.findOneAndUpdate(
+            { sessionId },
+            {
+                'refs.characterRefs': refs.characterRefs,
+                'refs.productRefs': refs.productRefs,
+                'refs.locationRefs': refs.locationRefs,
+                ...(autoApprove ? { refsApproved: true, stage: 'storyboard' } : {}),
+                $push: {
+                    messages: {
+                        role: 'agent', type: 'refs',
+                        content: autoApprove ? 'No reference images needed — proceeding to storyboard.' : `Generated ${refs.characterRefs.length + refs.productRefs.length + refs.locationRefs.length} reference image(s). Review and approve to continue.`,
+                        timestamp: Date.now(),
+                    }
+                }
+            }
+        );
+
+        res.json({
+            success: true, sessionId, refs,
+            autoApproved: autoApprove,
+            stage: autoApprove ? 'storyboard' : 'refs',
+        });
+    } catch (error) {
+        console.error('[VideoAgent V2] Stage 3 generate-refs error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ── Stage 3b: Regenerate a single reference image ────────────────────────────
+router.post('/agent/v2/:sessionId/regenerate-ref', protect, async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        const { refType, refIndex } = req.body; // refType: 'character'|'product'|'location'
+
+        const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
+        const session = await VideoAgentSession.findOne({ sessionId, user: req.user._id });
+        if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
+
+        const { generateReferenceImages } = await import('../agents/videoStudio/videoAgentDirector.js');
+
+        // Generate just the requested type
+        const partialPlan = { ...session.plan.toObject?.() || session.plan, refsNeeded: { character: refType === 'character', product: refType === 'product', location: refType === 'location' } };
+        const refs = await generateReferenceImages({
+            plan: partialPlan,
+            analysis: session.analysis,
+            brief: session.input.brief,
+            uploadedImages: session.input.images || [],
+            characterPhoto: session.input.characterPhoto || '',
+            productImages: session.input.productImages || [],
+            brandId: session.brand?.toString() || null,
+        });
+
+        const newRefs = refs[`${refType}Refs`] || [];
+        if (newRefs.length === 0) {
+            return res.status(500).json({ success: false, error: 'Failed to regenerate reference image' });
+        }
+
+        // Update the specific ref in the array
+        const arrayKey = `refs.${refType}Refs`;
+        const updateKey = `${arrayKey}.${refIndex || 0}`;
+        await VideoAgentSession.findOneAndUpdate(
+            { sessionId },
+            { [updateKey]: newRefs[0] }
+        );
+
+        res.json({ success: true, ref: newRefs[0] });
+    } catch (error) {
+        console.error('[VideoAgent V2] Regenerate ref error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ── Stage 3c: Approve References ─────────────────────────────────────────────
+router.post('/agent/v2/approve-refs', protect, async (req, res) => {
+    try {
+        const { sessionId, approvedRefs } = req.body;
+        if (!sessionId) return res.status(400).json({ success: false, error: 'sessionId required' });
+
+        const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
+        const session = await VideoAgentSession.findOne({ sessionId, user: req.user._id });
+        if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
+
+        // Build approved URL list in order: product → character → location
+        const allApproved = [
+            ...(approvedRefs?.productRefs || session.refs?.productRefs || []).map(r => r.url).filter(Boolean),
+            ...(approvedRefs?.characterRefs || session.refs?.characterRefs || []).map(r => r.url).filter(Boolean),
+            ...(approvedRefs?.locationRefs || session.refs?.locationRefs || []).map(r => r.url).filter(Boolean),
+        ];
+
+        await VideoAgentSession.findOneAndUpdate(
+            { sessionId },
+            {
+                refsApproved: true,
+                stage: 'storyboard',
+                'refs.approvedUrls': allApproved,
+                ...(approvedRefs?.characterRefs ? { 'refs.characterRefs': approvedRefs.characterRefs } : {}),
+                ...(approvedRefs?.productRefs   ? { 'refs.productRefs':   approvedRefs.productRefs   } : {}),
+                ...(approvedRefs?.locationRefs  ? { 'refs.locationRefs':  approvedRefs.locationRefs  } : {}),
+                $push: {
+                    messages: {
+                        role: 'user', type: 'approval', content: '✅ Reference images approved',
+                        timestamp: Date.now(),
+                    }
+                }
+            }
+        );
+
+        res.json({ success: true, sessionId, stage: 'storyboard', approvedCount: allApproved.length });
+    } catch (error) {
+        console.error('[VideoAgent V2] approve-refs error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ── Stage 4: Build Storyboard ─────────────────────────────────────────────────
+router.post('/agent/v2/storyboard', protect, async (req, res) => {
+    try {
+        const { sessionId } = req.body;
+        if (!sessionId) return res.status(400).json({ success: false, error: 'sessionId required' });
+
+        const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
+        const session = await VideoAgentSession.findOne({ sessionId, user: req.user._id });
+        if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
+
+        if (!await requireAgentStage(res, session, 'storyboard', 'refsApproved')) return;
+
+        const { buildStoryboard } = await import('../agents/videoStudio/videoAgentDirector.js');
+
+        console.log(`🤖 [VideoAgent V2] Stage 4: Building storyboard... session=${sessionId}`);
+
+        const approvedRefs = {
+            characterRefs: session.refs?.characterRefs || [],
+            productRefs:   session.refs?.productRefs   || [],
+            locationRefs:  session.refs?.locationRefs  || [],
+        };
+
+        const storyboardResult = await buildStoryboard({
+            plan: session.plan,
+            analysis: session.analysis,
+            brief: session.input.brief,
+            approvedRefs,
+            productImages: session.input.productImages || [],
+            brandId: session.brand?.toString() || null,
+            userId: req.user._id,
+        });
+
+        const storyboardData = {
+            colorPalette:            storyboardResult.colorPalette || [],
+            paletteNames:            storyboardResult.paletteNames || [],
+            materialNotes:           storyboardResult.materialNotes || '',
+            environmentFingerprint:  storyboardResult.environmentFingerprint || '',
+            cuts:                    storyboardResult.cuts || [],
+            moodKeywords:            storyboardResult.moodKeywords || [],
+            cinematographyRules:     storyboardResult.cinematographyRules || '',
+            emotionalArc:            storyboardResult.emotionalArc || '',
+            narrativeArc:            storyboardResult.narrativeArc || '',
+            hookStrategy:            storyboardResult.hookStrategy || '',
+            imagePrompt:             storyboardResult.imagePrompt || '',
+            posterUrl:               storyboardResult.posterUrl || storyboardResult.storyboardImageUrl || '',
+            totalDuration:           session.plan?.duration || 30,
+        };
+
+        await VideoAgentSession.findOneAndUpdate(
+            { sessionId },
+            {
+                storyboard: storyboardData,
+                stage: 'model',
+                $push: {
+                    messages: {
+                        role: 'agent', type: 'storyboard',
+                        content: `🎬 Storyboard complete! ${storyboardData.cuts?.length || 0} cuts planned. Environment: ${storyboardData.environmentFingerprint?.substring(0, 80) || 'defined'}`,
+                        timestamp: Date.now(),
+                    }
+                }
+            }
+        );
+
+        res.json({ success: true, sessionId, storyboard: storyboardData, stage: 'model' });
+    } catch (error) {
+        console.error('[VideoAgent V2] Stage 4 storyboard error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ── Stage 5: Model Selection + Prompt Build ──────────────────────────────────
+router.post('/agent/v2/select-model', protect, async (req, res) => {
+    try {
+        const { sessionId, model, resolution, qualityMode } = req.body;
+        if (!sessionId || !model) return res.status(400).json({ success: false, error: 'sessionId and model required' });
+
+        const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
+        const session = await VideoAgentSession.findOne({ sessionId, user: req.user._id });
+        if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
+
+        if (!await requireAgentStage(res, session, 'model', 'refsApproved')) return;
+        // Ensure storyboard exists
+        if (!session.storyboard?.cuts?.length && !session.storyboard?.imagePrompt) {
+            return res.status(400).json({ success: false, error: 'Storyboard must be generated before selecting a model' });
+        }
+
+        const { writeModelPrompt } = await import('../agents/videoStudio/videoAgentDirector.js');
+
+        console.log(`🤖 [VideoAgent V2] Stage 5: Writing ${model} prompt... session=${sessionId}`);
+
+        const approvedRefs = {
+            characterRefs: session.refs?.characterRefs || [],
+            productRefs:   session.refs?.productRefs   || [],
+            locationRefs:  session.refs?.locationRefs  || [],
+        };
+
+        const modelResult = await writeModelPrompt({
+            model,
+            storyboard: session.storyboard,
+            plan: session.plan,
+            analysis: session.analysis,
+            brief: session.input.brief,
+            approvedRefs,
+            brandId: session.brand?.toString() || null,
+        });
+
+        const modelSelection = {
+            model,
+            resolution: resolution || modelResult.resolution || '1080p',
+            qualityMode: qualityMode || modelResult.qualityMode || 'fast',
+            finalPrompt: modelResult.finalPrompt,
+            costEstimate: modelResult.costEstimate,
+        };
+
+        await VideoAgentSession.findOneAndUpdate(
+            { sessionId },
+            {
+                modelSelection,
+                modelApproved: true,
+                stage: 'generate',
+                $push: {
+                    messages: {
+                        role: 'agent', type: 'model-ready',
+                        content: `✅ ${model} prompt ready. Estimated cost: ${JSON.stringify(modelResult.costEstimate)}`,
+                        timestamp: Date.now(),
+                    }
+                }
+            }
+        );
+
+        res.json({ success: true, sessionId, modelSelection, stage: 'generate' });
+    } catch (error) {
+        console.error('[VideoAgent V2] Stage 5 select-model error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ── Stage 6: Generate Videos ──────────────────────────────────────────────────
+router.post('/agent/v2/generate', protect, requireCredits('videoGenerate'), aiGenerationLimiter, async (req, res) => {
+    try {
+        const { sessionId } = req.body;
+        if (!sessionId) return res.status(400).json({ success: false, error: 'sessionId required' });
+
+        const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
+        const session = await VideoAgentSession.findOne({ sessionId, user: req.user._id });
+        if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
+
+        if (!await requireAgentStage(res, session, 'generate', 'modelApproved')) return;
+
+        const { model, resolution, qualityMode, finalPrompt } = session.modelSelection;
+        const plan = session.plan;
+        const storyboard = session.storyboard;
+        const approvedRefUrls = session.refs?.approvedUrls || [];
+        const duration = plan.duration || 30;
+        const aspectRatio = plan.ratio || '9:16';
+
+        console.log(`🤖 [VideoAgent V2] Stage 6: Generating... session=${sessionId} model=${model} duration=${duration}s`);
+
+        const isLongForm = duration > 15;
+        const sceneProjects = [];
+
+        if (isLongForm) {
+            // ── Long-form: use scenePlanner + storyboardLongForm pipeline ──
+            try {
+                const { startStoryboardLongForm } = await import('../agents/videoStudio/storyboardLongForm.js');
+
+                // Create a proxy VideoProject for long-form pipeline
+                const proxyProject = await VideoProject.create({
+                    user: req.user._id,
+                    brand: session.brand || null,
+                    title: plan.title || 'Video Agent Long Form',
+                    status: 'storyboard-ready',
+                    mode: 'storyboard',
+                    storyboard: {
+                        imagePrompt: finalPrompt,
+                        videoPrompt: finalPrompt,
+                        totalDuration: duration,
+                        format: aspectRatio,
+                        style: plan.style || 'hyperrealistic',
+                        structuredPlan: {
+                            cuts: storyboard.cuts || [],
+                            colorPalette: storyboard.colorPalette || [],
+                            environmentFingerprint: storyboard.environmentFingerprint || '',
+                            moodKeywords: storyboard.moodKeywords || [],
+                            cinematographyRules: storyboard.cinematographyRules || '',
+                            emotionalArc: storyboard.emotionalArc || '',
+                        },
+                        characterRefSheetUrl: approvedRefUrls[0] || '',
+                    },
+                    input: {
+                        brief: session.input.brief,
+                        avatarUrls: session.refs?.characterRefs?.map(r => r.url).filter(Boolean) || [],
+                        refImageUrls: approvedRefUrls,
+                    },
+                });
+
+                // Start long-form job
+                const longFormJob = await startStoryboardLongForm({
+                    projectId: proxyProject._id.toString(),
+                    userId: req.user._id.toString(),
+                    model,
+                    aspectRatio,
+                    qualityMode: qualityMode || 'fast',
+                    referenceImages: approvedRefUrls,
+                    dialogueLanguage: 'English',
+                    generateMode: 'automatic',
+                });
+
+                await VideoAgentSession.findOneAndUpdate(
+                    { sessionId },
+                    {
+                        'generation.isLongForm': true,
+                        'generation.longFormJobId': longFormJob?.jobId || proxyProject._id.toString(),
+                        stage: 'generate',
+                        $push: { messages: { role: 'agent', type: 'generating', content: `🎬 Long-form video generation started (${duration}s). Generating ${Math.ceil(duration/10)} segments...`, timestamp: Date.now() } }
+                    }
+                );
+
+                res.json({
+                    success: true, sessionId, isLongForm: true,
+                    longFormJobId: longFormJob?.jobId || proxyProject._id.toString(),
+                    projectId: proxyProject._id,
+                    model, duration, aspectRatio,
+                });
+
+            } catch (lfErr) {
+                console.error('[VideoAgent V2] Long-form failed:', lfErr.message);
+                return res.status(500).json({ success: false, error: `Long-form generation failed: ${safeErrorMessage(lfErr)}` });
+            }
+        } else {
+            // ── Short-form: generate per-scene directly ──
+            const cuts = storyboard.cuts || [];
+            const scenesData = cuts.length > 0 ? cuts : [{ id: 1, scene: finalPrompt, duration: duration }];
+
+            for (let i = 0; i < scenesData.length; i++) {
+                const cut = scenesData[i];
+                const sceneDur = Math.min(Math.max(Number(cut.duration) || Math.ceil(duration / scenesData.length), 3), 15);
+
+                const scenePrompt = [
+                    storyboard.environmentFingerprint ? `ENVIRONMENT: ${storyboard.environmentFingerprint}` : '',
+                    storyboard.colorPalette?.length ? `COLORS: ${storyboard.colorPalette.join(', ')}` : '',
+                    cut.lens ? `CAMERA: ${cut.lens} ${cut.shot || ''} ${cut.move || ''}` : '',
+                    cut.scene || finalPrompt,
+                ].filter(Boolean).join('\n');
+
+                const firstImageUrl = approvedRefUrls[0] || '';
+
+                try {
+                    const project = await VideoProject.create({
+                        user: req.user._id,
+                        brand: session.brand || null,
+                        title: `${plan.title} — Scene ${i + 1}`,
+                        status: 'advanced-generating',
+                        mode: 'agent-scene',
+                        advancedConfig: {
+                            prompt: scenePrompt,
+                            firstImageUrl,
+                            aspectRatio,
+                            duration: sceneDur,
+                            referenceImages: approvedRefUrls.map(url => ({ url })),
+                        },
+                        routing: { selectedModel: model, resolution: resolution || '1080p', mode: qualityMode || 'fast' },
+                    });
+
+                    const state = await advancedGenerateNode({
+                        prompt: scenePrompt,
+                        model,
+                        duration: sceneDur,
+                        resolution: resolution || '1080p',
+                        qualityMode: qualityMode || 'fast',
+                        firstImageUrl,
+                        generateAudio: model === 'veo-3.1' || model === 'veo-3.1-fast',
+                        aspectRatio,
+                        referenceImages: approvedRefUrls.filter(u => u && u.startsWith('http')),
+                    });
+
+                    await VideoProject.findByIdAndUpdate(project._id, {
+                        generation: state.generation,
+                        backendPrompt: scenePrompt,
+                    });
+
+                    sceneProjects.push({
+                        sceneId: i + 1,
+                        projectId: project._id.toString(),
+                        duration: sceneDur,
+                        status: 'generating',
+                        generation: state.generation,
+                    });
+                    console.log(`   🎥 Scene ${i + 1}/${scenesData.length} submitted`);
+                } catch (sceneErr) {
+                    console.error(`   ❌ Scene ${i + 1} failed:`, sceneErr.message);
+                    sceneProjects.push({ sceneId: i + 1, projectId: null, duration: sceneDur, status: 'failed', error: sceneErr.message });
+                }
+            }
+
+            await VideoAgentSession.findOneAndUpdate(
+                { sessionId },
+                {
+                    'generation.scenes': sceneProjects,
+                    'generation.isLongForm': false,
+                    stage: 'generate',
+                    creditsUsed: (req.creditsDeducted || 0),
+                    $push: { messages: { role: 'agent', type: 'generating', content: `🎬 ${sceneProjects.filter(s => s.projectId).length}/${sceneProjects.length} scene(s) submitted for generation.`, timestamp: Date.now() } }
+                }
+            );
+
+            res.json({
+                success: true, sessionId, isLongForm: false,
+                scenes: sceneProjects,
+                model, aspectRatio, totalDuration: duration,
+            });
+        }
+    } catch (error) {
+        console.error('[VideoAgent V2] Stage 6 generate error:', error);
+        if (req.creditsDeducted > 0) {
+            await refundCredits(req.user._id, req.creditsDeducted, 'videoGenerateRefund', `Refund: VideoAgent V2 Gen Failure (${safeErrorMessage(error)})`, 'video');
+        }
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ── GET Session State ──────────────────────────────────────────────────────────
+router.get('/agent/v2/:sessionId', protect, async (req, res) => {
+    try {
+        const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
+        const session = await VideoAgentSession.findOne({
+            sessionId: req.params.sessionId,
+            user: req.user._id,
+        }).lean();
+        if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
+        res.json({ success: true, session });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+// ── Update Plan (user edits before generating) ────────────────────────────────
+router.patch('/agent/v2/:sessionId/plan', protect, async (req, res) => {
+    try {
+        const { duration, ratio, videoType, style } = req.body;
+        const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
+        const session = await VideoAgentSession.findOne({ sessionId: req.params.sessionId, user: req.user._id });
+        if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
+
+        const updates = {};
+        if (duration) updates['plan.duration'] = Number(duration);
+        if (ratio) updates['plan.ratio'] = ratio;
+        if (videoType) updates['plan.videoType'] = videoType;
+        if (style) updates['plan.style'] = style;
+
+        await VideoAgentSession.findOneAndUpdate({ sessionId: req.params.sessionId }, updates);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// END — 5-Stage Video Agent V2
+// ══════════════════════════════════════════════════════════════════════════════
+
+
+// ── POST /agent/v2/analyze-media — Media-as-Brief: analyze image/video/audio ──
+// User uploads any media → AI analyzes → returns a generated creative brief
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/agent/v2/analyze-media', protect, async (req, res) => {
+    const multer = (await import('multer')).default;
+    const upload = multer({
+        storage: multer.memoryStorage(),
+        limits: { fileSize: 60 * 1024 * 1024 }, // 60MB max
+    }).single('file');
+
+    upload(req, res, async (uploadErr) => {
+        if (uploadErr) {
+            return res.status(400).json({ success: false, error: uploadErr.message || 'File upload failed' });
+        }
+
+        try {
+            const file = req.file;
+            const brandId = req.body?.brandId || null;
+
+            if (!file) return res.status(400).json({ success: false, error: 'No file uploaded' });
+
+            const mime = file.mimetype || '';
+            const isImage = mime.startsWith('image/');
+            const isVideo = mime.startsWith('video/');
+            const isAudio = mime.startsWith('audio/');
+
+            if (!isImage && !isVideo && !isAudio) {
+                return res.status(400).json({ success: false, error: 'Unsupported file type. Upload image, video, or audio.' });
+            }
+
+            console.log(`🎬 [analyze-media] type=${mime} size=${(file.size/1024).toFixed(0)}KB brand=${brandId}`);
+
+            const { loadBrandContext } = await import('../agents/shared/agentUtils.js');
+            const { brand } = await loadBrandContext(brandId);
+            const brandName = brand?.name || '';
+            const brandCategory = brand?.dna?.category || brand?.category || '';
+
+            let generatedBrief = '';
+            let mediaUrl = '';
+            let thumbnailUrl = '';
+            let mediaType = isImage ? 'image' : isVideo ? 'video' : 'audio';
+
+            // ── Upload file to S3 first ──────────────────────────────────────
+            const { uploadToS3 } = await import('../utils/s3.js').catch(() => ({ uploadToS3: null }));
+            if (uploadToS3) {
+                try {
+                    const ext = mime.split('/')[1]?.split(';')[0] || 'bin';
+                    const s3Key = `video-studio/media-brief/${req.user._id}/${Date.now()}.${ext}`;
+                    mediaUrl = await uploadToS3(file.buffer, s3Key, mime);
+                    console.log(`📤 [analyze-media] Uploaded to S3: ${mediaUrl?.substring(0, 60)}`);
+                } catch (s3Err) {
+                    console.warn('[analyze-media] S3 upload failed:', s3Err.message);
+                }
+            }
+
+            // ── IMAGE: Vision analysis ───────────────────────────────────────
+            if (isImage) {
+                try {
+                    const sharp = (await import('sharp')).default;
+                    const resized = await sharp(file.buffer)
+                        .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
+                        .jpeg({ quality: 75 })
+                        .toBuffer();
+                    const base64 = resized.toString('base64');
+
+                    const { getRouter } = await import('../ai/router.js');
+                    const router = getRouter();
+
+                    const systemPrompt = `You are an expert creative director and brand strategist.
+Analyze this image and generate a creative brief for a video advertisement.
+
+${brandName ? `Brand: ${brandName} (${brandCategory})` : 'Infer brand from the image.'}
+
+Generate a compelling, specific creative brief in 2-3 sentences that describes:
+- What product/brand is shown or implied
+- The visual style, mood, and aesthetic
+- A recommendation for the video format (30s ad, 15s reel, etc.)
+- The target audience implied by the image
+- The emotional hook or CTA direction
+
+Return ONLY the brief text — no JSON, no bullet points. Write it as a clear instruction to a video director.`;
+
+                    const result = await router.chat([
+                        { role: 'user', content: [
+                            { type: 'text', text: systemPrompt },
+                            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } },
+                        ]}
+                    ], { provider: 'openai', model: 'gpt-4o', temperature: 0.7, maxTokens: 300 });
+
+                    generatedBrief = result?.content || result?.message || '';
+                    thumbnailUrl = mediaUrl;
+                } catch (visionErr) {
+                    console.error('[analyze-media] Vision analysis failed:', visionErr.message);
+                    generatedBrief = `Create a video ad inspired by this product image. Focus on premium visuals, lifestyle shots, and a strong CTA.`;
+                }
+            }
+
+            // ── VIDEO: Extract frames → analyze ──────────────────────────────
+            else if (isVideo) {
+                try {
+                    const { execSync } = await import('child_process');
+                    const fs = await import('fs');
+                    const path = await import('path');
+                    const os = await import('os');
+
+                    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mantram-media-'));
+                    const inputPath = path.join(tmpDir, `input.${mime.split('/')[1] || 'mp4'}`);
+                    fs.writeFileSync(inputPath, file.buffer);
+
+                    // Get ffmpeg path
+                    let ffmpegPath = 'ffmpeg';
+                    try {
+                        ffmpegPath = (await import('@ffmpeg-installer/ffmpeg')).default?.path || ffmpegPath;
+                    } catch { /* use system ffmpeg */ }
+
+                    // Extract 3 frames: 10%, 40%, 70% through video
+                    const framePaths = [];
+                    const frameTimestamps = ['0:00:01', '0:00:05', '0:00:10'];
+
+                    for (let i = 0; i < frameTimestamps.length; i++) {
+                        const framePath = path.join(tmpDir, `frame${i}.jpg`);
+                        try {
+                            execSync(`"${ffmpegPath}" -y -ss ${frameTimestamps[i]} -i "${inputPath}" -vframes 1 -q:v 3 -vf "scale=720:-1" "${framePath}" 2>/dev/null`, {
+                                timeout: 15000, stdio: 'pipe',
+                            });
+                            if (fs.existsSync(framePath)) framePaths.push(framePath);
+                        } catch { /* skip failed frame */ }
+                    }
+
+                    if (framePaths.length === 0) {
+                        // FFmpeg failed — extract first few bytes as image attempt
+                        throw new Error('No frames extracted');
+                    }
+
+                    // Upload first frame as thumbnail
+                    if (uploadToS3 && framePaths[0]) {
+                        const frameBuffer = fs.readFileSync(framePaths[0]);
+                        const thumbKey = `video-studio/media-brief/${req.user._id}/${Date.now()}-thumb.jpg`;
+                        thumbnailUrl = await uploadToS3(frameBuffer, thumbKey, 'image/jpeg').catch(() => '');
+                    }
+
+                    // Vision analyze the first 2 frames
+                    const { getRouter } = await import('../ai/router.js');
+                    const router = getRouter();
+
+                    const frameImages = framePaths.slice(0, 2).map(fp => {
+                        const buf = fs.readFileSync(fp);
+                        return { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${buf.toString('base64')}` } };
+                    });
+
+                    const result = await router.chat([
+                        { role: 'user', content: [
+                            { type: 'text', text: `You are an expert creative director. Analyze these video frames and generate a creative brief for a new video advertisement inspired by this content.${brandName ? ` Brand: ${brandName} (${brandCategory}).` : ''} Write a 2-3 sentence brief describing: the visual style and aesthetic, the content/product/message shown, the target audience, and a recommendation for the new video format. Write as a clear instruction to a video director. Return ONLY the brief text.` },
+                            ...frameImages,
+                        ]}
+                    ], { provider: 'openai', model: 'gpt-4o', temperature: 0.7, maxTokens: 300 });
+
+                    generatedBrief = result?.content || result?.message || '';
+
+                    // Cleanup tmp
+                    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
+                } catch (videoErr) {
+                    console.error('[analyze-media] Video analysis failed:', videoErr.message);
+                    generatedBrief = `Create a video ad inspired by the uploaded reference video. Match the energy, pacing, and visual style. Adapt the content to showcase our brand.`;
+                    thumbnailUrl = '';
+                }
+            }
+
+            // ── AUDIO: Whisper transcription → brief ─────────────────────────
+            else if (isAudio) {
+                try {
+                    const openaiKey = process.env.OPENAI_API_KEY;
+                    let transcript = '';
+
+                    if (openaiKey) {
+                        const FormDataNode = (await import('form-data')).default;
+                        const form = new FormDataNode();
+                        const ext = mime.includes('wav') ? 'wav' : mime.includes('mp4') || mime.includes('m4a') ? 'm4a' : mime.includes('ogg') ? 'ogg' : 'mp3';
+                        form.append('file', file.buffer, { filename: `audio.${ext}`, contentType: mime });
+                        form.append('model', 'whisper-1');
+                        form.append('response_format', 'text');
+
+                        const whisperResp = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+                            method: 'POST',
+                            headers: { Authorization: `Bearer ${openaiKey}`, ...form.getHeaders() },
+                            body: form,
+                            signal: AbortSignal.timeout(30000),
+                        });
+
+                        if (whisperResp.ok) {
+                            transcript = (await whisperResp.text()).trim();
+                        }
+                    }
+
+                    if (transcript) {
+                        const { callAgent } = await import('../agents/shared/agentUtils.js');
+                        const brief = await callAgent(
+                            `You are a video creative director. The user has recorded an audio brief for a video ad. Convert this spoken brief into a clean, professional written creative brief in 2-3 sentences. Keep all the key details but make it crisp and actionable for a video production team.`,
+                            `Audio brief transcript: "${transcript}"${brandName ? `\nBrand: ${brandName}` : ''}`,
+                            0.5, 300
+                        );
+                        generatedBrief = typeof brief === 'string' ? brief : brief?.brief || transcript;
+                    } else {
+                        generatedBrief = `Create a compelling video ad. Audio brief uploaded for reference. Focus on brand storytelling and emotional connection.`;
+                    }
+                } catch (audioErr) {
+                    console.error('[analyze-media] Audio analysis failed:', audioErr.message);
+                    generatedBrief = `Create a compelling video ad based on the uploaded audio brief.`;
+                }
+            }
+
+            // Clean up brief
+            generatedBrief = generatedBrief
+                .replace(/<think>[\s\S]*?<\/think>/gi, '')
+                .replace(/^["']|["']$/g, '')
+                .trim();
+
+            console.log(`✅ [analyze-media] Brief generated: "${generatedBrief.substring(0, 80)}..."`);
+
+            res.json({
+                success: true,
+                generatedBrief,
+                mediaUrl,
+                thumbnailUrl,
+                mediaType,
+            });
+
+        } catch (error) {
+            console.error('[analyze-media] Error:', error);
+            res.status(500).json({ success: false, error: safeErrorMessage(error) });
+        }
+    });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /agent/v2/chat — NLP Intent Engine
+// User sends any free-form message mid-pipeline; AI classifies intent and
+// returns { intent, action, params, agentResponse } so the frontend can route
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/agent/v2/chat', protect, async (req, res) => {
+    try {
+        const { sessionId, stage, message, planContext = {}, storyboardContext = {}, analysisContext = {} } = req.body;
+        if (!message?.trim()) return res.status(400).json({ success: false, error: 'No message provided' });
+
+        const { callAgent } = await import('../agents/shared/agentUtils.js');
+
+        // ── Load session for context ─────────────────────────────────────────
+        let sessionDoc = null;
+        if (sessionId) {
+            const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
+            sessionDoc = await VideoAgentSession.findById(sessionId).lean();
+        }
+
+        const brandName = sessionDoc?.brandName || planContext?.brandName || 'the brand';
+        const currentPlan = sessionDoc?.plan || planContext || {};
+        const currentStoryboard = sessionDoc?.storyboard || storyboardContext || {};
+        const currentAnalysis = sessionDoc?.analysis || analysisContext || {};
+
+        const MODEL_IDS = ['seedance-2.0', 'kling-3.0', 'veo-3.1', 'veo-3.1-fast', 'grok-imagine', 'gemini-flash'];
+
+        const systemPrompt = `You are Mantram's AI Video Director — an expert creative director and AI video strategist.
+
+You are having a conversation with a user who is creating a video ad. The pipeline has distinct stages:
+- analyze: Brief analyzed, awaiting plan generation
+- plan: Creative plan shown, awaiting ref image generation  
+- refs-review: Reference images shown, awaiting user approval
+- storyboard: Storyboard building or shown, awaiting model selection
+- model: Model selected, awaiting generation
+- generate: Video generating or done
+
+CURRENT STATE:
+- Stage: ${stage}
+- Brand: ${brandName}
+- Plan title: ${currentPlan.title || 'not yet created'}
+- Duration: ${currentPlan.duration || 'unknown'}s
+- Ratio: ${currentPlan.ratio || 'unknown'}
+- Video type: ${currentPlan.videoType || 'unknown'}
+- Recommended model: ${currentPlan.modelRecommendation || 'seedance-2.0'}
+- Style: ${currentPlan.styleGuide || 'unknown'}
+- Scene count: ${currentStoryboard.cuts?.length || 'not created yet'}
+
+AVAILABLE MODELS: ${MODEL_IDS.join(', ')}
+
+INTENT CLASSIFICATION RULES:
+- APPROVE: User is happy, agrees, wants to proceed — "looks good", "yes", "perfect", "let's go", "great", "approve", "proceed", "next", "continue", "go ahead", "fire", "do it", "nice", "love it", emoji only like 👍✅
+- MODIFY_PLAN: User wants to change something about the plan — duration, ratio, type, style, audience, etc.
+- SWITCH_MODEL: User mentions a specific model name or says "use X instead"
+- ADD_CONTEXT: User wants to add more info to the brief — product details, brand info, references
+- ASK_QUESTION: User is asking something, confused, wants explanation
+- START_OVER: User wants to reset and start fresh — "start over", "reset", "different product", "scratch"
+- GENERATE_NOW: User explicitly wants to skip to generation — "just generate", "make the video now", "skip"
+- AMBIGUOUS: Message is unclear, cannot classify
+
+Extract parameters when relevant:
+- For MODIFY_PLAN: extract { duration, ratio, videoType, style, audience } — only include what changed
+- For SWITCH_MODEL: extract { model } — map to one of: ${MODEL_IDS.join(', ')}
+- For ADD_CONTEXT: extract { additionalContext } — the new info to add
+
+Write agentResponse as a real, warm creative director:
+- For APPROVE: excited acknowledgment + describe what you're doing next
+- For MODIFY_PLAN: confirm the change + describe adjustment  
+- For SWITCH_MODEL: explain why that model is good/trade-offs
+- For ASK_QUESTION: answer naturally and helpfully
+- For START_OVER: acknowledge and confirm reset
+- Keep it SHORT — 1-2 sentences max. No bullet lists. First person. Warm, expert, not robotic.
+
+EXAMPLES:
+User "looks amazing!": { intent: "APPROVE", agentResponse: "Love it! Generating your reference images now — character, product, and set design." }
+User "make it 60 seconds": { intent: "MODIFY_PLAN", params: { duration: 60 }, agentResponse: "60 seconds — gives us room for a proper narrative arc. Rebuilding the plan now." }
+User "use Kling for this": { intent: "SWITCH_MODEL", params: { model: "kling-3.0" }, agentResponse: "Kling 3.0 it is — great choice for cinematic multi-shot work. Rewriting the prompt for Kling's syntax." }
+User "what's the difference between models?": { intent: "ASK_QUESTION", agentResponse: "Seedance 2.0 is fastest and great for most ads. Kling 3.0 gives the most cinematic quality. Veo 3.1 adds native audio. Grok is fastest for short reels." }
+User "actually make it vertical for Instagram": { intent: "MODIFY_PLAN", params: { ratio: "9:16" }, agentResponse: "Switching to 9:16 vertical — perfect for Instagram Reels and TikTok. Adjusting the scene compositions." }
+
+Return ONLY valid JSON: { "intent": "...", "params": {}, "agentResponse": "..." }`;
+
+        const userPrompt = `User message: "${message}"
+
+What is the intent? Return the JSON.`;
+
+        let result;
+        try {
+            result = await callAgent(systemPrompt, userPrompt, 0.3, 512);
+        } catch (err) {
+            console.warn('[VideoAgent/chat] Intent classification failed:', err.message);
+            result = { intent: 'AMBIGUOUS', params: {}, agentResponse: "I got that! Could you be a bit more specific so I can take the right action?" };
+        }
+
+        // Ensure result has required fields
+        const intent = result?.intent || 'AMBIGUOUS';
+        const params = result?.params || {};
+        const agentResponse = result?.agentResponse || "Got it! What would you like to do next?";
+
+        console.log(`[VideoAgent/chat] stage=${stage} msg="${message.substring(0,40)}" → intent=${intent}`);
+
+        res.json({ success: true, intent, params, agentResponse });
+
+    } catch (error) {
+        console.error('[VideoAgent/chat] Error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
 router.post('/compile', protect, async (req, res) => {
     const fs = await import('fs');
     const path = await import('path');
@@ -3027,6 +4036,34 @@ router.delete('/ugc-pro/avatars/:id', protect, async (req, res) => {
     }
 });
 
+function sanitizeScrapedText(text) {
+    if (!text) return '';
+    const patterns = [
+        /free\s+delivery/gi,
+        /free\s+shipping/gi,
+        /secure\s+checkout/gi,
+        /satisfaction\s+guaranteed/gi,
+        /easy\s+returns/gi,
+        /30-day\s+money\s+back/gi,
+        /money\s+back\s+guarantee/gi,
+        /add\s+to\s+cart/gi,
+        /buy\s+now/gi,
+        /checkout/gi,
+        /payment\s+methods/gi,
+        /visa,\s+mastercard,\s+paypal/gi,
+        /shipping\s+rates/gi,
+        /track\s+order/gi,
+        /customer\s+support/gi,
+        /trust\s+badge/gi,
+        /certified/gi,
+    ];
+    let sanitized = text;
+    for (const rx of patterns) {
+        sanitized = sanitized.replace(rx, '');
+    }
+    return sanitized.replace(/\n\s*\n+/g, '\n').trim();
+}
+
 // ── POST /api/video-studio/ugc-pro/analyze-product ──
 // MCoT product grounding — URL or text + optional product images
 router.post('/ugc-pro/analyze-product', protect, ugcUpload.array('productImages', 8), async (req, res) => {
@@ -3230,7 +4267,7 @@ router.post('/ugc-pro/analyze-product', protect, ugcUpload.array('productImages'
         // Run MCoT product grounding node — pass scraped text so node skips its own web_search
         const state = await ugcProductGroundingNode({
             productUrl: null, // Already scraped — prevent duplicate fetch inside the node
-            productText: scrapedProductText,
+            productText: sanitizeScrapedText(scrapedProductText),
             productImageUrls,
             brandId,
             userId: req.user._id,
@@ -3415,6 +4452,80 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), aiGe
         console.log(`[UGC Generate] Final prompt @image check — @image1: ${prompt.includes('@image1')}, @image2: ${prompt.includes('@image2')}`);
         console.log(`[UGC Generate] Submitting — ${duration}s, model=${selectedModel}, ${imageUrls.length} images, prompt ${prompt.split(/\s+/).length}w`);
 
+        const isLongForm = (selectedModel === 'gemini-flash' && duration > 10) ||
+                           ((selectedModel === 'seedance-2.0' || selectedModel === 'seedance-2.0-fast') && duration > 15);
+
+        if (isLongForm) {
+            console.log(`[UGC Generate] Routing to LONG-FORM generation: duration=${duration}s, model=${selectedModel}`);
+            const allRefImages = selectedModel === 'gemini-flash' ? imageUrls.slice(0, 7) : imageUrls.slice(0, 9);
+            const longFormRefs = allRefImages.map((url, idx) => ({
+                url,
+                role: idx === 0 ? 'avatar' : 'product'
+            }));
+
+            // Create temporary/skeleton project first so startStoryboardLongForm can auto-persist to it
+            const project = await VideoProject.create({
+                user: req.user._id,
+                brand: brandId,
+                studioMode: 'ugc-pro',
+                status: 'generating',
+                script: prompt,
+                backendPrompt: prompt,
+                input: { images: imageUrls.map(url => ({ url, source: 'existing' })), productData: parsedProduct },
+                generation: {
+                    provider: 'atlascloud',
+                    model: selectedModel,
+                    language: parsedSettings.language || 'English',
+                    bgmPreset: parsedSettings.bgmPreset || req.body.bgmPreset || 'cinematic',
+                    duration,
+                    aspectRatio,
+                    resolution,
+                    progress: 0,
+                    status: 'GENERATING'
+                }
+            });
+
+            const jobId = startStoryboardLongForm({
+                projectId: project._id,
+                userId: req.user._id,
+                imageUrl: imageUrls[0] || null,
+                firstFrameUrl: imageUrls[0] || null,
+                videoPrompt: prompt,
+                totalDuration: duration,
+                format: aspectRatio,
+                resolution,
+                referenceImages: longFormRefs,
+                model: selectedModel,
+                qualityMode: quality === 'high' ? 'quality' : 'fast',
+                voiceoverScript: '', // Will run UGC voiceover pipeline post-generation
+                voiceoverLanguage: parsedSettings.language || 'English',
+                bgmPreset: parsedSettings.bgmPreset || req.body.bgmPreset || 'cinematic',
+            });
+
+            // Update project with jobId
+            project.generation.taskId = jobId;
+            project.generation.requestId = jobId;
+            project.generation.falRequestId = jobId;
+            project.storyboard = {
+                longFormJobId: jobId,
+                status: 'animating',
+                totalDuration: duration,
+            };
+            await project.save();
+
+            return res.json({
+                success: true,
+                projectId: project._id,
+                requestId: jobId,
+                provider: 'atlascloud',
+                model: selectedModel,
+                prompt,
+                imageCount: imageUrls.length,
+                duration,
+                aspectRatio,
+            });
+        }
+
         let genResult;
         let usedProvider;
 
@@ -3483,6 +4594,7 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), aiGe
                 provider: usedProvider,
                 model: selectedModel,
                 language: parsedSettings.language || 'English',
+                bgmPreset: parsedSettings.bgmPreset || req.body.bgmPreset || 'cinematic',
                 taskId: genResult.taskId,
                 requestId: genResult.taskId,
                 duration,
@@ -3523,6 +4635,102 @@ router.get('/ugc-pro/status/:requestId', protect, async (req, res) => {
         const project = await VideoProject.findOne({
             $or: [{ 'generation.falRequestId': requestId }, { 'generation.requestId': requestId }, { 'generation.taskId': requestId }]
         });
+
+        if (requestId.startsWith('sb-lf-')) {
+            const jobStatus = getStoryboardLongFormJobStatus(requestId);
+            if (jobStatus) {
+                if (jobStatus.status === 'FAILED') {
+                    if (project) {
+                        await VideoProject.findByIdAndUpdate(project._id, {
+                            'generation.status': 'FAILED',
+                            'generation.error': jobStatus.error || 'Long-form generation failed',
+                            status: 'failed'
+                        });
+                    }
+                    return res.json({
+                        success: true,
+                        status: 'FAILED',
+                        error: jobStatus.error || 'Long-form generation failed',
+                        progress: jobStatus.progress
+                    });
+                }
+                if (jobStatus.status === 'COMPLETED') {
+                    let finalVideoUrl = jobStatus.videoUrl;
+                    try {
+                        const s3VideoUrl = await ensureS3Url(finalVideoUrl, `ugc-pro/gen-video-${Date.now()}.mp4`);
+                        if (s3VideoUrl) finalVideoUrl = s3VideoUrl;
+                    } catch (mirrorErr) {
+                        console.warn(`[UGC Pro Status] S3 mirror failed: ${mirrorErr.message}`);
+                    }
+
+                    const updatePayload = {
+                        'generation.progress': 100,
+                        'generation.status': 'COMPLETED',
+                        'generation.videoUrl': finalVideoUrl,
+                        status: 'done',
+                        finalVideoUrl
+                    };
+
+                    const updatedProject = await VideoProject.findOneAndUpdate(
+                        { _id: project._id },
+                        { $set: updatePayload },
+                        { returnDocument: 'after' }
+                    );
+
+                    // Trigger Voiceover pipeline if needed
+                    if (updatedProject && updatedProject.generation?.language && !updatedProject.generation?.voiceoverStatus) {
+                        console.log(`🎤 [TTS] Triggering UGC Pro voiceover pipeline for project ${updatedProject._id} (lang: ${updatedProject.generation.language})`);
+                        addVoiceoverToProject(updatedProject).catch(e => console.error(`🎤 [TTS] UGC Pro voiceover failed: ${e.message}`));
+                    }
+
+                    return res.json({
+                        success: true,
+                        status: 'COMPLETED',
+                        videoUrl: finalVideoUrl,
+                        progress: 100
+                    });
+                }
+                // Still in progress
+                if (project) {
+                    await VideoProject.findByIdAndUpdate(project._id, {
+                        'generation.progress': jobStatus.progress || 10,
+                        'generation.status': 'GENERATING'
+                    });
+                }
+                return res.json({
+                    success: true,
+                    status: 'IN_PROGRESS',
+                    progress: jobStatus.progress || 10,
+                    phase: jobStatus.phase,
+                    phaseLabel: jobStatus.phaseLabel,
+                    detail: jobStatus.detail
+                });
+            } else {
+                // Not in memory
+                if (project && project.status === 'done' && project.finalVideoUrl) {
+                    return res.json({
+                        success: true,
+                        status: 'COMPLETED',
+                        videoUrl: project.finalVideoUrl,
+                        progress: 100
+                    });
+                }
+                if (project && project.status === 'failed') {
+                    return res.json({
+                        success: true,
+                        status: 'FAILED',
+                        error: project.generation?.error || 'Failed',
+                        progress: project.generation?.progress || 0
+                    });
+                }
+                return res.json({
+                    success: true,
+                    status: 'IN_PROGRESS',
+                    progress: project?.generation?.progress || 10
+                });
+            }
+        }
+
         const provider = project?.generation?.provider || 'atlascloud';
 
         const result = await getUnifiedGenerationStatus(provider, requestId, project?.generation?.statusUrl, project?.generation?.resultUrl);
@@ -3558,11 +4766,10 @@ router.get('/ugc-pro/status/:requestId', protect, async (req, res) => {
             { returnDocument: 'after' }
         ).catch(e => { console.warn('[UGC Pro Status] DB update failed:', e.message); return null; });
 
-        // 🎤 Trigger async voiceover pipeline for non-English completed videos
+        // 🎤 Trigger async voiceover pipeline for completed videos
         if (result.status === 'COMPLETED' && updatedProject) {
             console.log(`[UGC Pro Status] ✅ DB updated: project=${updatedProject._id}, status=${updatedProject.status}`);
             if (updatedProject.generation?.language &&
-                updatedProject.generation.language.toLowerCase() !== 'english' &&
                 !updatedProject.generation?.voiceoverStatus) {
                 console.log(`🎤 [TTS] Triggering UGC Pro voiceover pipeline for project ${updatedProject._id} (lang: ${updatedProject.generation.language})`);
                 addVoiceoverToProject(updatedProject).catch(e => console.error(`🎤 [TTS] UGC Pro voiceover failed: ${e.message}`));
@@ -4066,27 +5273,56 @@ async function muxVideoWithAudio(videoUrl, audioUrl = null, bgmUrl = null) {
             else console.warn(`⚠️ [FFmpeg] Failed to download BGM, proceeding without it.`);
         }
 
+        // Probe for native audio stream
+        let hasNativeAudio = false;
+        try {
+            const { stdout } = await execFileAsync('ffprobe', [
+                '-v', 'quiet',
+                '-select_streams', 'a',
+                '-show_entries', 'stream=codec_type',
+                '-of', 'csv=p=0',
+                videoPath
+            ]);
+            hasNativeAudio = stdout.trim().includes('audio');
+            console.log(`🎬 [FFmpeg] Probe result hasNativeAudio: ${hasNativeAudio}`);
+        } catch (probeErr) {
+            console.warn(`⚠️ [FFmpeg] ffprobe failed (assuming no native audio):`, probeErr.message);
+        }
+
         const ffmpegArgs = ['-y', '-i', videoPath];
 
-        if (audioUrl && fs.existsSync(audioPath) && bgmUrl && fs.existsSync(bgmPath)) {
-            // Both Voiceover and BGM
-            ffmpegArgs.push('-i', audioPath);
-            ffmpegArgs.push('-stream_loop', '-1', '-i', bgmPath);
-            ffmpegArgs.push('-filter_complex', '[1:a]volume=1.5[vo];[2:a]volume=0.15[bgm];[vo][bgm]amix=inputs=2:duration=longest[aout]');
-            ffmpegArgs.push('-map', '0:v:0', '-map', '[aout]');
-        } else if (audioUrl && fs.existsSync(audioPath)) {
-            // Only Voiceover
-            ffmpegArgs.push('-i', audioPath);
-            ffmpegArgs.push('-map', '0:v:0', '-map', '1:a:0');
-            ffmpegArgs.push('-filter:a', 'volume=1.5');
-        } else if (bgmUrl && fs.existsSync(bgmPath)) {
-            // Only BGM
-            ffmpegArgs.push('-stream_loop', '-1', '-i', bgmPath);
-            ffmpegArgs.push('-map', '0:v:0', '-map', '1:a:0');
-            ffmpegArgs.push('-filter:a', 'volume=0.20');
+        if (hasNativeAudio) {
+            // Video has native audio. Preserve it and mix with voiceover if available.
+            if (audioUrl && fs.existsSync(audioPath)) {
+                ffmpegArgs.push('-i', audioPath);
+                ffmpegArgs.push('-filter_complex', '[0:a]volume=0.8[bg];[1:a]volume=1.5[vo];[bg][vo]amix=inputs=2:duration=longest[aout]');
+                ffmpegArgs.push('-map', '0:v:0', '-map', '[aout]');
+            } else {
+                console.log(`🎬 [FFmpeg] Preserving native audio, no voiceover to mix.`);
+                return videoUrl;
+            }
         } else {
-            // No audio to mux, just return the original video URL
-            return videoUrl;
+            // Video has no native audio (silent)
+            if (audioUrl && fs.existsSync(audioPath) && bgmUrl && fs.existsSync(bgmPath)) {
+                // Both Voiceover and BGM
+                ffmpegArgs.push('-i', audioPath);
+                ffmpegArgs.push('-stream_loop', '-1', '-i', bgmPath);
+                ffmpegArgs.push('-filter_complex', '[1:a]volume=1.5[vo];[2:a]volume=0.15[bgm];[vo][bgm]amix=inputs=2:duration=longest[aout]');
+                ffmpegArgs.push('-map', '0:v:0', '-map', '[aout]');
+            } else if (audioUrl && fs.existsSync(audioPath)) {
+                // Only Voiceover
+                ffmpegArgs.push('-i', audioPath);
+                ffmpegArgs.push('-map', '0:v:0', '-map', '1:a:0');
+                ffmpegArgs.push('-filter:a', 'volume=1.5');
+            } else if (bgmUrl && fs.existsSync(bgmPath)) {
+                // Only BGM
+                ffmpegArgs.push('-stream_loop', '-1', '-i', bgmPath);
+                ffmpegArgs.push('-map', '0:v:0', '-map', '1:a:0');
+                ffmpegArgs.push('-filter:a', 'volume=0.20');
+            } else {
+                // No audio to mux, just return the original video URL
+                return videoUrl;
+            }
         }
 
         ffmpegArgs.push('-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-shortest', '-movflags', '+faststart', outputPath);
@@ -4304,7 +5540,7 @@ router.get('/ugc-pro/qads/v2/status/:requestId', protect, async (req, res) => {
                 // 🎤 Trigger async voiceover pipeline for completed videos
                 // Fire-and-forget: the response returns immediately with the raw video.
                 // The muxed video (with voiceover) replaces it once TTS+FFmpeg completes.
-                if (result.status === 'COMPLETED' && updatedProject.generation?.language && updatedProject.generation.language.toLowerCase() !== 'english' && !updatedProject.generation?.voiceoverStatus) {
+                if (result.status === 'COMPLETED' && updatedProject.generation?.language && !updatedProject.generation?.voiceoverStatus) {
                     console.log(`🎤 [TTS] Triggering async voiceover pipeline for project ${updatedProject._id} (lang: ${updatedProject.generation.language})`);
                     addVoiceoverToProject(updatedProject).catch(e => console.error(`🎤 [TTS] Background voiceover failed: ${e.message}`));
                 }
@@ -4679,6 +5915,7 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
                     provider: genResult.provider || 'atlascloud',
                     model: finalModel, // Ensure the selected final model is saved
                     language: parsedSettings.language || 'English',
+                    bgmPreset: parsedSettings.bgmPreset || req.body.bgmPreset || 'cinematic',
                     falRequestId: genResult.requestId || genResult.taskId || genResult.falRequestId,
                     taskId: genResult.requestId || genResult.taskId || genResult.falRequestId,
                     requestId: genResult.requestId || genResult.taskId || genResult.falRequestId,
@@ -8057,6 +9294,7 @@ async function generateAnimateVideoPrompt({
     firstFrameIsAvatar = false, // true when avatar is used as first frame (no product images)
     structuredPlan = null,     // 4-section storyboard plan from DB (new)
     includeBranding = true,    // when false: strip all brand CTA, logo, brand context
+    model = 'seedance-2.0',    // default model
 }) {
     // Enforce branding toggle
     if (!includeBranding) {
@@ -8163,7 +9401,28 @@ The environment (${structuredPlan.environmentFingerprint}) must remain visually 
 
     const openingInstruction = 'Use the attached storyboard image (@image2) as the VISUAL STYLE REFERENCE ONLY. Do NOT open the video with this storyboard grid — the video must open with @image1.';
 
-    const systemPrompt = `You are a world-class AI Film Director specializing in writing video generation prompts for Seedance / Atlas video AI models.
+    const isGeminiFlash = model === 'gemini-flash';
+
+    const systemPrompt = isGeminiFlash
+        ? `You are a world-class AI Film Director specializing in writing video generation prompts for Google Gemini Omni Flash Image-to-Video.
+
+Your task: Write a single, continuous cinematic narrative prose prompt (NOT a shot list) that will animate an approved storyboard into a high-end commercial video.
+
+CRITICAL PROMPT RULES:
+1. MUST start with: "${openingInstruction}"
+2. The video OPENS with @image1 (${firstFrameIsAvatar ? 'the presenter/avatar' : 'the product image'}) as the first frame.
+3. Use @imageN tags precisely. The mapping is:
+${tagMap.map(t => `   ${t}`).join('\n')}
+4. Write ONE continuous cinematic narrative prose describing the scene-by-scene action. Use camera terms: slow push-in, handheld, overhead pan, rack-focus.
+5. MANDATORY DIALOGUES: Write all spoken dialogues / voiceover in ${dialogueLanguage} script directly inside the prompt.
+6. Specify timing for the cuts in the narrative prose.
+7. Describe product interaction: how the product is handled, held, or shown.
+${brandingRule}
+9. 300–600 words. Extremely specific. Directly executable by Gemini Omni Flash.
+10. Return ONLY the raw video prompt text. No JSON, no markdown, no explanation.
+11. NO TEXT OR LOGO RENDERING (CRITICAL): Do not describe specific text, letters, slogans, or logos on the product, screen, or background. Describe packaging and labels generically (e.g. "a sleek amber glass bottle with a clean white label", NOT "says 'GLOW' on the front"). Video generation models fail at rendering written text and instead produce garbled, hallucinatory letter-like shapes. Keep all scenes, products, and backgrounds completely text-free and logo-free.
+12. CRITICAL DESIGN AND COLOR FIDELITY: You must explicitly instruct the video AI model to preserve the original product design, shape, colors, branding, labels, and packaging details exactly as shown in the reference image. Under no circumstances should the product's colors, branding, or design elements be altered, simplified, or stylized. The brand colors must only be applied to the environment, background, or graphics, never to recolor or color-shift the product itself.`
+        : `You are a world-class AI Film Director specializing in writing video generation prompts for Seedance / Atlas video AI models.
 
 Your task: Write a single, richly detailed, cinematic VIDEO PROMPT that will animate an approved storyboard into a high-end commercial video.
 
@@ -8453,6 +9712,7 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                 firstFrameIsAvatar,
                 structuredPlan: dbStructuredPlan,
                 includeBranding: dbIncludeBranding,  // respect brand toggle
+                model, // selected model
             });
             console.log(`[Storyboard Animate] Video prompt (first 120): ${finalVideoPrompt.substring(0, 120)}...`);
             if (projectId) {

@@ -185,7 +185,7 @@ export async function callAgent(systemPrompt, userPrompt, temperature = 0.7, max
 /**
  * Call AI via router and return raw text (not JSON)
  */
-export async function callAgentText(systemPrompt, userPrompt, temperature = 0.7, maxTokens = 4096) {
+export async function callAgentText(systemPrompt, userPrompt, temperature = 0.7, maxTokens = 4096, preferences = {}) {
     const router = getRouter();
 
     // Safety: Truncate extremely long prompts
@@ -198,7 +198,7 @@ export async function callAgentText(systemPrompt, userPrompt, temperature = 0.7,
         userPrompt: safeUser,
         temperature,
         maxTokens,
-    }); // Router auto-selects cheapest provider
+    }, preferences); // Route using preferences (e.g. Anthropic/Claude or Gemini)
     return result.text || '';
 }
 
