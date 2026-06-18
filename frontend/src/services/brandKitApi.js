@@ -6,7 +6,8 @@
 export const API_BASE = (import.meta.env.VITE_API_URL || `${window.location.origin}/api`).replace(/\/$/, '');
 
 const authHeaders = () => {
-    const token = localStorage.getItem('mantram_token');
+    // Strip whitespace/newlines — Safari throws DOMException for dirty header values
+    const token = (localStorage.getItem('mantram_token') || '').replace(/[\s\r\n\t]+/g, '');
     return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
 };
 

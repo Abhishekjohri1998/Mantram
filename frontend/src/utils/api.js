@@ -1,7 +1,9 @@
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 export default async function api(endpoint, options = {}) {
-    const token = localStorage.getItem('mantram_token');
+    // Strip whitespace/control chars — Safari throws DOMException for header
+    // values containing newlines (from localStorage tokens stored with whitespace)
+    const token = (localStorage.getItem('mantram_token') || '').replace(/[\s\r\n\t]+/g, '');
     const headers = {
         ...options.headers,
     };
