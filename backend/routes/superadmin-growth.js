@@ -8,9 +8,69 @@ import GrowthContent from '../models/GrowthContent.js';
 import { generateDailyContent, regeneratePlatformContent, getISTDateDetails } from '../services/growthContentEngine.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import { getRouter } from '../ai/router.js';
-import { ensureS3Url } from '../utils/s3.js';
+import { ensureS3Url, getSignedUrlIfNeeded } from '../utils/s3.js';
 
 const router = Router();
+
+// Helper to sign S3 URLs in GrowthContent document dynamically
+async function signGrowthContentUrls(content) {
+    if (!content) return content;
+    const signed = JSON.parse(JSON.stringify(content));
+
+    if (signed.linkedin && Array.isArray(signed.linkedin)) {
+        for (const post of signed.linkedin) {
+            if (post.imageUrl) {
+                post.imageUrl = await getSignedUrlIfNeeded(post.imageUrl);
+            }
+        }
+    }
+    if (signed.twitter && Array.isArray(signed.twitter)) {
+        for (const post of signed.twitter) {
+            if (post.imageUrl) {
+                post.imageUrl = await getSignedUrlIfNeeded(post.imageUrl);
+            }
+        }
+    }
+    if (signed.reddit && Array.isArray(signed.reddit)) {
+        for (const post of signed.reddit) {
+            if (post.imageUrl) {
+                post.imageUrl = await getSignedUrlIfNeeded(post.imageUrl);
+            }
+        }
+    }
+    if (signed.instagram) {
+        if (signed.instagram.post) {
+            if (signed.instagram.post.coverImageUrl) {
+                signed.instagram.post.coverImageUrl = await getSignedUrlIfNeeded(signed.instagram.post.coverImageUrl);
+            }
+            if (signed.instagram.post.slides && Array.isArray(signed.instagram.post.slides)) {
+                for (const slide of signed.instagram.post.slides) {
+                    if (slide.imageUrl) {
+                        slide.imageUrl = await getSignedUrlIfNeeded(slide.imageUrl);
+                    }
+                }
+            }
+        }
+        if (signed.instagram.story) {
+            if (signed.instagram.story.slides && Array.isArray(signed.instagram.story.slides)) {
+                for (const slide of signed.instagram.story.slides) {
+                    if (slide.imageUrl) {
+                        slide.imageUrl = await getSignedUrlIfNeeded(slide.imageUrl);
+                    }
+                }
+            }
+        }
+        if (signed.instagram.reel) {
+            if (signed.instagram.reel.imageUrl) {
+                signed.instagram.reel.imageUrl = await getSignedUrlIfNeeded(signed.instagram.reel.imageUrl);
+            }
+            if (signed.instagram.reel.videoUrl) {
+                signed.instagram.reel.videoUrl = await getSignedUrlIfNeeded(signed.instagram.reel.videoUrl);
+            }
+        }
+    }
+    return signed;
+}
 
 // ══════════════════════════════════════════════════════════════
 // GET /api/superadmin/growth/today — Today's generated content
@@ -28,7 +88,8 @@ router.get('/today', async (req, res) => {
             });
         }
 
-        res.json({ success: true, content });
+        const signedContent = await signGrowthContentUrls(content);
+        res.json({ success: true, content: signedContent });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
@@ -51,9 +112,10 @@ router.get('/history', async (req, res) => {
             GrowthContent.countDocuments(),
         ]);
 
+        const signedContentList = await Promise.all(content.map(signGrowthContentUrls));
         res.json({
             success: true,
-            content,
+            content: signedContentList,
             total,
             page: parseInt(page),
             pages: Math.ceil(total / parseInt(limit)),
@@ -76,7 +138,8 @@ router.post('/generate', async (req, res) => {
         await GrowthContent.deleteOne({ dateKey });
 
         const content = await generateDailyContent(targetDate);
-        res.json({ success: true, content });
+        const signedContent = await signGrowthContentUrls(content?.toObject ? content.toObject() : content);
+        res.json({ success: true, content: signedContent });
     } catch (error) {
         console.error('[Growth Generate]', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -129,7 +192,8 @@ router.put('/:id/mark-posted', async (req, res) => {
         content.status = allPosted.every(Boolean) ? 'posted' : allPosted.some(Boolean) ? 'partial' : 'generated';
 
         await content.save();
-        res.json({ success: true, content });
+        const signedContent = await signGrowthContentUrls(content.toObject());
+        res.json({ success: true, content: signedContent });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
@@ -142,7 +206,8 @@ router.post('/:id/regenerate', async (req, res) => {
     try {
         const { platform, index = 0 } = req.body;
         const content = await regeneratePlatformContent(req.params.id, platform, index);
-        res.json({ success: true, content });
+        const signedContent = await signGrowthContentUrls(content?.toObject ? content.toObject() : content);
+        res.json({ success: true, content: signedContent });
     } catch (error) {
         console.error('[Growth Regenerate]', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
@@ -229,8 +294,8 @@ router.post('/:id/generate-image', async (req, res) => {
             targetObj.imageUrl = s3Url;
         }
         await content.save();
-
-        res.json({ success: true, content });
+        const signedContent = await signGrowthContentUrls(content.toObject());
+        res.json({ success: true, content: signedContent });
     } catch (error) {
         console.error('[Growth Generate Image]', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });

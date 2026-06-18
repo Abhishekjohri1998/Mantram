@@ -13,6 +13,11 @@ import { getOrchestrator } from '../agents/orchestrator.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import { mirrorUrlToS3, getSignedUrlIfNeeded } from '../utils/s3.js';
 import { setMaxListeners } from 'events';
+import fetch from 'node-fetch';
+import https from 'https';
+import { launchPuppeteer } from '../utils/puppeteerHelper.js';
+
+const sharedHttpsAgent = new https.Agent({ rejectUnauthorized: false });
 
 const router = Router();
 
@@ -183,9 +188,8 @@ async function signProductAssets(product) {
 async function scrapeWithPuppeteer(siteUrl) {
     let browser;
     try {
-        const puppeteer = await import('puppeteer');
         console.log(`[scrape-url] 🌐 Launching Puppeteer fallback for: ${siteUrl}`);
-        browser = await puppeteer.default.launch({
+        browser = await launchPuppeteer({
             headless: true,
             args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
         });
@@ -232,8 +236,6 @@ router.post('/scrape-url', protect, async (req, res) => {
             return res.status(400).json({ success: false, error: 'URL points to an internal or blocked network. Use a public URL.' });
         }
 
-        const fetch = (await import('node-fetch')).default;
-        
         let html = '';
         let fetchedSuccessfully = false;
 
@@ -241,6 +243,7 @@ router.post('/scrape-url', protect, async (req, res) => {
         try {
             console.log(`[scrape-url] Fetching with node-fetch: ${siteUrl}`);
             const response = await fetch(siteUrl, {
+                agent: sharedHttpsAgent,
                 headers: { 
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
                     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
@@ -414,6 +417,7 @@ router.post('/scrape-url', protect, async (req, res) => {
                     const shopifyJsonUrl = `${parsed.origin}/products/${handle}.json`;
                     console.log(`[scrape-url] Trying Shopify product API: ${shopifyJsonUrl}`);
                     const shopifyResp = await fetch(shopifyJsonUrl, {
+                        agent: sharedHttpsAgent,
                         headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
                         timeout: 8000,
                     });
@@ -903,6 +907,7 @@ async function fetchPageHTML(url) {
     const timeout = setTimeout(() => controller.abort(), 15000);
     try {
         const response = await fetch(url, {
+            agent: sharedHttpsAgent,
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -929,6 +934,7 @@ async function fetchJSON(url) {
     const timeout = setTimeout(() => controller.abort(), 15000);
     try {
         const response = await fetch(url, {
+            agent: sharedHttpsAgent,
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'Accept': 'application/json, */*;q=0.1',

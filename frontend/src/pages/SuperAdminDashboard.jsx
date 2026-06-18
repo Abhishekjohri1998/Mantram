@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import SEOHead from '../components/SEOHead'
-import { superadmin as API, social as socialAPI } from '../services/api'
+import { superadmin as API, social as socialAPI, getCorsUrl } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import TemplateManager from './TemplateManager'
 import QAdsManager from './QAdsManager'
@@ -229,7 +229,8 @@ export default function SuperAdminDashboard() {
 
     const downloadImage = async (url, filename) => {
         try {
-            const response = await fetch(url, { mode: 'cors' })
+            const corsUrl = getCorsUrl(url)
+            const response = await fetch(corsUrl, { mode: 'cors' })
             if (!response.ok) throw new Error('Network response was not ok')
             const blob = await response.blob()
             const blobUrl = URL.createObjectURL(blob)
