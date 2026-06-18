@@ -183,6 +183,13 @@ router.post('/wizard/generate', protect, async (req, res) => {
             generateBrandGuide({ brief: `Brand guide for ${briefBrand.name}`, briefBrand }),
         ]);
 
+        // Check if the core identity generation failed. Without visual identity, stationery & guide are useless.
+        const isIdentitySuccess = identityResult.status === 'fulfilled' && identityResult.value?.success;
+        if (!isIdentitySuccess) {
+            const errorMsg = (identityResult.status === 'fulfilled' ? identityResult.value?.error : identityResult.reason?.message) || 'Identity generation failed';
+            throw new Error(`Wizard failed: ${errorMsg}`);
+        }
+
         await deductCredits(req.user._id, cost, 'brand-kit-wizard');
 
         // Save all successfully generated assets

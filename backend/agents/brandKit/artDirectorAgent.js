@@ -257,15 +257,26 @@ ${collateralBrief ? `Collateral Brief: ${collateralBrief}` : ''}
     console.log(`🎨 ArtDirector: Archetype=${artStrategy.brandArchetype} | Movement=${artStrategy.designMovement}`);
 
     // Engineer asset-specific prompts
-    let promptData = { prompts: {} };
+    let prompts = {};
     if (assetSpecs && assetSpecs.length > 0) {
         console.log(`🎨 ArtDirector: Engineering ${assetSpecs.length} identity system asset prompts...`);
-        promptData = await engineerAssetPrompts(artStrategy, brandContext, assetType, assetSpecs, existingLogoUrl, collateralBrief);
+        const promptData = await engineerAssetPrompts(artStrategy, brandContext, assetType, assetSpecs, existingLogoUrl, collateralBrief);
+        if (promptData) {
+            if (promptData.prompts) {
+                prompts = promptData.prompts;
+            } else {
+                // Defense-in-depth: If Claude returned a flat object instead of nesting under "prompts"
+                const hasKeys = assetSpecs.some(key => promptData[key]);
+                if (hasKeys) {
+                    prompts = promptData;
+                }
+            }
+        }
     }
 
     return {
         artStrategy,
-        prompts: promptData?.prompts || {},
+        prompts,
         brandContext,
         brand,
     };

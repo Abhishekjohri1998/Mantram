@@ -151,13 +151,16 @@ export async function generateBrandIdentity({
                 existingLogoUrl,
             });
 
-            // Upload to S3 for permanence
+            // Upload to S3 for permanence if not already in our S3 bucket
             let finalUrl = imageUrl;
             if (imageUrl) {
-                try {
-                    const s3Url = await mirrorUrlToS3(imageUrl, `brand-kit/${brandId || 'anon'}/${slug}-${asset.subType}.png`);
-                    if (s3Url) finalUrl = s3Url;
-                } catch (_) { /* use original URL */ }
+                const isOurS3 = imageUrl.includes('mantram-media-assets.s3') || imageUrl.includes('.amazonaws.com');
+                if (!isOurS3) {
+                    try {
+                        const s3Url = await mirrorUrlToS3(imageUrl, `brand-kit/${brandId || 'anon'}/${slug}-${asset.subType}.png`);
+                        if (s3Url) finalUrl = s3Url;
+                    } catch (_) { /* use original URL */ }
+                }
             }
 
             return {
@@ -178,6 +181,13 @@ export async function generateBrandIdentity({
         .map(r => r.value);
 
     console.log(`✅ [Identity] Generated ${assets.length}/${IDENTITY_ASSETS.length} identity system assets`);
+
+    if (assets.length === 0) {
+        return {
+            success: false,
+            error: 'Failed to generate any brand identity assets',
+        };
+    }
 
     return {
         success: true,
