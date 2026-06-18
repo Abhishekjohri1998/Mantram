@@ -347,6 +347,7 @@ export default function SuperAdminDashboard() {
             const payload = {
                 accountIds: [selectedAccountId],
                 text,
+                platform,
                 ...(imageUrls.length > 1 ? { imageUrls } : {}),
                 ...(imageUrls.length === 1 && !imageUrl ? { imageUrl: imageUrls[0] } : {}),
                 ...(imageUrl ? { imageUrl } : {})

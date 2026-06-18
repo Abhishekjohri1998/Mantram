@@ -702,7 +702,7 @@ Do not include any text outside the JSON. Do not wrap in markdown code blocks.`;
  * @access  Private
  */
 router.post('/publish', protect, async (req, res) => {
-    let { accountIds, text, imageUrl, imageUrls, captions, videoUrl } = req.body;
+    let { accountIds, text, imageUrl, imageUrls, captions, videoUrl, platform } = req.body;
 
     const hasMedia = imageUrl || (Array.isArray(imageUrls) && imageUrls.length > 0) || videoUrl;
     if (!accountIds || accountIds.length === 0 || (!text && !captions && !hasMedia)) {
@@ -824,7 +824,18 @@ router.post('/publish', protect, async (req, res) => {
                     if (account.platform === 'facebook') {
                         postId = await publishCarouselToFacebook(account.accountId, account.accessToken, postText, carouselUrls);
                     } else if (account.platform === 'instagram') {
-                        postId = await publishCarouselToInstagram(account.accountId, account.accessToken, postText, carouselUrls);
+                        if (platform === 'instagram_story') {
+                            // Publish each story individually since Instagram API doesn't support carousel stories
+                            console.log(`[SOCIAL] Sequential story publish for ${carouselUrls.length} items`);
+                            const storyIds = [];
+                            for (const imgUrl of carouselUrls) {
+                                const id = await publishToInstagram(account.accountId, account.accessToken, '', imgUrl, null, { mediaType: 'STORIES' });
+                                storyIds.push(id);
+                            }
+                            postId = storyIds.join(',');
+                        } else {
+                            postId = await publishCarouselToInstagram(account.accountId, account.accessToken, postText, carouselUrls);
+                        }
                     } else if (account.platform === 'linkedin') {
                         postId = await publishCarouselToLinkedIn(account.accountId, account.accessToken, postText, carouselUrls);
                     } else if (account.platform === 'twitter') {
@@ -844,7 +855,9 @@ router.post('/publish', protect, async (req, res) => {
                     if (account.platform === 'facebook') {
                         postId = await publishToFacebook(account.accountId, account.accessToken, postText, absoluteImageUrl, absoluteVideoUrl);
                     } else if (account.platform === 'instagram') {
-                        postId = await publishToInstagram(account.accountId, account.accessToken, postText, absoluteImageUrl, absoluteVideoUrl);
+                        const isStory = platform === 'instagram_story';
+                        const options = isStory ? { mediaType: 'STORIES' } : {};
+                        postId = await publishToInstagram(account.accountId, account.accessToken, postText, absoluteImageUrl, absoluteVideoUrl, options);
                     } else if (account.platform === 'linkedin') {
                         postId = await publishToLinkedIn(account.accountId, account.accessToken, postText, absoluteImageUrl, absoluteVideoUrl);
                     } else if (account.platform === 'twitter') {
@@ -967,7 +980,7 @@ router.get('/accounts/:id/posts/:postId/insights', protect, async (req, res) => 
  * @access  Private
  */
 router.post('/schedule', protect, async (req, res) => {
-    const { accountIds, text, imageUrl, imageUrls, captions, scheduledFor, brandId, videoUrl } = req.body;
+    const { accountIds, text, imageUrl, imageUrls, captions, scheduledFor, brandId, videoUrl, platform } = req.body;
 
     const hasMedia = imageUrl || (Array.isArray(imageUrls) && imageUrls.length > 0) || videoUrl;
     if (!accountIds || accountIds.length === 0 || (!text && !captions && !hasMedia)) {
@@ -1051,7 +1064,7 @@ router.post('/schedule', protect, async (req, res) => {
             const record = await SocialPost.create({
                 user: req.user._id,
                 brand: brandId || undefined,
-                platform: account.platform,
+                platform: platform || account.platform,
                 accountId: account.accountId,
                 accountName: account.accountName,
                 caption: postCaption,

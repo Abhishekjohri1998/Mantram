@@ -274,7 +274,7 @@ export const publishToFacebook = async (pageId, accessToken, text, imageUrl, vid
     }
 };
 
-export const publishToInstagram = async (igAccountId, accessToken, text, imageUrl, videoUrl) => {
+export const publishToInstagram = async (igAccountId, accessToken, text, imageUrl, videoUrl, options = {}) => {
     try {
         if (!imageUrl && !videoUrl) {
             throw new Error("Instagram requires an image or video to publish.");
@@ -283,15 +283,23 @@ export const publishToInstagram = async (igAccountId, accessToken, text, imageUr
         // Step 1: Create media container
         const containerUrl = `${FB_API_URL}/${igAccountId}/media`;
         const containerPayload = {
-            caption: text,
             access_token: accessToken
         };
         
-        if (videoUrl) {
+        if (options.mediaType === 'STORIES') {
+            containerPayload.media_type = 'STORIES';
+            if (videoUrl) {
+                containerPayload.video_url = videoUrl;
+            } else {
+                containerPayload.image_url = imageUrl;
+            }
+        } else if (videoUrl) {
+            containerPayload.caption = text;
             containerPayload.video_url = videoUrl;
             containerPayload.media_type = 'REELS'; // Use REELS for video to maximize reach
             containerPayload.share_to_feed = true; // Also share to the main profile grid
         } else {
+            containerPayload.caption = text;
             containerPayload.image_url = imageUrl;
         }
 

@@ -165,9 +165,10 @@ async function resolveMediaUrl(url, userId, ext = 'png') {
 async function publishScheduledPost(post) {
     try {
         // Find the matching social account
+        const basePlatform = post.platform.startsWith('instagram') ? 'instagram' : post.platform;
         const accountQuery = {
             user: post.user,
-            platform: post.platform,
+            platform: basePlatform,
             isActive: true,
         };
         if (post.accountId) accountQuery.accountId = post.accountId;
@@ -244,12 +245,25 @@ async function publishScheduledPost(post) {
 
         let postId = null;
 
+        const isStory = post.platform === 'instagram_story';
+
         if (isCarousel) {
             // ── Carousel publish ──
             if (post.platform === 'facebook') {
                 postId = await publishCarouselToFacebook(account.accountId, account.accessToken, caption, carouselUrls);
-            } else if (post.platform === 'instagram') {
-                postId = await publishCarouselToInstagram(account.accountId, account.accessToken, caption, carouselUrls);
+            } else if (post.platform.startsWith('instagram')) {
+                if (isStory) {
+                    // Publish each story individually since Instagram API doesn't support carousel stories
+                    console.log(`[SCHEDULER] Sequential story publish for ${carouselUrls.length} items`);
+                    const storyIds = [];
+                    for (const imgUrl of carouselUrls) {
+                        const id = await publishToInstagram(account.accountId, account.accessToken, '', imgUrl, null, { mediaType: 'STORIES' });
+                        storyIds.push(id);
+                    }
+                    postId = storyIds.join(',');
+                } else {
+                    postId = await publishCarouselToInstagram(account.accountId, account.accessToken, caption, carouselUrls);
+                }
             } else if (post.platform === 'linkedin') {
                 postId = await publishCarouselToLinkedIn(account.accountId, account.accessToken, caption, carouselUrls);
             } else if (post.platform === 'twitter') {
@@ -268,8 +282,9 @@ async function publishScheduledPost(post) {
             // ── Single image/video/text publish ──
             if (post.platform === 'facebook') {
                 postId = await publishToFacebook(account.accountId, account.accessToken, caption, absoluteImageUrl, absoluteVideoUrl);
-            } else if (post.platform === 'instagram') {
-                postId = await publishToInstagram(account.accountId, account.accessToken, caption, absoluteImageUrl, absoluteVideoUrl);
+            } else if (post.platform.startsWith('instagram')) {
+                const options = isStory ? { mediaType: 'STORIES' } : {};
+                postId = await publishToInstagram(account.accountId, account.accessToken, caption, absoluteImageUrl, absoluteVideoUrl, options);
             } else if (post.platform === 'linkedin') {
                 postId = await publishToLinkedIn(account.accountId, account.accessToken, caption, absoluteImageUrl, absoluteVideoUrl);
             } else if (post.platform === 'twitter') {
