@@ -17,11 +17,35 @@ import VideoHoverActions from './VideoHoverActions'
 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
 async function api(path, opts = {}) {
-    const token = localStorage.getItem('mantram_token')
-    const headers = { Authorization: `Bearer ${token}`, ...opts.headers }
+    // Strip ALL whitespace from JWT — Safari/WebKit Fetch throws DOMException
+    // "The string did not match the expected pattern" for header values
+    // containing control characters (newlines, carriage returns, tabs)
+    const rawToken = localStorage.getItem('mantram_token') || ''
+    const token = rawToken.replace(/[\s\r\n\t]+/g, '')
+
+    const headers = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
     if (!(opts.body instanceof FormData)) headers['Content-Type'] = 'application/json'
-    const res = await fetch(`${API_BASE}${path}`, { ...opts, headers })
-    const data = await res.json()
+
+    // Merge caller headers last so they can override
+    const finalHeaders = { ...headers, ...(opts.headers || {}) }
+
+    let res
+    try {
+        res = await fetch(`${API_BASE}${path}`, { ...opts, headers: finalHeaders })
+    } catch (fetchErr) {
+        // Re-throw with more context to aid debugging
+        console.error(`[VideoAgent] fetch failed for ${path}:`, fetchErr)
+        throw new Error(`Network error: ${fetchErr.message}`)
+    }
+
+    let data
+    try {
+        data = await res.json()
+    } catch (jsonErr) {
+        throw new Error(`Server returned non-JSON (status ${res.status})`)
+    }
+
     if (!data.success && !data.reply) throw new Error(data.error || 'Request failed')
     return data
 }
@@ -496,7 +520,7 @@ export default function VideoAgent({ activeBrand, canCreateVideo = true, onUpgra
                 body: JSON.stringify({
                     brief: `${analysis?.summary || ''}\n\nAdditional context: ${additionalContext}`,
                     images: [],
-                    brandId: activeBrand?._id || '',
+                    brandId: activeBrand?._id || null,
                     productId: selProduct?._id || null,
                 }),
             })
