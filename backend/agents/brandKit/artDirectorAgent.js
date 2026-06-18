@@ -118,8 +118,17 @@ COLOR STRATEGY: ${JSON.stringify(artStrategy.colorStrategy)}
 TYPOGRAPHY: ${JSON.stringify(artStrategy.typographyStrategy)}
 MOOD: ${(artStrategy.moodKeywords || []).join(', ')}
 ART DIRECTOR NOTES: ${artStrategy.artDirectorNotes}
-${existingLogoUrl ? `EXISTING LOGO: The brand has an existing logo that will be used as a reference image. Build identity system boards around it — do NOT reinvent the logo, extend its visual language.` : 'NO EXISTING LOGO: The AI will generate a new logo as part of each identity system board.'}
+${existingLogoUrl ? `EXISTING LOGO: The brand has an existing logo that will be used as a reference image. Build all assets around it — do NOT reinvent the logo, extend its visual language.` : 'NO EXISTING LOGO: A new logo will be designed in the primary light system board, which will then serve as the visual reference image for all other assets.'}
 ${collateralBrief ? `COLLATERAL BRIEF: Additional real-world collateral to include in mockups: "${collateralBrief}"` : 'COLLATERAL: Standard brand touchpoints (packaging, bag, business card, cup).'}
+
+═══ CRITICAL: IMAGE-TO-IMAGE / REFERENCE MODE RULES ═══
+All prompts (except the initial 'identity-system-light' when no logo is provided) are executed in GPT-Image-2's image editing / reference mode.
+You must instruct the AI to reference the provided image and extract/preserve its visual elements:
+1. For 'identity-system-light': If there is an existing logo, instruct the AI to integrate it as the primary logo. If no logo, this is a text-to-image prompt (no reference).
+2. For 'identity-system-dark': Instruct the AI to recreate the exact layout, logo, typography, and palette from the reference image, but reversed on a dark brand-colored background.
+3. For 'identity-collateral': Instruct the AI to extract the primary logo design and color palette from the reference image and apply them onto the specified mockup objects (e.g. business cards, bags, boxes).
+4. For 'logo-icon-mark': Instruct the AI to isolate the central symbol or logo mark shown in the reference image onto a plain white background, removing all surrounding grids, swatches, and typography specimen text.
+5. For 'brand-stamp': Instruct the AI to place the logo symbol/monogram from the reference image into a clean circular seal stamp layout.
 
 ═══ CRITICAL: IDENTITY SYSTEM BOARD RULES ═══
 For assets ending in 'identity-system-light' or 'identity-system-dark', the image MUST be a PROFESSIONAL BRAND IDENTITY BOARD showing:
@@ -144,7 +153,7 @@ For 'brand-stamp': Circular seal only.
 6. Specify lighting: "flat studio lighting", "soft north-facing daylight", "Vogue editorial lighting"
 7. Reference quality benchmarks: "Pentagram studio quality", "D&AD award-winning identity", "AIGA 50 books quality"
 8. Use 2026 design markers: specific color temperatures, material trends, cultural codes
-9. Each system board prompt must be 80-120 words, dense with compositional and visual information
+9. Each prompt must be 80-120 words, dense with compositional and visual information
 10. For dark variants: specify "deep [brand color] background", "white reversed logo", "luminous palette display"`;
 
 async function engineerAssetPrompts(artStrategy, brandContext, assetType, assetSpecs, existingLogoUrl, collateralBrief) {
@@ -210,7 +219,11 @@ export async function runArtDirector({
         const ctx = await loadBrandContext(brandId);
         brandContext = ctx.brandContext || '';
         brand = ctx.brand;
-    } else if (briefBrand) {
+    }
+
+    const activeLogoUrl = existingLogoUrl || brand?.dna?.logo?.url || null;
+
+    if (briefBrand) {
         // Zero-brand wizard mode — build context from the wizard brief
         brandContext = `<brand_bible>
 Brand Name: ${briefBrand.name}
@@ -221,14 +234,14 @@ Brand Personality: ${briefBrand.personality || 'Modern, aspirational, trustworth
 Founder Vision: ${briefBrand.vision || ''}
 Price Point: ${briefBrand.pricePoint || 'Mid-premium'}
 Country: ${briefBrand.country || 'India'}
-${existingLogoUrl ? 'Logo Status: Brand has an existing logo — identity system must incorporate and build around it.' : 'Logo Status: No existing logo — AI will design a new logo as part of the identity system.'}
+${activeLogoUrl ? 'Logo Status: Brand has an existing logo — identity system must incorporate and build around it.' : 'Logo Status: No existing logo — AI will design a new logo as part of the identity system.'}
 ${collateralBrief ? `Collateral Brief: ${collateralBrief}` : ''}
 </brand_bible>`;
     }
 
     // Append logo/collateral context to brand context string
-    if (existingLogoUrl && brandContext) {
-        brandContext += `\n\n<logo_context>\nExisting Logo URL: ${existingLogoUrl}\nInstruction: Build the identity system around the existing logo. Do not redesign it. Extend its visual language.\n</logo_context>`;
+    if (activeLogoUrl && brandContext) {
+        brandContext += `\n\n<logo_context>\nExisting Logo URL: ${activeLogoUrl}\nInstruction: Build the identity system around the existing logo. Do not redesign it. Extend its visual language.\n</logo_context>`;
     }
     if (collateralBrief && brandContext) {
         brandContext += `\n\n<collateral_brief>\n${collateralBrief}\n</collateral_brief>`;
@@ -260,7 +273,7 @@ ${collateralBrief ? `Collateral Brief: ${collateralBrief}` : ''}
     let prompts = {};
     if (assetSpecs && assetSpecs.length > 0) {
         console.log(`🎨 ArtDirector: Engineering ${assetSpecs.length} identity system asset prompts...`);
-        const promptData = await engineerAssetPrompts(artStrategy, brandContext, assetType, assetSpecs, existingLogoUrl, collateralBrief);
+        const promptData = await engineerAssetPrompts(artStrategy, brandContext, assetType, assetSpecs, activeLogoUrl, collateralBrief);
         if (promptData) {
             if (promptData.prompts) {
                 prompts = promptData.prompts;

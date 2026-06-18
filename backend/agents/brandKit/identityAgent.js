@@ -82,9 +82,9 @@ async function generateIdentityImage({ prompt, size, subType, colors, existingLo
     const fullPrompt = `${prompt}${colorCue}${textInstruction} Ultra high resolution, print-ready, photorealistic rendering, award-winning brand design quality.`;
 
     try {
-        // If user has an existing logo → use GPT-Image-2 with reference (image editing mode)
-        if (existingLogoUrl && (subType === 'identity-system-light' || subType === 'identity-system-dark' || subType === 'identity-collateral')) {
-            console.log(`🎨 [Identity] Using existing logo as reference for ${subType}...`);
+        // If a reference logo/image is provided → use GPT-Image-2 edits mode
+        if (existingLogoUrl) {
+            console.log(`🎨 [Identity] Using reference image for ${subType}...`);
             const result = await laozhangGptImageWithRefs(fullPrompt, [existingLogoUrl], {
                 model: GPT_IMAGE_MODEL,
                 size,
@@ -92,7 +92,7 @@ async function generateIdentityImage({ prompt, size, subType, colors, existingLo
             return result?.imageUrl || null;
         }
 
-        // No reference logo — generate from scratch with GPT-Image-2
+        // No reference image — generate from scratch
         const result = await laozhangImageGenerate(fullPrompt, {
             model: GPT_IMAGE_MODEL,
             size,
@@ -134,51 +134,187 @@ export async function generateBrandIdentity({
 
     const colors = brand?.dna?.colors || briefBrand?.colors || [];
     const brandName = brand?.name || briefBrand?.name || 'Brand';
+    const activeLogoUrl = existingLogoUrl || brand?.dna?.logo?.url || null;
 
     console.log(`🎨 [Identity] Generating ${IDENTITY_ASSETS.length} identity system assets with GPT-Image-2...`);
 
-    // Stage 2: Generate all identity images in parallel (GPT-Image-2)
-    const results = await Promise.allSettled(
-        IDENTITY_ASSETS.map(async (asset) => {
-            const prompt = prompts?.[asset.subType] || FALLBACK_PROMPTS[asset.subType]
-                || `Professional ${asset.desc} for ${brandName} brand. Premium brand identity quality.`;
+    let assets = [];
 
-            const imageUrl = await generateIdentityImage({
-                prompt,
-                size: asset.size,
-                subType: asset.subType,
-                colors,
-                existingLogoUrl,
-            });
+    // Stage 2: Generate all identity images using reference mode to ensure visual consistency
+    if (activeLogoUrl) {
+        // Option A: Existing logo provided — generate all 5 in parallel using logo as reference
+        console.log(`🎨 [Identity] Generating all 5 identity assets in parallel using logo reference: ${activeLogoUrl}`);
+        const results = await Promise.allSettled(
+            IDENTITY_ASSETS.map(async (asset) => {
+                const prompt = prompts?.[asset.subType] || FALLBACK_PROMPTS[asset.subType]
+                    || `Professional ${asset.desc} for ${brandName} brand. Premium brand identity quality.`;
 
-            // Upload to S3 for permanence if not already in our S3 bucket
-            let finalUrl = imageUrl;
-            if (imageUrl) {
-                const isOurS3 = imageUrl.includes('mantram-media-assets.s3') || imageUrl.includes('.amazonaws.com');
-                if (!isOurS3) {
-                    try {
-                        const s3Url = await mirrorUrlToS3(imageUrl, `brand-kit/${brandId || 'anon'}/${slug}-${asset.subType}.png`);
-                        if (s3Url) finalUrl = s3Url;
-                    } catch (_) { /* use original URL */ }
+                const imageUrl = await generateIdentityImage({
+                    prompt,
+                    size: asset.size,
+                    subType: asset.subType,
+                    colors,
+                    existingLogoUrl: activeLogoUrl,
+                });
+
+                let finalUrl = imageUrl;
+                if (imageUrl) {
+                    const isOurS3 = imageUrl.includes('mantram-media-assets.s3') || imageUrl.includes('.amazonaws.com');
+                    if (!isOurS3) {
+                        try {
+                            const s3Url = await mirrorUrlToS3(imageUrl, `brand-kit/${brandId || 'anon'}/${slug}-${asset.subType}.png`);
+                            if (s3Url) finalUrl = s3Url;
+                        } catch (_) { /* use original */ }
+                    }
                 }
+
+                return {
+                    name: asset.name,
+                    assetSubType: asset.subType,
+                    imageUrl: finalUrl,
+                    prompt,
+                    format: 'image',
+                    width: asset.size.includes('1792') ? 1792 : 1024,
+                    height: asset.size.includes('1024') ? 1024 : 1024,
+                    thumbnailUrl: finalUrl,
+                };
+            })
+        );
+        assets = results
+            .filter(r => r.status === 'fulfilled' && r.value.imageUrl)
+            .map(r => r.value);
+    } else {
+        // Option B: No existing logo — two-stage visual consistency pipeline
+        console.log(`🎨 [Identity] Two-stage pipeline: generating primary 'identity-system-light' first...`);
+        
+        // Step 1: Generate light system board first (text-only)
+        const lightAssetDef = IDENTITY_ASSETS.find(a => a.subType === 'identity-system-light');
+        const lightPrompt = prompts?.[lightAssetDef.subType] || FALLBACK_PROMPTS[lightAssetDef.subType]
+            || `Professional ${lightAssetDef.desc} for ${brandName} brand. Premium brand identity quality.`;
+        
+        const lightImageUrl = await generateIdentityImage({
+            prompt: lightPrompt,
+            size: lightAssetDef.size,
+            subType: lightAssetDef.subType,
+            colors,
+            existingLogoUrl: null,
+        });
+
+        let finalLightUrl = lightImageUrl;
+        if (lightImageUrl) {
+            const isOurS3 = lightImageUrl.includes('mantram-media-assets.s3') || lightImageUrl.includes('.amazonaws.com');
+            if (!isOurS3) {
+                try {
+                    const s3Url = await mirrorUrlToS3(lightImageUrl, `brand-kit/${brandId || 'anon'}/${slug}-${lightAssetDef.subType}.png`);
+                    if (s3Url) finalLightUrl = s3Url;
+                } catch (_) { /* use original */ }
             }
+        }
 
-            return {
-                name: asset.name,
-                assetSubType: asset.subType,
-                imageUrl: finalUrl,
-                prompt,
+        if (finalLightUrl) {
+            console.log(`🎨 [Identity] Primary light board generated: ${finalLightUrl}. Generating remaining assets using it as visual reference...`);
+            
+            const lightAssetObj = {
+                name: lightAssetDef.name,
+                assetSubType: lightAssetDef.subType,
+                imageUrl: finalLightUrl,
+                prompt: lightPrompt,
                 format: 'image',
-                width: asset.size.includes('1792') ? 1792 : 1024,
-                height: asset.size.includes('1024') ? 1024 : 1024,
-                thumbnailUrl: finalUrl,
+                width: 1792,
+                height: 1024,
+                thumbnailUrl: finalLightUrl,
             };
-        })
-    );
+            assets.push(lightAssetObj);
 
-    const assets = results
-        .filter(r => r.status === 'fulfilled' && r.value.imageUrl)
-        .map(r => r.value);
+            // Step 2: Generate the remaining 4 assets in parallel using the generated light board as the reference image
+            const remainingDefs = IDENTITY_ASSETS.filter(a => a.subType !== 'identity-system-light');
+            const remainingResults = await Promise.allSettled(
+                remainingDefs.map(async (asset) => {
+                    const prompt = prompts?.[asset.subType] || FALLBACK_PROMPTS[asset.subType]
+                        || `Professional ${asset.desc} for ${brandName} brand. Premium brand identity quality.`;
+
+                    // Pass finalLightUrl as the existingLogoUrl reference!
+                    const imageUrl = await generateIdentityImage({
+                        prompt,
+                        size: asset.size,
+                        subType: asset.subType,
+                        colors,
+                        existingLogoUrl: finalLightUrl,
+                    });
+
+                    let finalUrl = imageUrl;
+                    if (imageUrl) {
+                        const isOurS3 = imageUrl.includes('mantram-media-assets.s3') || imageUrl.includes('.amazonaws.com');
+                        if (!isOurS3) {
+                            try {
+                                const s3Url = await mirrorUrlToS3(imageUrl, `brand-kit/${brandId || 'anon'}/${slug}-${asset.subType}.png`);
+                                if (s3Url) finalUrl = s3Url;
+                            } catch (_) { /* use original */ }
+                        }
+                    }
+
+                    return {
+                        name: asset.name,
+                        assetSubType: asset.subType,
+                        imageUrl: finalUrl,
+                        prompt,
+                        format: 'image',
+                        width: asset.size.includes('1792') ? 1792 : 1024,
+                        height: asset.size.includes('1024') ? 1024 : 1024,
+                        thumbnailUrl: finalUrl,
+                    };
+                })
+            );
+
+            const remainingAssets = remainingResults
+                .filter(r => r.status === 'fulfilled' && r.value.imageUrl)
+                .map(r => r.value);
+            
+            assets.push(...remainingAssets);
+        } else {
+            // Step 3 (Fallback): If the primary light board failed, generate all 5 in parallel from text
+            console.warn(`⚠️ [Identity] Primary light board failed. Falling back to parallel text-only generation for all assets.`);
+            const results = await Promise.allSettled(
+                IDENTITY_ASSETS.map(async (asset) => {
+                    const prompt = prompts?.[asset.subType] || FALLBACK_PROMPTS[asset.subType]
+                        || `Professional ${asset.desc} for ${brandName} brand. Premium brand identity quality.`;
+
+                    const imageUrl = await generateIdentityImage({
+                        prompt,
+                        size: asset.size,
+                        subType: asset.subType,
+                        colors,
+                        existingLogoUrl: null,
+                    });
+
+                    let finalUrl = imageUrl;
+                    if (imageUrl) {
+                        const isOurS3 = imageUrl.includes('mantram-media-assets.s3') || imageUrl.includes('.amazonaws.com');
+                        if (!isOurS3) {
+                            try {
+                                const s3Url = await mirrorUrlToS3(imageUrl, `brand-kit/${brandId || 'anon'}/${slug}-${asset.subType}.png`);
+                                if (s3Url) finalUrl = s3Url;
+                            } catch (_) { /* use original */ }
+                        }
+                    }
+
+                    return {
+                        name: asset.name,
+                        assetSubType: asset.subType,
+                        imageUrl: finalUrl,
+                        prompt,
+                        format: 'image',
+                        width: asset.size.includes('1792') ? 1792 : 1024,
+                        height: asset.size.includes('1024') ? 1024 : 1024,
+                        thumbnailUrl: finalUrl,
+                    };
+                })
+            );
+            assets = results
+                .filter(r => r.status === 'fulfilled' && r.value.imageUrl)
+                .map(r => r.value);
+        }
+    }
 
     console.log(`✅ [Identity] Generated ${assets.length}/${IDENTITY_ASSETS.length} identity system assets`);
 
