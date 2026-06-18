@@ -27,13 +27,29 @@ import './VideoStudio.css'
 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
 // ── API helper (uses correct auth token) ──
+// Strip ALL whitespace from JWT — Safari/WebKit throws DOMException
+// "The string did not match the expected pattern" for header values
+// containing control characters (newlines, tabs, carriage returns).
 async function api(path, opts = {}) {
-    const token = localStorage.getItem('mantram_token')
-    const res = await fetch(`${API_BASE}${path}`, {
-        ...opts,
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...opts.headers },
-        signal: opts.signal,
-    })
+    const rawToken = localStorage.getItem('mantram_token') || ''
+    const token = rawToken.replace(/[\s\r\n\t]+/g, '')
+
+    const headers = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    if (!(opts.body instanceof FormData)) headers['Content-Type'] = 'application/json'
+
+    let res
+    try {
+        res = await fetch(`${API_BASE}${path}`, {
+            ...opts,
+            headers: { ...headers, ...opts.headers },
+            signal: opts.signal,
+        })
+    } catch (fetchErr) {
+        console.error(`[VideoStudio] fetch failed for ${path}:`, fetchErr)
+        throw new Error(`Network error: ${fetchErr.message}`)
+    }
+
     const contentType = res.headers.get('content-type') || ''
     if (!contentType.includes('application/json')) {
         throw new Error(`Server returned ${res.status} — ensure backend is running`)
