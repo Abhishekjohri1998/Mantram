@@ -704,8 +704,9 @@ Do not include any text outside the JSON. Do not wrap in markdown code blocks.`;
 router.post('/publish', protect, async (req, res) => {
     let { accountIds, text, imageUrl, imageUrls, captions, videoUrl } = req.body;
 
-    if (!accountIds || accountIds.length === 0 || (!text && !captions)) {
-        return res.status(400).json({ success: false, error: 'Please provide text/captions and select at least one account' });
+    const hasMedia = imageUrl || (Array.isArray(imageUrls) && imageUrls.length > 0) || videoUrl;
+    if (!accountIds || accountIds.length === 0 || (!text && !captions && !hasMedia)) {
+        return res.status(400).json({ success: false, error: 'Please provide text/captions or media, and select at least one account' });
     }
 
     // Auto-detect video URLs sent through imageUrl field (e.g. from Video Studio storyboard)
@@ -968,8 +969,9 @@ router.get('/accounts/:id/posts/:postId/insights', protect, async (req, res) => 
 router.post('/schedule', protect, async (req, res) => {
     const { accountIds, text, imageUrl, imageUrls, captions, scheduledFor, brandId, videoUrl } = req.body;
 
-    if (!accountIds || accountIds.length === 0 || (!text && !captions)) {
-        return res.status(400).json({ success: false, error: 'Please provide text/captions and select at least one account' });
+    const hasMedia = imageUrl || (Array.isArray(imageUrls) && imageUrls.length > 0) || videoUrl;
+    if (!accountIds || accountIds.length === 0 || (!text && !captions && !hasMedia)) {
+        return res.status(400).json({ success: false, error: 'Please provide text/captions or media, and select at least one account' });
     }
     if (!scheduledFor) {
         return res.status(400).json({ success: false, error: 'scheduledFor date is required' });
