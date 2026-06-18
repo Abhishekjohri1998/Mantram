@@ -6,6 +6,7 @@
  */
 
 import GrowthContent from '../models/GrowthContent.js';
+import Brand from '../models/Brand.js';
 import { getAIRouter } from '../ai/router.js';
 
 // ══════════════════════════════════════════════════════════════
@@ -512,16 +513,71 @@ async function fetchTrendingTopics() {
 }
 
 /**
+ * Build dynamic brand description context from Brand document
+ */
+async function getBrandContext(brandId) {
+    if (!brandId) return null;
+    try {
+        const brand = await Brand.findById(brandId).lean();
+        if (!brand) return null;
+
+        const dna = brand.dna || {};
+        const brandName = brand.name || '';
+        const website = brand.website || '';
+        const brandDescription = dna.brandDescription || '';
+        const tagline = dna.tagline || '';
+        const uniqueSellingPoints = Array.isArray(dna.uniqueSellingPoints) ? dna.uniqueSellingPoints.join(', ') : '';
+        const brandValues = Array.isArray(dna.brandValues) ? dna.brandValues.join(', ') : '';
+        const voicePersonality = dna.voice?.personality || '';
+        const voiceDescription = dna.voice?.description || '';
+        const toneInsight = dna.socialVoice?.toneInsight || '';
+        
+        // Retrieve crawled/onboarded knowledge bank entries
+        let knowledgeContext = '';
+        if (brand.knowledge && Array.isArray(brand.knowledge.entries)) {
+            const entriesText = brand.knowledge.entries
+                .filter(entry => entry.content && entry.content.trim())
+                .map(entry => `[Knowledge Bank Entry: ${entry.title || 'Untitled'} (${entry.sourceType || 'Text'})]\n${entry.content.substring(0, 1500)}`)
+                .join('\n\n');
+            if (entriesText) {
+                knowledgeContext = `\nBRAND KNOWLEDGE BANK ENTRIES:\n${entriesText}`;
+            }
+        }
+
+        return {
+            name: brandName,
+            website,
+            logoUrl: dna.logo?.url || '',
+            description: `Brand Name: ${brandName}
+Website: ${website}
+Description: ${brandDescription}
+Tagline: ${tagline}
+Unique Selling Points: ${uniqueSellingPoints}
+Brand Values: ${brandValues}
+Voice/Tone Personality: ${voicePersonality} (${voiceDescription})
+Social Voice Tone Insight: ${toneInsight}
+${knowledgeContext}`.trim()
+        };
+    } catch (err) {
+        console.error('Error fetching brand context for growth engine:', err);
+        return null;
+    }
+}
+
+/**
  * Build the master prompt for content generation
  */
-function buildGenerationPrompt(dayOfWeek, itineraryDay, trendingTopics, subreddits) {
+function buildGenerationPrompt(dayOfWeek, itineraryDay, trendingTopics, subreddits, brandContext = null) {
     const trendSection = trendingTopics.length > 0
         ? `\n\nTRENDING TOPICS TODAY (weave 1-2 of these into your content naturally if relevant):\n${trendingTopics.map(t => `- ${t}`).join('\n')}`
         : '';
 
-    return `You are a growth marketing content writer for Mantram AI — an AI marketing operating system for D2C brands.
-
-ABOUT MANTRAM AI (use this context in all content):
+    let brandDetails = '';
+    if (brandContext) {
+        brandDetails = `ABOUT THE BRAND (use this context in all content, maintaining extreme visual and tonal consistency with the brand's DNA):
+${brandContext.description}`;
+    } else {
+        brandDetails = `ABOUT MANTRAM AI (use this context in all content):
 - AI marketing OS that replaces Canva + Jasper + SEMrush + Buffer + Klaviyo + video agencies
 - Core concept: "Brand DNA" — enter website URL, 90 seconds, AI builds living brand intelligence
 - 14 specialized AI studios (Content, Creative, Video, SEO/AEO, Social, Performance Marketing, Retention, Funnels, Brainstorm, YouTube, Avatar, Virality Predictor, Research, Brand)
@@ -532,18 +588,34 @@ ABOUT MANTRAM AI (use this context in all content):
 - Built by 2 co-founders (Abhishek & Sachin), zero funding, 18 months
 - 75 API routes, 71 database models, 66+ frontend pages, 20+ AI models
 - Pricing: $250/$599/$1,499 per month (SaaS + credits)
-- Target: D2C brands doing $36K-$600K ARR, 5-50 person teams
+- Target: D2C brands doing $36K-$600K ARR, 5-50 person teams`;
+    }
+
+    const brandName = brandContext ? brandContext.name : 'Mantram AI';
+
+    const adaptationInstruction = brandContext ? `
+IMPORTANT ADAPTATION INSTRUCTIONS:
+Today's theme/focus is: "${itineraryDay.title}"
+The theme's focus topic is originally written for Mantram AI: "${itineraryDay.focusTopic}"
+You MUST adapt this theme and talking points completely to the selected brand "${brandName}"! 
+Translate the theme's core category (e.g. founder journey, feature highlight, industry trend, cost savings, educational guide, technical deep-dive) to fit "${brandName}"'s products, services, value proposition, and brand DNA. Use the brand description and details from the brand's knowledge bank entries.
+Do NOT talk about Mantram AI, Sachin, Abhishek, 14 studios, or ₹33 video ads unless the selected brand is actually Mantram AI.` : '';
+
+    return `You are a growth marketing content writer for ${brandName}.
+${adaptationInstruction}
+
+${brandDetails}
 
 TODAY'S ITINERARY FOCUS: ${itineraryDay.title} (${dayOfWeek})
 THEME: ${itineraryDay.theme}
 
 CORE TOPIC DESCRIPTION:
-${itineraryDay.focusTopic}
+${brandContext ? `[ADAPT THIS FOCUS TOPIC CATEGORY FOR ${brandName}]: ` : ''}${itineraryDay.focusTopic}
 
-MANTATORY TALKING POINTS TO WEAVE IN (expand creatively but focus strictly on these):
+MANTATORY TALKING POINTS TO WEAVE IN (expand creatively, but adapt to ${brandName} if different from Mantram):
 ${itineraryDay.talkingPoints.map(p => `- ${p}`).join('\n')}
 
-PLATFORM-SPECIFIC TARGET TOPICS:
+PLATFORM-SPECIFIC TARGET TOPICS (adapt these to ${brandName}):
 - LinkedIn Post 1 & Post 2: ${itineraryDay.linkedinTopic}
 - Instagram Carousel, Reel & Story: ${itineraryDay.instagramTopic}
 - Twitter/X stand-alone & thread: ${itineraryDay.twitterTopic}
@@ -564,6 +636,7 @@ CRITICAL WRITING RULES:
 7. Reddit posts should sound like a founder talking to peers, not a press release.
 8. Instagram story scripts must be actionable — describe exact visuals, text overlays, and stickers.
 9. Instagram Reel script must be a COMPLETE shooting guide — scene-by-scene with shot type, duration, action to perform, voiceover narration, and text overlay. Think like a director giving instructions to a one-person crew.
+10. If the selected brand has specific brand voice guidelines in the context (personality, tone, rules), prioritize those rules.
 
 REDDIT SUBREDDITS FOR TODAY:
 ${subreddits.map(s => `- ${s.name}: Tone = ${s.tone}`).join('\n')}
@@ -574,24 +647,25 @@ Generate content for ALL platforms. Return as a single JSON object with this EXA
   "linkedin": [
     {
       "type": "${itineraryDay.theme}",
-      "content": "Full post text here matching TODAY'S ITINERARY FOCUS (500-1500 chars). One sentence per paragraph. Use → for bullets.",
-      "hashtags": ["#D2C", "#AIMarketing", "#BuildingInPublic"],
+      "content": "Full post text here matching TODAY'S ITINERARY FOCUS adapted to ${brandName} (500-1500 chars). One sentence per paragraph. Use → for bullets.",
+      "hashtags": ["#Hashtag1", "#Hashtag2"],
       "bestTime": "8:30 AM IST"
     },
     {
       "type": "${itineraryDay.theme}_alternate",
-      "content": "Full post text here. Different angle from the first, but STILL matching TODAY'S ITINERARY FOCUS.",
-      "hashtags": ["#SaaS", "#MarketingTools"],
+      "content": "Full post text here. Different angle from the first, but STILL matching TODAY'S ITINERARY FOCUS adapted to ${brandName}.",
+      "hashtags": ["#Hashtag3"],
       "bestTime": "12:00 PM IST"
     }
   ],
   "instagram": {
     "post": {
-      "caption": "Full caption text matching TODAY'S ITINERARY FOCUS (max 2200 chars). Include CTA.",
-      "hashtags": ["#mantram", "#aimarketing", "#d2c"],
+      "caption": "Full caption text matching TODAY'S ITINERARY FOCUS adapted to ${brandName} (max 2200 chars). Include CTA.",
+      "hashtags": ["#hashtag1", "#hashtag2"],
       "slides": [
         {"slideNumber": 1, "text": "Hook text for slide 1", "visualDescription": "Describe what the visual should show based on today's focus"},
-        {"slideNumber": 2, "text": "Text for slide 2", "visualDescription": "Visual description"}
+        {"slideNumber": 2, "text": "Supporting text for slide 2", "visualDescription": "Visual description"},
+        {"slideNumber": 3, "text": "CTA or closing text for slide 3", "visualDescription": "Visual description"}
       ],
       "bestTime": "11:00 AM IST"
     },
@@ -603,9 +677,9 @@ Generate content for ALL platforms. Return as a single JSON object with this EXA
     },
     "reel": {
       "hook": "First 3 seconds — the line that stops the scroll",
-      "concept": "One sentence describing what this reel is about (Must match TODAY'S ITINERARY FOCUS)",
+      "concept": "One sentence describing what this reel is about (Must match TODAY'S ITINERARY FOCUS adapted to ${brandName})",
       "caption": "Reel caption with CTA (max 2200 chars)",
-      "hashtags": ["#mantram", "#aimarketing", "#reels"],
+      "hashtags": ["#hashtag1", "#reels"],
       "audioSuggestion": "Trending audio name OR 'original audio — voiceover'",
       "totalDuration": "30–45 seconds",
       "bestTime": "12:00 PM IST",
@@ -618,13 +692,13 @@ Generate content for ALL platforms. Return as a single JSON object with this EXA
   "twitter": [
     {
       "type": "standalone",
-      "tweets": ["Single tweet text under 280 chars. Punchy and shareable. Matches TODAY'S ITINERARY FOCUS."],
+      "tweets": ["Single tweet text under 280 chars. Punchy and shareable. Matches TODAY'S ITINERARY FOCUS adapted to ${brandName}."],
       "bestTime": "8:30 AM IST"
     },
     {
       "type": "thread",
       "tweets": [
-        "Thread opener — hook that makes people click 🧵👇 (Matches TODAY'S ITINERARY FOCUS)",
+        "Thread opener — hook that makes people click 🧵👇 (Matches TODAY'S ITINERARY FOCUS adapted to ${brandName})",
         "Tweet 2 — expand on the hook with specifics",
         "Tweet 3 — the insight or data point",
         "Tweet 4 — CTA or question"
@@ -635,14 +709,14 @@ Generate content for ALL platforms. Return as a single JSON object with this EXA
   "reddit": [
     {
       "subreddit": "${subreddits[0]?.name || 'r/Entrepreneur'}",
-      "title": "Post title — specific, not clickbait. Matches TODAY'S ITINERARY FOCUS.",
+      "title": "Post title — specific, not clickbait. Matches TODAY'S ITINERARY FOCUS adapted to ${brandName}.",
       "body": "Full post body. 500-2000 chars. Raw, authentic tone. NO LINKS if subreddit is r/startups. End with a question.",
       "tone": "${subreddits[0]?.tone || 'story-driven'}",
       "bestTime": "9:00 AM EST"
     },
     {
       "subreddit": "${subreddits[1]?.name || 'r/SaaS'}",
-      "title": "Different angle post title for TODAY'S ITINERARY FOCUS.",
+      "title": "Different angle post title for TODAY'S ITINERARY FOCUS adapted to ${brandName}.",
       "body": "Full post body. Different angle from the first.",
       "tone": "${subreddits[1]?.tone || 'technical'}",
       "bestTime": "10:00 AM EST"
@@ -688,7 +762,7 @@ export function getISTDateDetails(dateInput = new Date()) {
 /**
  * Generate daily content for all platforms based on the 30-day fixed itinerary
  */
-export async function generateDailyContent(forceDate = null) {
+export async function generateDailyContent(forceDate = null, brandId = null) {
     const now = forceDate ? new Date(forceDate) : new Date();
     const { dateKey, dayOfWeek, dayOfMonth } = getISTDateDetails(now);
 
@@ -697,7 +771,7 @@ export async function generateDailyContent(forceDate = null) {
     const itineraryDay = ITINERARY[itineraryIndex];
     const theme = itineraryDay.theme;
 
-    console.log(`\n🚀 [GrowthEngine] Generating daily content for ${dateKey} (${dayOfWeek}) — Itinerary Day ${itineraryDay.day}: ${itineraryDay.title}`);
+    console.log(`\n🚀 [GrowthEngine] Generating daily content for ${dateKey} (${dayOfWeek}) — Itinerary Day ${itineraryDay.day}: ${itineraryDay.title}${brandId ? ` (Brand ID: ${brandId})` : ''}`);
 
     // Check if already generated today
     const existing = await GrowthContent.findOne({ dateKey });
@@ -707,6 +781,10 @@ export async function generateDailyContent(forceDate = null) {
     }
 
     try {
+        // Fetch brand context if brandId is provided
+        const brandContext = brandId ? await getBrandContext(brandId) : null;
+        const brandName = brandContext ? brandContext.name : 'Mantram AI';
+
         // 1. Get trending topics via Grok
         console.log('📊 [GrowthEngine] Fetching trending topics via Grok...');
         const trendingTopics = await fetchTrendingTopics();
@@ -720,13 +798,13 @@ export async function generateDailyContent(forceDate = null) {
         // 3. Generate content via Claude (Anthropic)
         console.log(`✍️ [GrowthEngine] Generating content via Claude using Itinerary Day ${itineraryDay.day}...`);
         const router = getAIRouter();
-        const prompt = buildGenerationPrompt(dayOfWeek, itineraryDay, trendingTopics, [sub1, sub2]);
+        const prompt = buildGenerationPrompt(dayOfWeek, itineraryDay, trendingTopics, [sub1, sub2], brandContext);
         const randomSeed = Math.random().toString(36).substring(7);
 
         const result = await router.generateText(
             {
                 systemPrompt: prompt,
-                userPrompt: `Generate today's growth marketing content for Mantram AI. Today is ${dayOfWeek}, ${dateKey}. Itinerary Day: ${itineraryDay.day} (${itineraryDay.title}). Random Seed: ${randomSeed}. Return the JSON object.`,
+                userPrompt: `Generate today's growth marketing content for ${brandName}. Today is ${dayOfWeek}, ${dateKey}. Itinerary Day: ${itineraryDay.day} (${itineraryDay.title}). Random Seed: ${randomSeed}. Return the JSON object.`,
                 temperature: 0.85,
                 maxTokens: 16000,
                 model: 'claude-sonnet-4-6',
@@ -826,6 +904,7 @@ export async function generateDailyContent(forceDate = null) {
             dayOfWeek,
             theme: itineraryDay.title, // store the specific title as theme
             status: 'generated',
+            brandId: brandId || null,
 
             linkedin: (content.linkedin || []).map(p => ({
                 type: p.type || 'general',
@@ -920,6 +999,10 @@ export async function regeneratePlatformContent(contentId, platform, index = 0) 
     const existing = await GrowthContent.findById(contentId);
     if (!existing) throw new Error('Content not found');
 
+    const brandId = existing.brandId;
+    const brandContext = brandId ? await getBrandContext(brandId) : null;
+    const brandName = brandContext ? brandContext.name : 'Mantram AI';
+
     const targetDate = new Date(existing.date);
     const { dayOfMonth } = getISTDateDetails(targetDate);
     const itineraryIndex = (dayOfMonth - 1) % 30;
@@ -927,15 +1010,21 @@ export async function regeneratePlatformContent(contentId, platform, index = 0) 
 
     const router = getAIRouter();
     const platformPrompts = {
-        linkedin: `Generate ONE LinkedIn post for Mantram AI. Today's theme: ${itineraryDay.title}. Focus: ${itineraryDay.linkedinTopic}. Key details: ${itineraryDay.talkingPoints.join(' | ')}. Professional, story-driven, one sentence per paragraph. Return JSON: {"content": "...", "hashtags": [...], "bestTime": "..."}`,
-        twitter: `Generate ONE ${index === 0 ? 'standalone tweet (under 280 chars)' : 'Twitter thread (4-5 tweets)'} for Mantram AI. Today's theme: ${itineraryDay.title}. Focus: ${itineraryDay.twitterTopic}. Key details: ${itineraryDay.talkingPoints.join(' | ')}. Punchy, shareable. Return JSON: {"type": "${index === 0 ? 'standalone' : 'thread'}", "tweets": [...], "bestTime": "..."}`,
+        linkedin: `Generate ONE LinkedIn post for ${brandName}. Today's theme: ${itineraryDay.title}. Focus: ${itineraryDay.linkedinTopic}. Key details: ${itineraryDay.talkingPoints.join(' | ')}. Professional, story-driven, one sentence per paragraph. Return JSON: {"content": "...", "hashtags": [...], "bestTime": "..."}`,
+        twitter: `Generate ONE ${index === 0 ? 'standalone tweet (under 280 chars)' : 'Twitter thread (4-5 tweets)'} for ${brandName}. Today's theme: ${itineraryDay.title}. Focus: ${itineraryDay.twitterTopic}. Key details: ${itineraryDay.talkingPoints.join(' | ')}. Punchy, shareable. Return JSON: {"type": "${index === 0 ? 'standalone' : 'thread'}", "tweets": [...], "bestTime": "..."}`,
         reddit: `Generate ONE Reddit post for ${existing.reddit?.[index]?.subreddit || 'r/Entrepreneur'}. Today's theme: ${itineraryDay.title}. Focus: ${itineraryDay.redditTopic}. Key details: ${itineraryDay.talkingPoints.join(' | ')}. Raw, authentic, NO marketing speak, NO links. Return JSON: {"subreddit": "...", "title": "...", "body": "...", "tone": "...", "bestTime": "..."}`,
-        instagram_post: `Generate ONE Instagram carousel post for Mantram AI. Today's theme: ${itineraryDay.title}. Focus: ${itineraryDay.instagramTopic}. Key details: ${itineraryDay.talkingPoints.join(' | ')}. Include caption, hashtags, and 5-7 slide descriptions. Return JSON: {"caption": "...", "hashtags": [...], "slides": [...], "bestTime": "..."}`,
-        instagram_story: `Generate ONE Instagram Story script for Mantram AI (5-6 slides). Today's theme: ${itineraryDay.title}. Focus: ${itineraryDay.instagramTopic}. Include visual descriptions, text overlays, and sticker suggestions. Return JSON: {"slides": [{"slideNumber": 1, "type": "text", "text": "...", "visualDescription": "...", "ctaText": "...", "stickerSuggestion": "..."}]}`,
-        instagram_reel: `Generate ONE Instagram Reel shooting script for Mantram AI (30-45 seconds, 5-8 scenes). Today's theme: ${itineraryDay.title}. Focus: ${itineraryDay.instagramTopic}. Include a scroll-stopping hook, scene-by-scene breakdown with shot type, duration, action, voiceover narration, text overlay, and visual description. Also include caption, hashtags, and audio suggestion. Return JSON: {"hook": "...", "concept": "...", "caption": "...", "hashtags": [...], "audioSuggestion": "...", "totalDuration": "30-45 seconds", "bestTime": "12:00 PM IST", "scenes": [{"sceneNumber": 1, "duration": "0:00-0:03", "shotType": "...", "action": "...", "voiceover": "...", "textOverlay": "...", "visualDescription": "..."}]}`,
+        instagram_post: `Generate ONE Instagram carousel post for ${brandName}. Today's theme: ${itineraryDay.title}. Focus: ${itineraryDay.instagramTopic}. Key details: ${itineraryDay.talkingPoints.join(' | ')}. Include caption, hashtags, and 3-5 slide descriptions. Return JSON: {"caption": "...", "hashtags": [...], "slides": [...], "bestTime": "..."}`,
+        instagram_story: `Generate ONE Instagram Story script for ${brandName} (5-6 slides). Today's theme: ${itineraryDay.title}. Focus: ${itineraryDay.instagramTopic}. Include visual descriptions, text overlays, and sticker suggestions. Return JSON: {"slides": [{"slideNumber": 1, "type": "text", "text": "...", "visualDescription": "...", "ctaText": "...", "stickerSuggestion": "..."}]}`,
+        instagram_reel: `Generate ONE Instagram Reel shooting script for ${brandName} (30-45 seconds, 5-8 scenes). Today's theme: ${itineraryDay.title}. Focus: ${itineraryDay.instagramTopic}. Include a scroll-stopping hook, scene-by-scene breakdown with shot type, duration, action, voiceover narration, text overlay, and visual description. Also include caption, hashtags, and audio suggestion. Return JSON: {"hook": "...", "concept": "...", "caption": "...", "hashtags": [...], "audioSuggestion": "...", "totalDuration": "30-45 seconds", "bestTime": "12:00 PM IST", "scenes": [{"sceneNumber": 1, "duration": "0:00-0:03", "shotType": "...", "action": "...", "voiceover": "...", "textOverlay": "...", "visualDescription": "..."}]}`,
     };
 
-    const systemPrompt = `You are a growth content writer for Mantram AI (AI marketing OS, 14 studios, Brand DNA, 20+ AI models, built by 2 people). Write naturally — no AI tells. Return ONLY raw JSON.`;
+    let systemPrompt = `You are a growth content writer for ${brandName}. Write naturally — no AI tells. Return ONLY raw JSON.`;
+    if (brandContext) {
+        systemPrompt += `\nABOUT THE BRAND (use this context for visual and tonal consistency):\n${brandContext.description}\nAdapt today's focus to this brand.`;
+    } else {
+        systemPrompt += `\nABOUT MANTRAM AI:\n- AI marketing OS replacing Canva + Jasper + SEMrush + Buffer + Klaviyo\n- UGC video ads at ₹33/clip\n- Built by Sachin & Abhishek`;
+    }
+
     const randomSeed = Math.random().toString(36).substring(7);
     const userPrompt = `${platformPrompts[platform]} [Random Seed: ${randomSeed}]`;
     if (!platformPrompts[platform]) throw new Error(`Unknown platform: ${platform}`);

@@ -158,6 +158,7 @@ export default function SuperAdminDashboard() {
     const [publishModalConfig, setPublishModalConfig] = useState(null)
     const [showIgSliders, setShowIgSliders] = useState(false)
     const [growthPreviewImage, setGrowthPreviewImage] = useState(null)
+    const [growthSelectedBrandId, setGrowthSelectedBrandId] = useState('')
 
     if (user?.role !== 'superadmin') {
         return <DashboardLayout><div className="flex items-center justify-center h-screen"><div className="text-center"><span className="material-symbols-outlined text-6xl text-primary mb-4">shield</span><h2 className="text-2xl font-bold text-[var(--sys-text)] mb-2">Access Denied</h2><p className="text-[var(--sys-text-muted)]">Super Admin access required</p></div></div></DashboardLayout>
@@ -250,14 +251,21 @@ export default function SuperAdminDashboard() {
     const loadGrowthData = async () => {
         setGrowthLoading(true)
         try {
-            const [contentRes, statsRes, accountsRes] = await Promise.all([
+            const [contentRes, statsRes, accountsRes, brandsRes] = await Promise.all([
                 API.getGrowthContent(),
                 API.getGrowthStats(),
-                socialAPI.accounts().catch(() => ({ data: [] }))
+                socialAPI.accounts().catch(() => ({ data: [] })),
+                API.getBrands({ limit: 100 }).catch(() => ({ brands: [] }))
             ])
             setGrowthContent(contentRes.content)
+            if (contentRes.content && contentRes.content.brandId) {
+                setGrowthSelectedBrandId(contentRes.content.brandId)
+            }
             setGrowthStats(statsRes.stats)
             setSocialAccounts(accountsRes.data || [])
+            if (brandsRes && brandsRes.brands) {
+                setBrands(brandsRes.brands)
+            }
         } catch (e) { console.error('Growth data load failed:', e) }
         finally { setGrowthLoading(false) }
     }
@@ -272,7 +280,7 @@ export default function SuperAdminDashboard() {
     const handleGenerateGrowth = async () => {
         setGrowthGenerating(true)
         try {
-            const res = await API.generateGrowthContent()
+            const res = await API.generateGrowthContent({ brandId: growthSelectedBrandId || undefined })
             if (res.success) {
                 setGrowthContent(res.content)
                 showToast('Content generated successfully!')
@@ -4766,6 +4774,22 @@ export default function SuperAdminDashboard() {
                                         </div>
                                     </div>
                                 )}
+                                <div className="flex items-center gap-2 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-2 py-1.5 mr-2">
+                                    <span className="text-xs font-bold text-[var(--sys-text-muted)] flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-xs">auto_awesome_motion</span>
+                                        Brand context:
+                                    </span>
+                                    <select
+                                        value={growthSelectedBrandId}
+                                        onChange={(e) => setGrowthSelectedBrandId(e.target.value)}
+                                        className="text-xs p-1 rounded-lg bg-[var(--sys-bg)] border border-[var(--sys-border)] text-[var(--sys-text)] outline-none font-bold cursor-pointer"
+                                    >
+                                        <option value="">Default (Mantram AI)</option>
+                                        {brands.map(b => (
+                                            <option key={b._id} value={b._id}>{b.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
                                 <button
                                     onClick={() => { setShowGrowthHistory(!showGrowthHistory); if (!showGrowthHistory) loadGrowthHistory() }}
                                     className="px-3 py-2 rounded-xl text-xs font-bold bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer transition-all border border-[var(--sys-border)]"

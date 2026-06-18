@@ -63,6 +63,7 @@ const growthContentSchema = new mongoose.Schema({
     dayOfWeek: { type: String, enum: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] },
     theme: { type: String },
     status: { type: String, enum: ['generated', 'partial', 'posted', 'skipped'], default: 'generated' },
+    brandId: { type: mongoose.Schema.Types.ObjectId, ref: 'Brand', index: true },
 
     linkedin: [postSchema],
 

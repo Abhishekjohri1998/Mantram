@@ -5,10 +5,12 @@
 
 import { Router } from 'express';
 import GrowthContent from '../models/GrowthContent.js';
+import Brand from '../models/Brand.js';
 import { generateDailyContent, regeneratePlatformContent, getISTDateDetails } from '../services/growthContentEngine.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import { getRouter } from '../ai/router.js';
-import { ensureS3Url, getSignedUrlIfNeeded } from '../utils/s3.js';
+import { ensureS3Url, getSignedUrlIfNeeded, uploadToS3 } from '../utils/s3.js';
+import { fetchImageBuffer, overlayLogo } from '../utils/logoOverlay.js';
 
 const router = Router();
 
@@ -130,14 +132,14 @@ router.get('/history', async (req, res) => {
 // ══════════════════════════════════════════════════════════════
 router.post('/generate', async (req, res) => {
     try {
-        const { date } = req.body; // Optional: generate for specific date
+        const { date, brandId } = req.body; // Optional: generate for specific date and brand
         const targetDate = date ? new Date(date) : new Date();
         const dateKey = getISTDateDetails(targetDate).dateKey;
 
         // If content already exists, delete it first (force regeneration)
         await GrowthContent.deleteOne({ dateKey });
 
-        const content = await generateDailyContent(targetDate);
+        const content = await generateDailyContent(targetDate, brandId);
         const signedContent = await signGrowthContentUrls(content?.toObject ? content.toObject() : content);
         res.json({ success: true, content: signedContent });
     } catch (error) {
@@ -290,7 +292,39 @@ router.post('/:id/generate-image', async (req, res) => {
 
         // Decode base64 and upload to S3 (this also stores a copy on local SSD)
         console.log(`📤 Growth Image: Uploading generated image to S3...`);
-        const s3Url = await ensureS3Url(result.imageUrl, `growth/gen-${Date.now()}`);
+        let s3Url;
+        let logoUrl = '';
+        if (content.brandId) {
+            const brand = await Brand.findById(content.brandId).lean();
+            if (brand && brand.dna?.logo?.url) {
+                logoUrl = brand.dna.logo.url;
+            }
+        }
+
+        if (logoUrl) {
+            try {
+                console.log(`📥 Downloading generated image for overlay: ${result.imageUrl.substring(0, 100)}`);
+                const imageBuffer = await fetchImageBuffer(result.imageUrl, { cache: false });
+                const logoBuffer = await fetchImageBuffer(logoUrl).catch(err => {
+                    console.warn(`Failed to fetch brand logo buffer: ${err.message}`);
+                    return null;
+                });
+                
+                if (imageBuffer && logoBuffer) {
+                    console.log(`🎨 Overlaying brand logo watermark on generated image...`);
+                    const finalBuffer = await overlayLogo(imageBuffer, logoBuffer, 'bottom-right', 'medium');
+                    const targetKey = `growth/gen-${Date.now()}.png`;
+                    s3Url = await uploadToS3(finalBuffer, targetKey, 'image/png');
+                } else {
+                    s3Url = await ensureS3Url(result.imageUrl, `growth/gen-${Date.now()}`);
+                }
+            } catch (err) {
+                console.error(`Error applying watermark logo overlay: ${err.message}`);
+                s3Url = await ensureS3Url(result.imageUrl, `growth/gen-${Date.now()}`);
+            }
+        } else {
+            s3Url = await ensureS3Url(result.imageUrl, `growth/gen-${Date.now()}`);
+        }
 
         if (platform === 'instagram_post' && slideIndex === null) {
             content.instagram.post.coverImageUrl = s3Url;
