@@ -2252,10 +2252,14 @@ router.post('/agent/v2/chat', protect, async (req, res) => {
         const { callAgent } = await import('../agents/shared/agentUtils.js');
 
         // ── Load session for context ─────────────────────────────────────────
+        // CRITICAL: sessionId is a custom string like "vas_1234_abc", NOT a
+        // MongoDB ObjectId. Using findById() would throw:
+        //   BSONError: The string did not match the expected pattern.
+        // Must use findOne({ sessionId }) instead.
         let sessionDoc = null;
         if (sessionId) {
             const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
-            sessionDoc = await VideoAgentSession.findById(sessionId).lean();
+            sessionDoc = await VideoAgentSession.findOne({ sessionId, user: req.user._id }).lean();
         }
 
         const brandName = sessionDoc?.brandName || planContext?.brandName || 'the brand';
