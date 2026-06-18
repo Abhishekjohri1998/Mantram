@@ -4749,15 +4749,15 @@ export default function SuperAdminDashboard() {
                 {tab === 'growth' && (
                     <div className="space-y-6">
                         {/* Header */}
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[var(--sys-border)] pb-4">
                             <div>
-                                <h2 className="text-xl font-black text-[var(--sys-text)] flex items-center gap-2">
+                                <h2 className="text-xl font-black text-[var(--sys-text)] flex items-center gap-2 whitespace-nowrap">
                                     <span className="material-symbols-outlined text-emerald-500">trending_up</span>
                                     Growth Engine
                                 </h2>
                                 <p className="text-xs text-[var(--sys-text-muted)] mt-1">Auto-generated daily content • Copy, post, grow</p>
                             </div>
-                            <div className="flex items-center gap-3">
+                            <div className="flex flex-wrap items-center gap-3 lg:justify-end">
                                 {growthStats && (
                                     <div className="flex items-center gap-4 mr-4">
                                         <div className="text-center">
@@ -4774,15 +4774,15 @@ export default function SuperAdminDashboard() {
                                         </div>
                                     </div>
                                 )}
-                                <div className="flex items-center gap-2 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-2 py-1.5 mr-2">
-                                    <span className="text-xs font-bold text-[var(--sys-text-muted)] flex items-center gap-1">
-                                        <span className="material-symbols-outlined text-xs">auto_awesome_motion</span>
+                                <div className="flex items-center gap-2 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-2.5 py-1.5 mr-2 shrink-0 w-fit max-w-full">
+                                    <span className="text-xs font-bold text-[var(--sys-text-muted)] flex items-center gap-1 shrink-0 whitespace-nowrap">
+                                        <span className="material-symbols-outlined text-xs text-emerald-500">auto_awesome_motion</span>
                                         Brand context:
                                     </span>
                                     <select
                                         value={growthSelectedBrandId}
                                         onChange={(e) => setGrowthSelectedBrandId(e.target.value)}
-                                        className="text-xs p-1 rounded-lg bg-[var(--sys-bg)] border border-[var(--sys-border)] text-[var(--sys-text)] outline-none font-bold cursor-pointer"
+                                        className="text-xs p-1 rounded-lg bg-[var(--sys-bg)] border border-[var(--sys-border)] text-[var(--sys-text)] outline-none font-bold cursor-pointer max-w-[120px] sm:max-w-[160px] truncate"
                                     >
                                         <option value="">Default (Mantram AI)</option>
                                         {brands.map(b => (
@@ -4837,9 +4837,9 @@ export default function SuperAdminDashboard() {
                                 </div>
 
                                 {/* Top Controls */}
-                                <div className="flex items-center justify-between mt-4">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mt-4">
                                     {/* Platform Tabs */}
-                                    <div className="flex gap-1 p-1 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)]" style={{ width: 'fit-content' }}>
+                                    <div className="flex flex-wrap gap-1 p-1 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] w-fit max-w-full">
                                         {[
                                             { id: 'linkedin', label: 'LinkedIn', icon: '💼', color: '#0A66C2', count: growthContent.linkedin?.length || 0 },
                                             { id: 'instagram', label: 'Instagram', icon: '📸', color: '#E4405F', count: 3 },
@@ -4849,7 +4849,7 @@ export default function SuperAdminDashboard() {
                                             <button
                                                 key={p.id}
                                                 onClick={() => setGrowthPlatformTab(p.id)}
-                                                className={`px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-2 ${
+                                                className={`px-2.5 sm:px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 ${
                                                     growthPlatformTab === p.id
                                                         ? 'text-white shadow-lg'
                                                         : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'
@@ -4863,12 +4863,12 @@ export default function SuperAdminDashboard() {
                                     </div>
 
                                     {/* Image Model Selector */}
-                                    <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)]" style={{ width: 'fit-content' }}>
+                                    <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] w-fit max-w-full shrink-0">
                                         <span className="text-xs font-bold text-[var(--sys-text-muted)] pl-2">🖼️ Image Model:</span>
                                         <select
                                             value={growthImageModel}
                                             onChange={(e) => setGrowthImageModel(e.target.value)}
-                                            className="text-xs p-1.5 rounded-xl bg-[var(--sys-bg)] border border-[var(--sys-border)] text-[var(--sys-text)] outline-none font-bold cursor-pointer"
+                                            className="text-xs p-1.5 rounded-xl bg-[var(--sys-bg)] border border-[var(--sys-border)] text-[var(--sys-text)] outline-none font-bold cursor-pointer max-w-[150px] truncate"
                                         >
                                             <option value="gpt-image-2">GPT Image 2</option>
                                             <option value="nanobanana-2">NanoBanana 2</option>
@@ -4882,14 +4882,14 @@ export default function SuperAdminDashboard() {
                                     <div className="space-y-4">
                                         {(growthContent.linkedin || []).map((post, i) => (
                                             <div key={i} className="rounded-2xl border border-[var(--sys-border)] bg-[var(--sys-surface)] overflow-hidden">
-                                                <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #0A66C210, transparent)' }}>
-                                                    <div className="flex items-center gap-2">
+                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #0A66C210, transparent)' }}>
+                                                    <div className="flex flex-wrap items-center gap-2">
                                                         <span className="text-sm">💼</span>
                                                         <span className="text-xs font-bold text-[var(--sys-text)]">LinkedIn Post {i + 1}</span>
                                                         <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-500/10 text-blue-500">{post.type?.replace(/_/g, ' ')}</span>
                                                         {post.bestTime && <span className="text-[10px] text-[var(--sys-text-muted)]">⏰ {post.bestTime}</span>}
                                                     </div>
-                                                    <div className="flex items-center gap-2">
+                                                    <div className="flex flex-wrap items-center gap-2">
                                                         <button 
                                                             onClick={() => triggerPublishModal('linkedin', i)}
                                                             disabled={isPublishing === `linkedin-${i}`}
@@ -4963,13 +4963,13 @@ export default function SuperAdminDashboard() {
                                     <div className="space-y-4">
                                         {/* Instagram Post */}
                                         <div className="rounded-2xl border border-[var(--sys-border)] bg-[var(--sys-surface)] overflow-hidden">
-                                            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #E4405F10, #833AB410, transparent)' }}>
-                                                <div className="flex items-center gap-2">
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #E4405F10, #833AB410, transparent)' }}>
+                                                <div className="flex flex-wrap items-center gap-2">
                                                     <span className="text-sm">📸</span>
                                                     <span className="text-xs font-bold text-[var(--sys-text)]">Instagram Post</span>
                                                     {growthContent.instagram?.post?.bestTime && <span className="text-[10px] text-[var(--sys-text-muted)]">⏰ {growthContent.instagram.post.bestTime}</span>}
                                                 </div>
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex flex-wrap items-center gap-2">
                                                     <button 
                                                         onClick={() => triggerPublishModal('instagram_post')}
                                                         disabled={isPublishing === `instagram_post-0`}
@@ -5166,7 +5166,7 @@ export default function SuperAdminDashboard() {
                                                 {growthContent.instagram?.post?.slides?.length > 0 && showIgSliders && (
                                                     <div className="mt-4 animate-in fade-in slide-in-from-top-4 duration-300">
                                                         <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2">📑 Carousel Slides</p>
-                                                        <div className="grid grid-cols-2 gap-2">
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                             {growthContent.instagram.post.slides.map((s, j) => (
                                                                 <div key={j} className="p-3 rounded-xl bg-[var(--sys-bg)] border border-[var(--sys-border)] flex flex-col justify-between">
                                                                     <div>
@@ -5234,13 +5234,13 @@ export default function SuperAdminDashboard() {
 
                                     {/* Instagram Story */}
                                     <div className="rounded-2xl border border-[var(--sys-border)] bg-[var(--sys-surface)] overflow-hidden">
-                                        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #833AB410, #FD1D1D10, transparent)' }}>
-                                            <div className="flex items-center gap-2">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #833AB410, #FD1D1D10, transparent)' }}>
+                                            <div className="flex flex-wrap items-center gap-2">
                                                 <span className="text-sm">📱</span>
                                                 <span className="text-xs font-bold text-[var(--sys-text)]">Instagram Story Script</span>
                                                 <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-500/10 text-purple-500">{growthContent.instagram?.story?.slides?.length || 0} slides</span>
                                             </div>
-                                                <div className="flex items-center gap-2">
+                                            <div className="flex flex-wrap items-center gap-2">
                                                     <button 
                                                         onClick={() => triggerPublishModal('instagram_story')}
                                                         disabled={isPublishing === 'instagram_story-0'}
@@ -5317,15 +5317,15 @@ export default function SuperAdminDashboard() {
 
                                         {/* Instagram Reel */}
                                         <div className="rounded-2xl border border-[var(--sys-border)] bg-[var(--sys-surface)] overflow-hidden">
-                                            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #FF006610, #FE350410, transparent)' }}>
-                                                <div className="flex items-center gap-2">
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #FF006610, #FE350410, transparent)' }}>
+                                                <div className="flex flex-wrap items-center gap-2">
                                                     <span className="text-sm">🎬</span>
                                                     <span className="text-xs font-bold text-[var(--sys-text)]">Instagram Reel Script</span>
                                                     <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-red-500/10 text-red-500">{growthContent.instagram?.reel?.scenes?.length || 0} scenes</span>
                                                     {growthContent.instagram?.reel?.totalDuration && <span className="text-[10px] text-[var(--sys-text-muted)]">⏱️ {growthContent.instagram.reel.totalDuration}</span>}
                                                     {growthContent.instagram?.reel?.bestTime && <span className="text-[10px] text-[var(--sys-text-muted)]">⏰ {growthContent.instagram.reel.bestTime}</span>}
                                                 </div>
-                                                 <div className="flex items-center gap-2">
+                                                <div className="flex flex-wrap items-center gap-2">
                                                      <button 
                                                          onClick={() => triggerPublishModal('instagram_reel')}
                                                          disabled={isPublishing === 'instagram_reel-0'}
@@ -5416,14 +5416,14 @@ export default function SuperAdminDashboard() {
                                     <div className="space-y-4">
                                         {(growthContent.twitter || []).map((post, i) => (
                                             <div key={i} className="rounded-2xl border border-[var(--sys-border)] bg-[var(--sys-surface)] overflow-hidden">
-                                                <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #1DA1F210, transparent)' }}>
-                                                    <div className="flex items-center gap-2">
+                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #1DA1F210, transparent)' }}>
+                                                    <div className="flex flex-wrap items-center gap-2">
                                                         <span className="text-sm">🐦</span>
                                                         <span className="text-xs font-bold text-[var(--sys-text)]">{post.type === 'thread' ? 'Twitter Thread' : 'Tweet'}</span>
                                                         {post.type === 'thread' && <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-sky-500/10 text-sky-500">{post.tweets?.length} tweets</span>}
                                                         {post.bestTime && <span className="text-[10px] text-[var(--sys-text-muted)]">⏰ {post.bestTime}</span>}
                                                     </div>
-                                                     <div className="flex items-center gap-2">
+                                                    <div className="flex flex-wrap items-center gap-2">
                                                          <button 
                                                              onClick={() => triggerPublishModal('twitter', i)}
                                                              disabled={isPublishing === `twitter-${i}`}
@@ -5499,14 +5499,14 @@ export default function SuperAdminDashboard() {
                                     <div className="space-y-4">
                                         {(growthContent.reddit || []).map((post, i) => (
                                             <div key={i} className="rounded-2xl border border-[var(--sys-border)] bg-[var(--sys-surface)] overflow-hidden">
-                                                <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #FF450010, transparent)' }}>
-                                                    <div className="flex items-center gap-2">
+                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #FF450010, transparent)' }}>
+                                                    <div className="flex flex-wrap items-center gap-2">
                                                         <span className="text-sm">🟠</span>
                                                         <span className="text-xs font-bold text-[var(--sys-text)]">{post.subreddit}</span>
                                                         <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-orange-500/10 text-orange-500">{post.tone}</span>
                                                         {post.bestTime && <span className="text-[10px] text-[var(--sys-text-muted)]">⏰ {post.bestTime}</span>}
                                                     </div>
-                                                     <div className="flex items-center gap-2">
+                                                    <div className="flex flex-wrap items-center gap-2">
                                                          <button 
                                                              onClick={() => triggerPublishModal('reddit', i)}
                                                              disabled={isPublishing === `reddit-${i}`}
