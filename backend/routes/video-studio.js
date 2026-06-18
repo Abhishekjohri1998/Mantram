@@ -1998,9 +1998,246 @@ router.patch('/agent/v2/:sessionId/plan', protect, async (req, res) => {
 });
 
 
+
+
 // ══════════════════════════════════════════════════════════════════════════════
 // END — 5-Stage Video Agent V2
 // ══════════════════════════════════════════════════════════════════════════════
+
+
+// ── POST /agent/v2/analyze-media — Media-as-Brief: analyze image/video/audio ──
+// User uploads any media → AI analyzes → returns a generated creative brief
+// ══════════════════════════════════════════════════════════════════════════════
+router.post('/agent/v2/analyze-media', protect, async (req, res) => {
+    const multer = (await import('multer')).default;
+    const upload = multer({
+        storage: multer.memoryStorage(),
+        limits: { fileSize: 60 * 1024 * 1024 }, // 60MB max
+    }).single('file');
+
+    upload(req, res, async (uploadErr) => {
+        if (uploadErr) {
+            return res.status(400).json({ success: false, error: uploadErr.message || 'File upload failed' });
+        }
+
+        try {
+            const file = req.file;
+            const brandId = req.body?.brandId || null;
+
+            if (!file) return res.status(400).json({ success: false, error: 'No file uploaded' });
+
+            const mime = file.mimetype || '';
+            const isImage = mime.startsWith('image/');
+            const isVideo = mime.startsWith('video/');
+            const isAudio = mime.startsWith('audio/');
+
+            if (!isImage && !isVideo && !isAudio) {
+                return res.status(400).json({ success: false, error: 'Unsupported file type. Upload image, video, or audio.' });
+            }
+
+            console.log(`🎬 [analyze-media] type=${mime} size=${(file.size/1024).toFixed(0)}KB brand=${brandId}`);
+
+            const { loadBrandContext } = await import('../agents/shared/agentUtils.js');
+            const { brand } = await loadBrandContext(brandId);
+            const brandName = brand?.name || '';
+            const brandCategory = brand?.dna?.category || brand?.category || '';
+
+            let generatedBrief = '';
+            let mediaUrl = '';
+            let thumbnailUrl = '';
+            let mediaType = isImage ? 'image' : isVideo ? 'video' : 'audio';
+
+            // ── Upload file to S3 first ──────────────────────────────────────
+            const { uploadToS3 } = await import('../utils/s3.js').catch(() => ({ uploadToS3: null }));
+            if (uploadToS3) {
+                try {
+                    const ext = mime.split('/')[1]?.split(';')[0] || 'bin';
+                    const s3Key = `video-studio/media-brief/${req.user._id}/${Date.now()}.${ext}`;
+                    mediaUrl = await uploadToS3(file.buffer, s3Key, mime);
+                    console.log(`📤 [analyze-media] Uploaded to S3: ${mediaUrl?.substring(0, 60)}`);
+                } catch (s3Err) {
+                    console.warn('[analyze-media] S3 upload failed:', s3Err.message);
+                }
+            }
+
+            // ── IMAGE: Vision analysis ───────────────────────────────────────
+            if (isImage) {
+                try {
+                    const sharp = (await import('sharp')).default;
+                    const resized = await sharp(file.buffer)
+                        .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
+                        .jpeg({ quality: 75 })
+                        .toBuffer();
+                    const base64 = resized.toString('base64');
+
+                    const { getRouter } = await import('../ai/router.js');
+                    const router = getRouter();
+
+                    const systemPrompt = `You are an expert creative director and brand strategist.
+Analyze this image and generate a creative brief for a video advertisement.
+
+${brandName ? `Brand: ${brandName} (${brandCategory})` : 'Infer brand from the image.'}
+
+Generate a compelling, specific creative brief in 2-3 sentences that describes:
+- What product/brand is shown or implied
+- The visual style, mood, and aesthetic
+- A recommendation for the video format (30s ad, 15s reel, etc.)
+- The target audience implied by the image
+- The emotional hook or CTA direction
+
+Return ONLY the brief text — no JSON, no bullet points. Write it as a clear instruction to a video director.`;
+
+                    const result = await router.chat([
+                        { role: 'user', content: [
+                            { type: 'text', text: systemPrompt },
+                            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } },
+                        ]}
+                    ], { provider: 'openai', model: 'gpt-4o', temperature: 0.7, maxTokens: 300 });
+
+                    generatedBrief = result?.content || result?.message || '';
+                    thumbnailUrl = mediaUrl;
+                } catch (visionErr) {
+                    console.error('[analyze-media] Vision analysis failed:', visionErr.message);
+                    generatedBrief = `Create a video ad inspired by this product image. Focus on premium visuals, lifestyle shots, and a strong CTA.`;
+                }
+            }
+
+            // ── VIDEO: Extract frames → analyze ──────────────────────────────
+            else if (isVideo) {
+                try {
+                    const { execSync } = await import('child_process');
+                    const fs = await import('fs');
+                    const path = await import('path');
+                    const os = await import('os');
+
+                    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mantram-media-'));
+                    const inputPath = path.join(tmpDir, `input.${mime.split('/')[1] || 'mp4'}`);
+                    fs.writeFileSync(inputPath, file.buffer);
+
+                    // Get ffmpeg path
+                    let ffmpegPath = 'ffmpeg';
+                    try {
+                        ffmpegPath = (await import('@ffmpeg-installer/ffmpeg')).default?.path || ffmpegPath;
+                    } catch { /* use system ffmpeg */ }
+
+                    // Extract 3 frames: 10%, 40%, 70% through video
+                    const framePaths = [];
+                    const frameTimestamps = ['0:00:01', '0:00:05', '0:00:10'];
+
+                    for (let i = 0; i < frameTimestamps.length; i++) {
+                        const framePath = path.join(tmpDir, `frame${i}.jpg`);
+                        try {
+                            execSync(`"${ffmpegPath}" -y -ss ${frameTimestamps[i]} -i "${inputPath}" -vframes 1 -q:v 3 -vf "scale=720:-1" "${framePath}" 2>/dev/null`, {
+                                timeout: 15000, stdio: 'pipe',
+                            });
+                            if (fs.existsSync(framePath)) framePaths.push(framePath);
+                        } catch { /* skip failed frame */ }
+                    }
+
+                    if (framePaths.length === 0) {
+                        // FFmpeg failed — extract first few bytes as image attempt
+                        throw new Error('No frames extracted');
+                    }
+
+                    // Upload first frame as thumbnail
+                    if (uploadToS3 && framePaths[0]) {
+                        const frameBuffer = fs.readFileSync(framePaths[0]);
+                        const thumbKey = `video-studio/media-brief/${req.user._id}/${Date.now()}-thumb.jpg`;
+                        thumbnailUrl = await uploadToS3(frameBuffer, thumbKey, 'image/jpeg').catch(() => '');
+                    }
+
+                    // Vision analyze the first 2 frames
+                    const { getRouter } = await import('../ai/router.js');
+                    const router = getRouter();
+
+                    const frameImages = framePaths.slice(0, 2).map(fp => {
+                        const buf = fs.readFileSync(fp);
+                        return { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${buf.toString('base64')}` } };
+                    });
+
+                    const result = await router.chat([
+                        { role: 'user', content: [
+                            { type: 'text', text: `You are an expert creative director. Analyze these video frames and generate a creative brief for a new video advertisement inspired by this content.${brandName ? ` Brand: ${brandName} (${brandCategory}).` : ''} Write a 2-3 sentence brief describing: the visual style and aesthetic, the content/product/message shown, the target audience, and a recommendation for the new video format. Write as a clear instruction to a video director. Return ONLY the brief text.` },
+                            ...frameImages,
+                        ]}
+                    ], { provider: 'openai', model: 'gpt-4o', temperature: 0.7, maxTokens: 300 });
+
+                    generatedBrief = result?.content || result?.message || '';
+
+                    // Cleanup tmp
+                    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
+                } catch (videoErr) {
+                    console.error('[analyze-media] Video analysis failed:', videoErr.message);
+                    generatedBrief = `Create a video ad inspired by the uploaded reference video. Match the energy, pacing, and visual style. Adapt the content to showcase our brand.`;
+                    thumbnailUrl = '';
+                }
+            }
+
+            // ── AUDIO: Whisper transcription → brief ─────────────────────────
+            else if (isAudio) {
+                try {
+                    const openaiKey = process.env.OPENAI_API_KEY;
+                    let transcript = '';
+
+                    if (openaiKey) {
+                        const FormDataNode = (await import('form-data')).default;
+                        const form = new FormDataNode();
+                        const ext = mime.includes('wav') ? 'wav' : mime.includes('mp4') || mime.includes('m4a') ? 'm4a' : mime.includes('ogg') ? 'ogg' : 'mp3';
+                        form.append('file', file.buffer, { filename: `audio.${ext}`, contentType: mime });
+                        form.append('model', 'whisper-1');
+                        form.append('response_format', 'text');
+
+                        const whisperResp = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+                            method: 'POST',
+                            headers: { Authorization: `Bearer ${openaiKey}`, ...form.getHeaders() },
+                            body: form,
+                            signal: AbortSignal.timeout(30000),
+                        });
+
+                        if (whisperResp.ok) {
+                            transcript = (await whisperResp.text()).trim();
+                        }
+                    }
+
+                    if (transcript) {
+                        const { callAgent } = await import('../agents/shared/agentUtils.js');
+                        const brief = await callAgent(
+                            `You are a video creative director. The user has recorded an audio brief for a video ad. Convert this spoken brief into a clean, professional written creative brief in 2-3 sentences. Keep all the key details but make it crisp and actionable for a video production team.`,
+                            `Audio brief transcript: "${transcript}"${brandName ? `\nBrand: ${brandName}` : ''}`,
+                            0.5, 300
+                        );
+                        generatedBrief = typeof brief === 'string' ? brief : brief?.brief || transcript;
+                    } else {
+                        generatedBrief = `Create a compelling video ad. Audio brief uploaded for reference. Focus on brand storytelling and emotional connection.`;
+                    }
+                } catch (audioErr) {
+                    console.error('[analyze-media] Audio analysis failed:', audioErr.message);
+                    generatedBrief = `Create a compelling video ad based on the uploaded audio brief.`;
+                }
+            }
+
+            // Clean up brief
+            generatedBrief = generatedBrief
+                .replace(/<think>[\s\S]*?<\/think>/gi, '')
+                .replace(/^["']|["']$/g, '')
+                .trim();
+
+            console.log(`✅ [analyze-media] Brief generated: "${generatedBrief.substring(0, 80)}..."`);
+
+            res.json({
+                success: true,
+                generatedBrief,
+                mediaUrl,
+                thumbnailUrl,
+                mediaType,
+            });
+
+        } catch (error) {
+            console.error('[analyze-media] Error:', error);
+            res.status(500).json({ success: false, error: safeErrorMessage(error) });
+        }
+    });
+});
 
 router.post('/compile', protect, async (req, res) => {
     const fs = await import('fs');
