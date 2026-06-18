@@ -187,7 +187,7 @@ function CollectionCopyPanel({ copy }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
-export default function BrandKitStudio({ brand }) {
+export default function BrandKitStudio({ brand, onBrandUpdated }) {
     const [activeTab, setActiveTab] = useState('identity')
     const [assets, setAssets] = useState({}) // { identity: [], stationery: [], guide: [], collection: [] }
     const [lastStrategy, setLastStrategy] = useState({})
@@ -286,6 +286,7 @@ export default function BrandKitStudio({ brand }) {
             }
             if (result?.artStrategy) setLastStrategy(prev => ({ ...prev, [activeTab]: result.artStrategy }))
             if (result?.copy) setLastCopy(result.copy)
+            if (result?.brand) onBrandUpdated?.(result.brand)
             setSuccess('Generated successfully!')
             setBrief('')
         } catch (e) {

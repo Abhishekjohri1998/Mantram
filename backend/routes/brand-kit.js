@@ -14,6 +14,9 @@ import express from 'express';
 import { protect } from '../middleware/auth.js';
 import { deductCredits } from '../middleware/credits.js';
 import BrandKitAsset from '../models/BrandKitAsset.js';
+import Brand from '../models/Brand.js';
+import redis from '../utils/redisClient.js';
+import { clearBrandMemCache } from '../agents/shared/agentUtils.js';
 
 import { generateBrandIdentity } from '../agents/brandKit/identityAgent.js';
 import { generateStationeryKit } from '../agents/brandKit/stationeryAgent.js';
@@ -79,7 +82,32 @@ router.post('/identity/generate', protect, async (req, res) => {
         await deductCredits(req.user._id, cost, 'brand-kit-identity');
         const saved = await saveAsset(req.user._id, brandId, 'identity', result, brief, '', cost);
 
-        res.json({ success: true, asset: saved, artStrategy: result.artStrategy });
+        // If brandId is provided, update the Brand DNA logo with the newly generated icon mark
+        let updatedBrand = null;
+        if (brandId) {
+            try {
+                const logoAsset = result.assets?.find(a => a.assetSubType === 'logo-icon-mark');
+                if (logoAsset?.imageUrl) {
+                    updatedBrand = await Brand.findByIdAndUpdate(
+                        brandId,
+                        {
+                            'dna.logo.url': logoAsset.imageUrl,
+                            'dna.logo.metadata.source': 'ai-generated',
+                        },
+                        { new: true }
+                    ).lean();
+                    console.log(`🎯 [BrandKit] Updated Brand ${brandId} DNA logo URL to: ${logoAsset.imageUrl}`);
+                    
+                    // Invalidate caches so other engines pick up the change immediately
+                    await redis.del(`brand:${brandId}:context`);
+                    clearBrandMemCache(brandId.toString());
+                }
+            } catch (brandErr) {
+                console.error('⚠️ [BrandKit] Failed to update brand logo:', brandErr.message);
+            }
+        }
+
+        res.json({ success: true, asset: saved, artStrategy: result.artStrategy, brand: updatedBrand });
     } catch (err) {
         console.error('[BrandKit] Identity error:', err.message);
         res.status(500).json({ error: err.message || 'Identity generation failed' });
@@ -190,9 +218,41 @@ router.post('/wizard/generate', protect, async (req, res) => {
             throw new Error(`Wizard failed: ${errorMsg}`);
         }
 
+        // 🎯 Create new Brand document in DB using the brief details
+        let brandObj = null;
+        try {
+            const logoAsset = identityResult.value?.assets?.find(a => a.assetSubType === 'logo-icon-mark');
+            const colors = identityResult.value?.brand?.dna?.colors || briefBrand.colors || [];
+            
+            brandObj = await Brand.create({
+                user: req.user._id,
+                name: briefBrand.name,
+                onboardingMethod: 'brainstorm',
+                status: 'active',
+                dna: {
+                    logo: {
+                        url: logoAsset?.imageUrl || '',
+                        metadata: {
+                            source: 'ai-generated',
+                            confidence: 'high',
+                        }
+                    },
+                    industry: briefBrand.industry || '',
+                    targetAudience: briefBrand.targetAudience || '',
+                    brandDescription: briefBrand.products || '',
+                    tagline: briefBrand.vision || '',
+                    country: briefBrand.country || 'India',
+                    colors: colors,
+                }
+            });
+            console.log(`🎯 [BrandKit Wizard] Created brand "${briefBrand.name}" (ID: ${brandObj._id})`);
+        } catch (brandErr) {
+            console.error('⚠️ [BrandKit Wizard] Brand creation failed:', brandErr.message);
+        }
+
         await deductCredits(req.user._id, cost, 'brand-kit-wizard');
 
-        // Save all successfully generated assets
+        // Save all successfully generated assets, linking them to the new brandObj._id
         const savedAssets = [];
         const pairs = [
             ['identity',   identityResult],
@@ -201,7 +261,7 @@ router.post('/wizard/generate', protect, async (req, res) => {
         ];
         for (const [type, result] of pairs) {
             if (result.status === 'fulfilled' && result.value?.success) {
-                const saved = await saveAsset(req.user._id, null, type, result.value, `Wizard: ${briefBrand.name}`, '', 0);
+                const saved = await saveAsset(req.user._id, brandObj?._id || null, type, result.value, `Wizard: ${briefBrand.name}`, '', 0);
                 savedAssets.push(saved);
             }
         }
@@ -211,6 +271,7 @@ router.post('/wizard/generate', protect, async (req, res) => {
             assets: savedAssets,
             guideUrl: guideResult.status === 'fulfilled' ? guideResult.value?.hostedUrl : null,
             artStrategy: identityResult.status === 'fulfilled' ? identityResult.value?.artStrategy : null,
+            brand: brandObj, // return the newly created brand document
         });
     } catch (err) {
         console.error('[BrandKit] Wizard error:', err.message);

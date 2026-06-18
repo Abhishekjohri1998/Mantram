@@ -11,7 +11,7 @@ import MonthlyStrategy from '../components/MonthlyStrategy'
 export default function BrandKitStudioPage() {
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
-    const { activeBrand, updateBrandDNA } = useBrand()
+    const { activeBrand, updateBrandDNA, addBrand, selectBrand } = useBrand()
     
     // Tab can be pre-filled via search param (e.g. ?tab=calendar)
     const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'assets')
@@ -86,7 +86,7 @@ export default function BrandKitStudioPage() {
                 <div className="mt-4">
                     {activeTab === 'assets' && (
                         <div className="animate-fade-in">
-                            <BrandKitStudio brand={activeBrand} />
+                            <BrandKitStudio brand={activeBrand} onBrandUpdated={(updatedBrand) => updateBrandDNA(updatedBrand._id, updatedBrand.dna)} />
                         </div>
                     )}
                     {activeTab === 'calendar' && (
@@ -108,7 +108,10 @@ export default function BrandKitStudioPage() {
                     onClose={() => setShowWizard(false)}
                     onComplete={(res) => {
                         setShowWizard(false)
-                        if (res?.brand) updateBrandDNA(res.brand._id, res.brand.dna)
+                        if (res?.brand) {
+                            addBrand?.(res.brand)
+                            selectBrand?.(res.brand._id)
+                        }
                     }}
                 />
             )}
