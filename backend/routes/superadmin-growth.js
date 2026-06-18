@@ -243,7 +243,9 @@ router.post('/:id/generate-image', async (req, res) => {
             if (slideIndex !== null) {
                 if (content.instagram.post.slides[slideIndex]) {
                     targetObj = content.instagram.post.slides[slideIndex];
-                    promptText = targetObj.visualDescription || targetObj.text;
+                    const visualDesc = targetObj.visualDescription || 'A clean and professional graphic';
+                    const slideText = targetObj.text || '';
+                    promptText = `A professional, modern Instagram post graphic depicting the following scene: "${visualDesc}". The graphic MUST feature the following exact text overlay, written clearly, boldly, legibly, and prominently on the image: "${slideText}". Make sure the text is integrated cleanly as a header or overlay banner. The layout should look high-end, clean, aesthetic, and premium. No spelling mistakes in the text.`.trim();
                 } else {
                     return res.status(400).json({ success: false, error: 'Invalid slide index for instagram post' });
                 }
@@ -252,13 +254,15 @@ router.post('/:id/generate-image', async (req, res) => {
                 const post = content.instagram.post;
                 const firstSlideText = post.slides?.[0]?.text || '';
                 const theme = content.theme || '';
-                promptText = `A highly aesthetic and scroll-stopping Instagram carousel cover graphic. Main Title/Hook text: "${firstSlideText}". Visual theme context: "${theme}". The cover should be visually striking, clean, premium, and designed to maximize engagement and CTR. Use harmonious color palettes, sophisticated modern layout, and clean typography. Avoid cluttered elements. Make it look like a professional, high-end design agency creation.`;
+                promptText = `A highly aesthetic and scroll-stopping Instagram carousel cover graphic. Visual theme context: "${theme}". The cover image MUST display the following main title/hook text clearly, boldly, legibly, and prominently: "${firstSlideText}". Ensure the design is clean, premium, and visually striking, with a modern layout and professional typography. No spelling mistakes.`.trim();
             }
             aspectRatio = '4:5';
         } else if (platform === 'instagram_story') {
             if (slideIndex !== null && content.instagram.story.slides[slideIndex]) {
                 targetObj = content.instagram.story.slides[slideIndex];
-                promptText = targetObj.visualDescription || targetObj.text;
+                const visualDesc = targetObj.visualDescription || 'A clean and professional graphic';
+                const slideText = targetObj.text || '';
+                promptText = `A professional, modern Instagram story graphic depicting the following scene: "${visualDesc}". The graphic MUST feature the following exact text overlay, written clearly, boldly, legibly, and prominently on the image: "${slideText}". Make sure the text is integrated cleanly as a header or overlay banner. The layout should look high-end, clean, aesthetic, and premium. No spelling mistakes in the text.`.trim();
             } else {
                 return res.status(400).json({ success: false, error: 'Slide index required for instagram story' });
             }
