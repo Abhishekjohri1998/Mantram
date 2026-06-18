@@ -282,13 +282,27 @@ router.post('/:id/generate-image', async (req, res) => {
         const isOpenAIModel = imageModel.startsWith('gpt-') || imageModel.startsWith('dall-e');
         const providerPreference = isOpenAIModel ? 'openai' : 'gemini';
 
-        const result = await aiRouter.generateImage({ 
-            prompt: promptText, 
-            aspectRatio,
-            model: imageModel
-        }, { provider: providerPreference });
+        let result;
+        try {
+            result = await aiRouter.generateImage({ 
+                prompt: promptText, 
+                aspectRatio,
+                model: imageModel
+            }, { provider: providerPreference });
+        } catch (err) {
+            console.warn(`[Growth Image Gen] ⚠️ Generation failed with model ${imageModel}: ${err.message}. Trying fallback to gemini...`);
+            if (isOpenAIModel) {
+                result = await aiRouter.generateImage({
+                    prompt: promptText,
+                    aspectRatio,
+                    model: 'gemini-3.1-flash-image-preview'
+                }, { provider: 'gemini' });
+            } else {
+                throw err;
+            }
+        }
 
-        if (!result.imageUrl) throw new Error('Image generation failed to return URL');
+        if (!result || !result.imageUrl) throw new Error('Image generation failed to return URL');
 
         // Decode base64 and upload to S3 (this also stores a copy on local SSD)
         console.log(`📤 Growth Image: Uploading generated image to S3...`);

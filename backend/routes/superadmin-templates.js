@@ -509,18 +509,27 @@ router.post('/generate', protect, superadmin, async (req, res) => {
 
             let result;
             if (selectedModel === 'gpt-image-2') {
-                console.log(`🎨 Using GPT Image 2 (OpenAI via LaoZhang)...`);
-                const { openaiImageGenerate } = await import('./creatives.js');
-                const generationData = await openaiImageGenerate(
-                    enrichedPrompt,
-                    format || '1:1',
-                    'standard',
-                    'gpt-image-2',
-                    'webp',
-                    'opaque',
-                    validRefs
-                );
-                result = { imageUrl: generationData.imageUrl };
+                try {
+                    console.log(`🎨 Using GPT Image 2 (OpenAI via LaoZhang)...`);
+                    const { openaiImageGenerate } = await import('./creatives.js');
+                    const generationData = await openaiImageGenerate(
+                        enrichedPrompt,
+                        format || '1:1',
+                        'standard',
+                        'gpt-image-2',
+                        'webp',
+                        'opaque',
+                        validRefs
+                    );
+                    result = { imageUrl: generationData.imageUrl };
+                } catch (err) {
+                    console.warn(`[Template Gen] ⚠️ GPT Image 2 failed: ${err.message}. Falling back to Gemini Native...`);
+                    const { geminiImageGenerate } = await import('../agents/videoStudio/firstFrame.js');
+                    result = await geminiImageGenerate(enrichedPrompt, [], 0.5, {
+                        aspectRatio: format || '1:1',
+                        referenceImageUrls: validRefs,
+                    });
+                }
             } else {
                 console.log(`🎨 Using Gemini Native...`);
                 const { geminiImageGenerate } = await import('../agents/videoStudio/firstFrame.js');
