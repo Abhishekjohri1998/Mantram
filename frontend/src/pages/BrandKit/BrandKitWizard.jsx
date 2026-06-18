@@ -4,10 +4,11 @@
  * 3-step flow:
  *   Step 1: Brand Brief (name, what you sell, audience)
  *   Step 2: Style Preferences (personality, price point, country)
+ *            + Logo Upload + Collateral brief
  *   Step 3: Generating... (animated progress)
  */
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { brandKitApi } from '../../services/brandKitApi'
 
 const PERSONALITIES = [
@@ -30,8 +31,8 @@ const PRICE_POINTS = [
 const GENERATION_STEPS = [
     { icon: 'psychology', text: 'Analyzing brand archetype & 2026 design trends...' },
     { icon: 'palette', text: 'Art Director building visual strategy...' },
-    { icon: 'auto_awesome', text: 'Crafting GPT-Image-2 prompts...' },
-    { icon: 'image', text: 'Generating logo & identity marks...' },
+    { icon: 'auto_awesome', text: 'Crafting GPT-Image-2 identity system prompts...' },
+    { icon: 'image', text: 'Generating identity system boards & collateral...' },
     { icon: 'style', text: 'Designing stationery kit...' },
     { icon: 'article', text: 'Writing brand guide...' },
     { icon: 'check_circle', text: 'Finalizing brand kit...' },
@@ -43,6 +44,13 @@ export default function BrandKitWizard({ onClose, onComplete }) {
     const [genStep, setGenStep] = useState(0)
     const [error, setError] = useState('')
 
+    // Logo state
+    const [hasExistingLogo, setHasExistingLogo] = useState(false)
+    const [existingLogoUrl, setExistingLogoUrl] = useState('')
+    const [logoUploadMode, setLogoUploadMode] = useState('url') // 'url' | 'file'
+    const [logoUploading, setLogoUploading] = useState(false)
+    const logoFileRef = useRef(null)
+
     const [form, setForm] = useState({
         name: '',
         products: '',
@@ -53,6 +61,7 @@ export default function BrandKitWizard({ onClose, onComplete }) {
         vision: '',
         contactName: '',
         contactTitle: '',
+        collateralBrief: '',
     })
 
     const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
@@ -69,7 +78,7 @@ export default function BrandKitWizard({ onClose, onComplete }) {
         const stepInterval = setInterval(() => {
             stepIdx++
             if (stepIdx < GENERATION_STEPS.length) setGenStep(stepIdx)
-        }, 4000)
+        }, 5000)
 
         try {
             const result = await brandKitApi.runWizard({
@@ -87,6 +96,8 @@ export default function BrandKitWizard({ onClose, onComplete }) {
                     title: form.contactTitle || 'Founder',
                     company: form.name,
                 },
+                existingLogoUrl: hasExistingLogo && existingLogoUrl ? existingLogoUrl : undefined,
+                collateralBrief: form.collateralBrief || undefined,
             })
             clearInterval(stepInterval)
             onComplete?.(result)
@@ -113,7 +124,7 @@ export default function BrandKitWizard({ onClose, onComplete }) {
                         </div>
                         <div>
                             <h3 className="text-base font-bold text-[var(--sys-text)]">Brand Kit Wizard</h3>
-                            <p className="text-xs text-[var(--sys-text-muted)]">AI generates your complete brand identity</p>
+                            <p className="text-xs text-[var(--sys-text-muted)]">AI generates your complete brand identity system</p>
                         </div>
                     </div>
                     {!generating && (
@@ -135,13 +146,13 @@ export default function BrandKitWizard({ onClose, onComplete }) {
                             </div>
                         ))}
                         <p className="ml-4 text-xs text-[var(--sys-text-muted)]">
-                            {step === 1 ? 'Brand Brief' : 'Style Preferences'}
+                            {step === 1 ? 'Brand Brief' : 'Style & Identity'}
                         </p>
                     </div>
                 )}
 
                 {/* Content */}
-                <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+                <div className="p-6 space-y-4 max-h-[65vh] overflow-y-auto">
 
                     {/* ── Step 1: Brand Brief ── */}
                     {step === 1 && (
@@ -187,7 +198,7 @@ export default function BrandKitWizard({ onClose, onComplete }) {
                         </>
                     )}
 
-                    {/* ── Step 2: Style Preferences ── */}
+                    {/* ── Step 2: Style + Identity ── */}
                     {step === 2 && (
                         <>
                             <div>
@@ -203,6 +214,7 @@ export default function BrandKitWizard({ onClose, onComplete }) {
                                     ))}
                                 </div>
                             </div>
+
                             <div>
                                 <label className="block text-xs font-medium text-[var(--sys-text-muted)] mb-2 uppercase tracking-wider">Price Point</label>
                                 <div className="flex gap-2 flex-wrap">
@@ -215,6 +227,7 @@ export default function BrandKitWizard({ onClose, onComplete }) {
                                     ))}
                                 </div>
                             </div>
+
                             <div>
                                 <label className="block text-xs font-medium text-[var(--sys-text-muted)] mb-1.5 uppercase tracking-wider">Country / Market</label>
                                 <select
@@ -226,6 +239,7 @@ export default function BrandKitWizard({ onClose, onComplete }) {
                                     ))}
                                 </select>
                             </div>
+
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-xs font-medium text-[var(--sys-text-muted)] mb-1.5 uppercase tracking-wider">Your Name (for stationery)</label>
@@ -238,6 +252,114 @@ export default function BrandKitWizard({ onClose, onComplete }) {
                                         placeholder="Founder / CEO" value={form.contactTitle} onChange={e => set('contactTitle', e.target.value)} />
                                 </div>
                             </div>
+
+                            {/* ── Existing Logo Section ── */}
+                            <div className="space-y-3 pt-1">
+                                <div className="h-px bg-[var(--sys-border)]" />
+                                <p className="text-xs font-bold text-[var(--sys-text)] uppercase tracking-wider">Identity Setup</p>
+
+                                {/* Toggle */}
+                                <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                        <span className="material-symbols-outlined text-primary text-base">image_search</span>
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-xs font-semibold text-[var(--sys-text)]">Do you have an existing logo?</p>
+                                        <p className="text-xs text-[var(--sys-text-muted)]">We'll build the full identity system around it</p>
+                                    </div>
+                                    <button
+                                        onClick={() => { setHasExistingLogo(v => !v); setExistingLogoUrl('') }}
+                                        className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer flex-shrink-0 ${hasExistingLogo ? 'bg-primary' : 'bg-[var(--sys-border)]'}`}>
+                                        <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${hasExistingLogo ? 'left-5' : 'left-0.5'}`} />
+                                    </button>
+                                </div>
+
+                                {/* No logo banner */}
+                                {!hasExistingLogo && (
+                                    <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-primary/5 border border-primary/15">
+                                        <span className="material-symbols-outlined text-primary text-sm">auto_awesome</span>
+                                        <p className="text-xs text-[var(--sys-text-muted)]">AI will design a new logo + full identity system from your brand brief</p>
+                                    </div>
+                                )}
+
+                                {/* Logo upload UI */}
+                                {hasExistingLogo && (
+                                    <div className="space-y-2">
+                                        {/* Mode toggle */}
+                                        <div className="flex gap-1 p-1 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] w-fit">
+                                            {[['url', 'link', 'Paste URL'], ['file', 'upload', 'Upload File']].map(([mode, icon, label]) => (
+                                                <button key={mode}
+                                                    onClick={() => setLogoUploadMode(mode)}
+                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${logoUploadMode === mode ? 'bg-primary text-white' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
+                                                    <span className="material-symbols-outlined text-sm">{icon}</span>
+                                                    {label}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {logoUploadMode === 'url' ? (
+                                            <input
+                                                className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm focus:outline-none focus:border-primary/50 transition-colors"
+                                                placeholder="Paste your logo URL (S3, Cloudinary, Google Drive...)"
+                                                value={existingLogoUrl}
+                                                onChange={e => setExistingLogoUrl(e.target.value)}
+                                            />
+                                        ) : (
+                                            <div
+                                                onClick={() => logoFileRef.current?.click()}
+                                                className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-dashed cursor-pointer transition-all ${
+                                                    existingLogoUrl ? 'border-primary/50 bg-primary/5' : 'border-[var(--sys-border)] hover:border-primary/30'
+                                                }`}>
+                                                {logoUploading ? (
+                                                    <span className="material-symbols-outlined text-primary animate-spin text-xl">progress_activity</span>
+                                                ) : existingLogoUrl ? (
+                                                    <img src={existingLogoUrl} alt="logo" className="w-10 h-10 object-contain rounded-lg bg-white p-1" />
+                                                ) : (
+                                                    <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-2xl">add_photo_alternate</span>
+                                                )}
+                                                <div>
+                                                    <p className="text-sm text-[var(--sys-text)] font-medium">
+                                                        {existingLogoUrl ? 'Logo uploaded ✓' : 'Click to upload logo'}
+                                                    </p>
+                                                    <p className="text-xs text-[var(--sys-text-muted)]">PNG, SVG, JPG — transparent background preferred</p>
+                                                </div>
+                                                <input
+                                                    ref={logoFileRef}
+                                                    type="file"
+                                                    className="hidden"
+                                                    accept="image/*"
+                                                    onChange={async (e) => {
+                                                        const file = e.target.files?.[0]
+                                                        if (!file) return
+                                                        setLogoUploading(true)
+                                                        const reader = new FileReader()
+                                                        reader.onload = (ev) => {
+                                                            setExistingLogoUrl(ev.target.result)
+                                                            setLogoUploading(false)
+                                                        }
+                                                        reader.readAsDataURL(file)
+                                                    }}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Collateral Brief */}
+                                <div>
+                                    <label className="block text-xs font-medium text-[var(--sys-text-muted)] mb-1.5 uppercase tracking-wider">
+                                        Real-world Collateral (optional)
+                                    </label>
+                                    <input
+                                        className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm focus:outline-none focus:border-primary/50 transition-colors"
+                                        placeholder="e.g. product packaging, coffee cup, tote bag, phone case, shopping bag"
+                                        value={form.collateralBrief}
+                                        onChange={e => set('collateralBrief', e.target.value)}
+                                    />
+                                    <p className="text-xs text-[var(--sys-text-muted)] mt-1">These will appear in your identity mockup visuals</p>
+                                </div>
+                            </div>
+
                             {error && <p className="text-sm text-primary bg-primary/10 rounded-xl px-4 py-2">{error}</p>}
                         </>
                     )}
@@ -250,8 +372,13 @@ export default function BrandKitWizard({ onClose, onComplete }) {
                                     <span className="material-symbols-outlined text-primary text-4xl animate-pulse">auto_awesome</span>
                                     <div className="absolute inset-0 rounded-2xl border-2 border-primary/30 animate-ping" style={{ animationDuration: '2s' }} />
                                 </div>
-                                <h4 className="text-xl font-bold text-[var(--sys-text)] mb-2">Building your brand...</h4>
-                                <p className="text-sm text-[var(--sys-text-muted)]">Art Director + GPT-Image-2 at work. This takes ~2 minutes.</p>
+                                <h4 className="text-xl font-bold text-[var(--sys-text)] mb-2">Building your brand system...</h4>
+                                <p className="text-sm text-[var(--sys-text-muted)]">
+                                    {hasExistingLogo
+                                        ? 'Art Director + GPT-Image-2 extending your logo into a full identity system.'
+                                        : 'Art Director + GPT-Image-2 designing your complete identity from scratch.'}
+                                    {' '}This takes ~3 minutes.
+                                </p>
                             </div>
 
                             {/* Steps progress */}
@@ -277,7 +404,7 @@ export default function BrandKitWizard({ onClose, onComplete }) {
                 {step < 3 && (
                     <div className="flex items-center justify-between p-6 border-t border-[var(--sys-border)]">
                         <div className="text-xs text-[var(--sys-text-muted)]">
-                            {step === 2 && <span>🎨 60 credits — Logo + Stationery + Brand Guide</span>}
+                            {step === 2 && <span>🎨 60 credits — Identity System + Stationery + Brand Guide</span>}
                         </div>
                         <div className="flex gap-3">
                             {step === 2 && (

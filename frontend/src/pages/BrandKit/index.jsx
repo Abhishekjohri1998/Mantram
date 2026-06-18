@@ -14,7 +14,7 @@
  *   - Art Director intelligence card (after generation)
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { brandKitApi } from '../../services/brandKitApi'
 import AssetCard from './AssetCard'
 
@@ -89,7 +89,7 @@ function EmptyAssets({ type, onGenerate }) {
 // ── Loading Overlay ───────────────────────────────────────────────────────────
 function GeneratingOverlay({ type }) {
     const labels = {
-        identity: ['Reading brand DNA...', 'Determining archetype & design movement...', 'Crafting image prompts...', 'Generating logo variants...', 'Uploading assets...'],
+        identity: ['Reading brand DNA...', 'Claude Art Director analyzing archetype & movement...', 'Crafting GPT-Image-2 identity system prompts...', 'Generating identity system boards (light + dark)...', 'Generating collateral mockups...', 'Uploading to S3...'],
         stationery: ['Analyzing brand personality...', 'Designing layout compositions...', 'Generating business card...', 'Creating letterhead...', 'Writing email signature...'],
         guide: ['Deep brand analysis...', 'Writing color system rules...', 'Composing typography guide...', 'Building voice guidelines...', 'Assembling interactive guide...'],
         collection: ['Researching 2026 trends...', 'Building campaign concept...', 'Writing launch copy...', 'Generating hero visuals...', 'Creating campaign pack...'],
@@ -203,6 +203,14 @@ export default function BrandKitStudio({ brand }) {
     const [scopeLabel, setScopeLabel] = useState('')
     const [contactDetails, setContactDetails] = useState({ name: '', title: '', email: '', phone: '', website: '' })
 
+    // Identity-specific state
+    const [hasExistingLogo, setHasExistingLogo] = useState(false)
+    const [existingLogoUrl, setExistingLogoUrl] = useState('')
+    const [logoUploadMode, setLogoUploadMode] = useState('url') // 'url' | 'file'
+    const [logoUploading, setLogoUploading] = useState(false)
+    const [collateralBrief, setCollateralBrief] = useState('')
+    const logoFileRef = useRef(null)
+
     // Load existing assets from DB
     const loadAssets = useCallback(async () => {
         if (!brand?._id) return
@@ -251,7 +259,11 @@ export default function BrandKitStudio({ brand }) {
             const basePayload = { brandId: brand._id, brief: brief || undefined }
 
             if (activeTab === 'identity') {
-                result = await brandKitApi.generateIdentity(basePayload)
+                result = await brandKitApi.generateIdentity({
+                    ...basePayload,
+                    existingLogoUrl: hasExistingLogo && existingLogoUrl ? existingLogoUrl : undefined,
+                    collateralBrief: collateralBrief || undefined,
+                })
             } else if (activeTab === 'stationery') {
                 result = await brandKitApi.generateStationery({ ...basePayload, contactDetails })
             } else if (activeTab === 'guide') {
@@ -319,18 +331,121 @@ export default function BrandKitStudio({ brand }) {
 
                         {/* Brief input */}
                         {activeTab !== 'collection' ? (
-                            <textarea
-                                className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm focus:outline-none focus:border-primary/50 transition-colors resize-none"
-                                placeholder={
-                                    activeTab === 'identity' ? 'Optional: Any specific direction for the logo? (e.g. "modern wordmark with abstract geometric mark, earthy tones")'
-                                    : activeTab === 'stationery' ? 'Optional: Any specific stationery preferences? (e.g. "minimal white with gold foil, landscape business card")'
-                                    : 'Optional: Specific focus for the brand guide? (e.g. "emphasize sustainability messaging")'
-                                }
-                                rows={2}
-                                value={brief}
-                                onChange={e => setBrief(e.target.value)}
-                                disabled={loading}
-                            />
+                            <div className="space-y-3">
+                                <textarea
+                                    className="w-full px-4 py-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm focus:outline-none focus:border-primary/50 transition-colors resize-none"
+                                    placeholder={
+                                        activeTab === 'identity' ? 'Optional: Any direction for the identity system? (e.g. "geometric wordmark, earthy tones, include packaging mockups")'
+                                        : activeTab === 'stationery' ? 'Optional: Any stationery preferences? (e.g. "minimal white with gold foil, landscape card")'
+                                        : 'Optional: Focus for the brand guide? (e.g. "emphasize sustainability messaging")'
+                                    }
+                                    rows={2}
+                                    value={brief}
+                                    onChange={e => setBrief(e.target.value)}
+                                    disabled={loading}
+                                />
+
+                                {/* ── Identity-only: Logo Upload + Collateral ── */}
+                                {activeTab === 'identity' && (
+                                    <div className="space-y-3">
+                                        {/* Existing Logo Toggle */}
+                                        <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                                            <span className="material-symbols-outlined text-primary text-base">image_search</span>
+                                            <div className="flex-1">
+                                                <p className="text-xs font-semibold text-[var(--sys-text)]">Do you have an existing logo?</p>
+                                                <p className="text-xs text-[var(--sys-text-muted)]">Upload it and we'll build the identity system around it</p>
+                                            </div>
+                                            <button
+                                                onClick={() => { setHasExistingLogo(v => !v); setExistingLogoUrl('') }}
+                                                disabled={loading}
+                                                className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer flex-shrink-0 ${hasExistingLogo ? 'bg-primary' : 'bg-[var(--sys-border)]'}`}>
+                                                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${hasExistingLogo ? 'left-5' : 'left-0.5'}`} />
+                                            </button>
+                                        </div>
+
+                                        {/* Logo upload / URL input */}
+                                        {hasExistingLogo && (
+                                            <div className="space-y-2">
+                                                {/* Mode tabs */}
+                                                <div className="flex gap-1 p-1 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] w-fit">
+                                                    {[['url', 'link', 'Paste URL'], ['file', 'upload', 'Upload File']].map(([mode, icon, label]) => (
+                                                        <button key={mode}
+                                                            onClick={() => setLogoUploadMode(mode)}
+                                                            disabled={loading}
+                                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${logoUploadMode === mode ? 'bg-primary text-white' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
+                                                            <span className="material-symbols-outlined text-sm">{icon}</span>
+                                                            {label}
+                                                        </button>
+                                                    ))}
+                                                </div>
+
+                                                {logoUploadMode === 'url' ? (
+                                                    <input
+                                                        className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm focus:outline-none focus:border-primary/50 transition-colors"
+                                                        placeholder="Paste your logo URL (S3, Cloudinary, Drive link...)"
+                                                        value={existingLogoUrl}
+                                                        onChange={e => setExistingLogoUrl(e.target.value)}
+                                                        disabled={loading}
+                                                    />
+                                                ) : (
+                                                    <div
+                                                        onClick={() => !loading && logoFileRef.current?.click()}
+                                                        className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-dashed cursor-pointer transition-all ${
+                                                            existingLogoUrl ? 'border-primary/50 bg-primary/5' : 'border-[var(--sys-border)] hover:border-primary/30'
+                                                        }`}>
+                                                        {logoUploading ? (
+                                                            <span className="material-symbols-outlined text-primary animate-spin text-xl">progress_activity</span>
+                                                        ) : existingLogoUrl ? (
+                                                            <img src={existingLogoUrl} alt="logo preview" className="w-10 h-10 object-contain rounded-lg bg-white p-1" />
+                                                        ) : (
+                                                            <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-2xl">add_photo_alternate</span>
+                                                        )}
+                                                        <div>
+                                                            <p className="text-sm text-[var(--sys-text)] font-medium">
+                                                                {existingLogoUrl ? 'Logo uploaded ✓' : 'Click to upload logo'}
+                                                            </p>
+                                                            <p className="text-xs text-[var(--sys-text-muted)]">PNG, SVG, JPG — transparent background preferred</p>
+                                                        </div>
+                                                        <input
+                                                            ref={logoFileRef}
+                                                            type="file"
+                                                            className="hidden"
+                                                            accept="image/*"
+                                                            onChange={async (e) => {
+                                                                const file = e.target.files?.[0]
+                                                                if (!file) return
+                                                                setLogoUploading(true)
+                                                                try {
+                                                                    const reader = new FileReader()
+                                                                    reader.onload = (ev) => {
+                                                                        setExistingLogoUrl(ev.target.result) // base64 data URI
+                                                                        setLogoUploading(false)
+                                                                    }
+                                                                    reader.readAsDataURL(file)
+                                                                } catch { setLogoUploading(false) }
+                                                            }}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Collateral Brief */}
+                                        <div>
+                                            <label className="block text-xs font-medium text-[var(--sys-text-muted)] mb-1.5 uppercase tracking-wider">
+                                                Collateral Mockups (optional)
+                                            </label>
+                                            <input
+                                                className="w-full px-4 py-2.5 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] text-sm focus:outline-none focus:border-primary/50 transition-colors"
+                                                placeholder="e.g. product packaging, coffee cup, shopping bags, phone case, tote bag"
+                                                value={collateralBrief}
+                                                onChange={e => setCollateralBrief(e.target.value)}
+                                                disabled={loading}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         ) : (
                             <div className="space-y-3">
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">

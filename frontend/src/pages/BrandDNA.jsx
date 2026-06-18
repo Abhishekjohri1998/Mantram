@@ -5,8 +5,7 @@ import DashboardLayout from '../components/DashboardLayout'
 import SEOHead from '../components/SEOHead'
 import { useBrand } from '../context/BrandContext'
 import { brands as brandsAPI, products as productsAPI } from '../services/api'
-import BrandKitStudio from './BrandKit/index.jsx'
-import BrandKitWizard from './BrandKit/BrandKitWizard.jsx'
+
 
 // ============================================================================
 // EDIT MODAL — reusable inline editor for any DNA section
@@ -1149,8 +1148,7 @@ export default function BrandDNA() {
     const [showDelete, setShowDelete] = useState(false)
     const [rescanning, setRescanning] = useState(false)
     const [rescanResult, setRescanResult] = useState(null)
-    const [mainTab, setMainTab] = useState('dna') // 'dna' | 'brandkit'
-    const [showWizard, setShowWizard] = useState(false)
+
 
     // Load audit log
     useEffect(() => {
@@ -1420,51 +1418,8 @@ export default function BrandDNA() {
                 )}
             </div>
 
-            {/* ── Tab Navigation ── */}
-            <div className="flex items-center justify-between gap-4 mb-6">
-                <div className="flex items-center gap-1 p-1 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] w-fit">
-                    {[
-                        { id: 'dna',      icon: 'psychology',    label: 'Brand DNA' },
-                        { id: 'brandkit', icon: 'auto_awesome',  label: 'Brand Kit Studio' },
-                    ].map(tab => (
-                        <button key={tab.id}
-                            onClick={() => setMainTab(tab.id)}
-                            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
-                                mainTab === tab.id
-                                    ? 'bg-primary text-white shadow-lg shadow-primary/20'
-                                    : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'
-                            }`}>
-                            <span className="material-symbols-outlined text-[1.1rem]">{tab.icon}</span>
-                            {tab.label}
-                            {tab.id === 'brandkit' && (
-                                <span className="px-1.5 py-0.5 rounded-md bg-white/20 text-[10px] font-bold tracking-wider">
-                                    NEW
-                                </span>
-                            )}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Wizard CTA — shown on Brand Kit tab */}
-                {mainTab === 'brandkit' && (
-                    <button
-                        onClick={() => setShowWizard(true)}
-                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-primary/30 bg-primary/5 text-primary text-sm font-medium hover:bg-primary/10 transition-all cursor-pointer">
-                        <span className="material-symbols-outlined text-sm">wand_stars</span>
-                        New Brand Wizard
-                    </button>
-                )}
-            </div>
-
-            {/* ── Brand Kit Studio Tab ── */}
-            {mainTab === 'brandkit' && (
-                <div className="grid grid-cols-12 gap-6">
-                    <BrandKitStudio brand={brand} />
-                </div>
-            )}
-
-            {/* ── Brand DNA Tab (all original content) ── */}
-            {mainTab === 'dna' && <div className="grid grid-cols-12 gap-6">
+            {/* ── Brand DNA Content ── */}
+            <div className="grid grid-cols-12 gap-6">
                 {/* Color Palette */}
                 <div className="col-span-12 md:col-span-6 glass-panel rounded-2xl p-6 animate-fade-in" style={{ animationDelay: '80ms' }}>
                     <SectionHeader icon="palette" title="Color Palette" onEdit={() => startEdit('colors')} />
@@ -1667,18 +1622,7 @@ export default function BrandDNA() {
                         </div>
                     )}
                 </div>
-            </div>}
-
-            {/* ── Brand Kit Wizard Modal ── */}
-            {showWizard && (
-                <BrandKitWizard
-                    onClose={() => setShowWizard(false)}
-                    onComplete={(result) => {
-                        setShowWizard(false)
-                        setMainTab('brandkit')
-                    }}
-                />
-            )}
+            </div>
 
             {/* ═══════════ EDIT MODALS ═══════════ */}
 
@@ -1862,17 +1806,6 @@ export default function BrandDNA() {
             )}
             {/* Delete Confirmation */}
             {showDelete && <DeleteBrandModal brand={brand} onClose={() => setShowDelete(false)} onConfirm={handleDeleteBrand} />}
-
-            {/* ── Brand Kit Wizard Modal ── */}
-            {showWizard && (
-                <BrandKitWizard
-                    onClose={() => setShowWizard(false)}
-                    onComplete={(result) => {
-                        setShowWizard(false)
-                        setMainTab('brandkit') // Switch to Brand Kit Studio tab
-                    }}
-                />
-            )}
         </DashboardLayout>
     )
 }

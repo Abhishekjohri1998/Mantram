@@ -64,15 +64,15 @@ async function saveAsset(userId, brandId, assetType, result, brief, scopeLabel, 
 // POST /identity/generate — Logo, Icon Mark, Favicon
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/identity/generate', protect, async (req, res) => {
-    const { brandId, brief, briefBrand, scope } = req.body;
+    const { brandId, brief, briefBrand, scope, existingLogoUrl, collateralBrief } = req.body;
     const cost = COSTS.identity;
 
     try {
         const balance = getBalance(req.user);
         if (balance < cost) return res.status(402).json({ success: false, error: 'Insufficient credits', required: cost });
 
-        console.log(`🎨 [BrandKit] Identity generation for user ${req.user._id}`);
-        const result = await generateBrandIdentity({ brandId, brief, briefBrand, scope });
+        console.log(`🎨 [BrandKit] Identity generation for user ${req.user._id}${existingLogoUrl ? ' (with existing logo)' : ' (new logo)'}`);
+        const result = await generateBrandIdentity({ brandId, brief, briefBrand, scope, existingLogoUrl, collateralBrief });
 
         if (!result.success) throw new Error('Identity generation failed');
 
@@ -163,7 +163,7 @@ router.post('/collection/generate', protect, async (req, res) => {
 // Generates identity + stationery + guide from a brief (no brand onboarding needed)
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/wizard/generate', protect, async (req, res) => {
-    const { briefBrand, contactDetails } = req.body;
+    const { briefBrand, contactDetails, existingLogoUrl, collateralBrief } = req.body;
     const cost = COSTS.wizard;
 
     if (!briefBrand?.name || !briefBrand?.products) {
@@ -174,11 +174,11 @@ router.post('/wizard/generate', protect, async (req, res) => {
         const balance = getBalance(req.user);
         if (balance < cost) return res.status(402).json({ success: false, error: 'Insufficient credits', required: cost });
 
-        console.log(`🧙 [BrandKit Wizard] Generating all-in-one kit for "${briefBrand.name}"...`);
+        console.log(`🧙 [BrandKit Wizard] Generating all-in-one kit for "${briefBrand.name}"${existingLogoUrl ? ' (with existing logo)' : ' (new logo)'}...`);
 
         // Run all 3 generators in parallel for speed
         const [identityResult, stationeryResult, guideResult] = await Promise.allSettled([
-            generateBrandIdentity({ brief: `Brand kit for ${briefBrand.name}`, briefBrand }),
+            generateBrandIdentity({ brief: `Brand kit for ${briefBrand.name}`, briefBrand, existingLogoUrl, collateralBrief }),
             generateStationeryKit({ brief: `Stationery for ${briefBrand.name}`, briefBrand, contactDetails }),
             generateBrandGuide({ brief: `Brand guide for ${briefBrand.name}`, briefBrand }),
         ]);
