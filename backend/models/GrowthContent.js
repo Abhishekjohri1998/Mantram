@@ -93,6 +93,9 @@ const growthContentSchema = new mongoose.Schema({
             bestTime: String,
             posted: { type: Boolean, default: false },
             postedAt: Date,
+            imageUrl: String,
+            videoUrl: String,
+            storyboardProjectId: String,
         },
     },
 

@@ -399,6 +399,31 @@ router.get('/stats', async (req, res) => {
             },
         });
     } catch (error) {
+        console.error('[Growth Stats] Error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════
+// PUT /api/superadmin/growth/:id/reel-video — Update Reel Video details
+// ══════════════════════════════════════════════════════════════
+router.put('/:id/reel-video', async (req, res) => {
+    try {
+        const { videoUrl, imageUrl, storyboardProjectId } = req.body;
+        const content = await GrowthContent.findById(req.params.id);
+        if (!content) return res.status(404).json({ success: false, error: 'Content not found' });
+
+        if (!content.instagram) content.instagram = {};
+        if (!content.instagram.reel) content.instagram.reel = {};
+
+        if (videoUrl !== undefined) content.instagram.reel.videoUrl = videoUrl;
+        if (imageUrl !== undefined) content.instagram.reel.imageUrl = imageUrl;
+        if (storyboardProjectId !== undefined) content.instagram.reel.storyboardProjectId = storyboardProjectId;
+
+        await content.save();
+        const signedContent = await signGrowthContentUrls(content.toObject());
+        res.json({ success: true, content: signedContent });
+    } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });

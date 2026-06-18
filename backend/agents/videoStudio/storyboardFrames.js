@@ -184,7 +184,8 @@ export async function generateStoryboardPoster(
             console.warn(`[SB Poster] Credentials check failed: ${e.message}`);
         }
 
-        if (!credsExist) {
+        const devKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
+        if (!credsExist && !devKey) {
             throw new Error(`GOOGLE_APPLICATION_CREDENTIALS file not found or invalid: "${credsVar}". Cannot generate image with NanoBanana (Gemini Vertex AI).`);
         }
     }

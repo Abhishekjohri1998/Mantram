@@ -2935,11 +2935,22 @@ router.get('/ugc-pro/avatars', protect, async (req, res) => {
             ]);
         }
 
+        const [templatesSigned, userAvatarsSigned] = await Promise.all([
+            Promise.all(templates.map(async (av) => ({
+                ...av,
+                imageUrl: await getSignedUrlIfNeeded(av.imageUrl),
+            }))),
+            Promise.all(userAvatars.map(async (av) => ({
+                ...av,
+                imageUrl: await getSignedUrlIfNeeded(av.imageUrl),
+            }))),
+        ]);
+
         res.json({
             success: true,
-            templates,
-            userAvatars,
-            total: templates.length + userAvatars.length,
+            templates: templatesSigned,
+            userAvatars: userAvatarsSigned,
+            total: templatesSigned.length + userAvatarsSigned.length,
         });
     } catch (err) {
         console.error('Avatar list error:', err.message);
@@ -2976,7 +2987,14 @@ router.post('/ugc-pro/avatars', protect, ugcUpload.single('avatarImage'), async 
             isPublished: isSuperAdmin
         });
 
-        res.json({ success: true, avatar });
+        const signedUrl = await getSignedUrlIfNeeded(avatar.imageUrl);
+        res.json({
+            success: true,
+            avatar: {
+                ...avatar.toObject(),
+                imageUrl: signedUrl
+            }
+        });
     } catch (err) {
         console.error('Avatar save error:', err.message);
         res.status(500).json({ success: false, error: err.message });
@@ -7516,24 +7534,134 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
         console.log(`[Storyboard Create] brand=${brandId}, duration=${totalDuration}s, style=${style}, imgs=${productImageUrls.length}, avatars=${avatarUrls.length}, refs=${refImageUrls.length}, branding=${includeBranding}`);
         console.log(`🔍 [Storyboard Create] ══ END DUMP ══\n`);
 
-        // Step 1: Director Brain — generate shot plan via Claude
-        const plan = await runStoryboardDirector({
-            brandId,
-            brief,
-            productName,
-            productFeatures,
-            productImageUrls,
-            avatarUrls,
-            avatarNames,
-            refImageUrls,
-            includeBranding,
-            style,
-            duration: totalDuration,
-            format,
-            userId: req.user._id,
-            directorModel,
-            dialogueLanguage,
-        });
+        // Step 1: Director Brain — generate shot plan via Claude (or use pre-seeded cuts if provided)
+        let plan;
+        if (req.body.preSeededCuts) {
+            let parsedCuts = [];
+            try {
+                parsedCuts = typeof req.body.preSeededCuts === 'string'
+                    ? JSON.parse(req.body.preSeededCuts)
+                    : req.body.preSeededCuts;
+            } catch (e) {
+                console.warn('[Storyboard Create] Failed to parse preSeededCuts:', e.message);
+            }
+
+            if (parsedCuts && parsedCuts.length > 0) {
+                console.log(`[Storyboard Create] 🎬 Using ${parsedCuts.length} pre-seeded cuts/scenes!`);
+                const cuts = parsedCuts.map((c, i) => ({
+                    id: c.id || i + 1,
+                    lens: c.lens || '50mm prime',
+                    duration: Math.max(2, parseInt(c.duration) || 3),
+                    move: c.move || 'STEADICAM',
+                    shot: c.shot || 'MEDIUM',
+                    scene: c.scene || '',
+                    framePrompt: c.framePrompt || c.scene || '',
+                }));
+
+                const totalCalculatedDuration = cuts.reduce((sum, c) => sum + c.duration, 0);
+
+                // Load brand context colors and logo watermarks
+                let brandColors = ['#1A1A1A', '#E1306C', '#FFFFFF'];
+                let brandColorNames = ['Dark Studio', 'Reel Pink', 'Pure White'];
+                let brandLogoUrl = null;
+                let brandLogoDescription = '';
+                let brandContext = '';
+
+                if (brandId) {
+                    const brand = await Brand.findById(brandId).lean();
+                    if (brand) {
+                        brandContext = brand.dna?.description || '';
+                        if (brand.dna?.colors?.length > 0) {
+                            brandColors = brand.dna.colors.slice(0, 3);
+                            brandColorNames = brandColors.map((c, idx) => `Brand Color ${idx + 1}`);
+                        }
+                        if (brand.dna?.logo?.url) {
+                            brandLogoUrl = brand.dna.logo.url;
+                            brandLogoDescription = brand.dna.logo.metadata?.visionDescription || '';
+                        }
+                    }
+                }
+
+                // Construct structured plan
+                plan = {
+                    colorPalette: brandColors,
+                    paletteNames: brandColorNames,
+                    materialNotes: 'Clean studio lighting, brand colors, minimal layout',
+                    environmentFingerprint: 'A high-end, clean creator studio set with soft background lighting',
+                    cuts,
+                    moodKeywords: ['engaging', 'modern', 'clean', 'professional', 'bold'],
+                    cinematographyRules: 'Soft key light, shallow depth of field, steady focus tracking.',
+                    emotionalArc: 'hook → explain → solve → detail → CTA',
+                    narrativeArc: brief || 'A D2C brand marketing video.',
+                    hookStrategy: cuts[0]?.scene || 'Stop paying agencies ₹4 lakh for one ad',
+                    requestedDuration: totalCalculatedDuration,
+                    format,
+                    defaultStyle: style,
+                    productImageUrls,
+                    avatarUrls,
+                    avatarNames,
+                    refImageUrls,
+                    dialogueLanguage,
+                    logoUrl: includeBranding ? brandLogoUrl : null,
+                    includeBranding,
+                };
+
+                // Build imagePrompt automatically for the grid poster
+                const panelCount = Math.min(Math.max(cuts.length, 5), 8);
+                const visible = cuts.slice(0, 8);
+                const panelBlock = visible.map((cut, i) => (
+                    `  - Panel ${i + 1} (Cut ${cut.id || i + 1}): ${cut.scene || cut.framePrompt || `Shot ${i + 1}`} (max 12 words).`
+                )).join('\n');
+                
+                const charRefBlock = avatarNames.length > 0
+                    ? `- CHARACTER REFERENCE: ${avatarNames.length} panels — one per character: ${avatarNames.map(n => `"${n}" (front view + face close-up)`).join(', ')}. Label each panel with the character name.`
+                    : `- CHARACTER REFERENCE: 6 panels showing the presenter/model from angles (front, side, back, face close-up, side close-up, wardrobe detail).`;
+
+                plan.imagePrompt = `Create a highly detailed, professional pre-production storyboard pitch deck sheet in a structured billboard layout for a ${productName || 'product'} advertisement.
+Beige/creme background canvas.
+Top Meta Header: Display 'Cut Count: ${panelCount}', 'Color Palette: [${brandColors.join(', ')}]', 'Environment Fingerprint: A high-end, clean creator studio set with soft background lighting' in clean black typography.
+
+Section 1 (CHARACTER & HERO PRODUCT REFERENCE):
+- ${charRefBlock}
+- HERO PRODUCT REFERENCE: 5 panels showing the product from angles (front view, three-quarter view, side view, macro detail, in-context lifestyle).
+- Bottom row: Color palette circular swatches and text material notes.
+
+Section 2 (ENVIRONMENT / SET DESIGN):
+- Left side: A large 16:9 set design render of the environment (A high-end, clean creator studio set with soft background lighting).
+- Right side: A top-down floor plan schematic diagram showing furniture layout and camera paths/arrows labeled with cut numbers.
+
+Section 3 (STORYBOARD):
+- A clean horizontal row of ${panelCount} storyboard panels showing:
+${panelBlock}
+- Below each panel, include clear black typography: 'Lens | Duration | Move | Shot Type'.
+
+Section 4 (LIGHTING / MOOD / STYLE NOTES):
+- 4 small lighting panels showing soft backlight, warm glow, rim light, and bokeh details with descriptions.
+- On the right: 'MOOD KEYWORDS' list and bulleted 'CINEMATOGRAPHY NOTES'.
+
+Format: ${format} | Style: ${style === '3d' ? 'Pixar/Unreal Engine 3D animated' : style === '2d' ? 'Clean 2D flat animated illustration' : 'Hyperrealistic cinematic live-action photography'} | ${totalCalculatedDuration}s total. Negative prompt: [cartoonish styles, low quality, distorted panels, text errors, smiling models, watermarks]. Note: The product's original color shade, shape, and label must remain completely unchanged and must not be recolored with the brand colors.`;
+            }
+        }
+
+        if (!plan) {
+            plan = await runStoryboardDirector({
+                brandId,
+                brief,
+                productName,
+                productFeatures,
+                productImageUrls,
+                avatarUrls,
+                avatarNames,
+                refImageUrls,
+                includeBranding,
+                style,
+                duration: totalDuration,
+                format,
+                userId: req.user._id,
+                directorModel,
+                dialogueLanguage,
+            });
+        }
 
         // Step 2: Generate single storyboard poster via LaoZhang → GPT Image 2 / NanoBanana
         // Pass raw file buffers directly (bypasses S3 re-download which can silently fail)

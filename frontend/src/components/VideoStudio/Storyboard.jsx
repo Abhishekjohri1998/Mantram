@@ -132,9 +132,22 @@ function CfgMenu({ value, onChange, options, icon }) {
 // ── Single Poster Display (Inline below) ──
 
 // ── Main Storyboard Component ────────────────────────────────────────────────
-export default function Storyboard({ activeBrand, projects = [], onVideoComplete, canCreateVideo, onUpgradeRequired, user }) {
+export default function Storyboard({
+    activeBrand,
+    projects = [],
+    onVideoComplete,
+    canCreateVideo,
+    onUpgradeRequired,
+    user,
+    initialBrief = '',
+    initialCuts = null,
+    initialDuration = 30,
+    initialFormat = '9:16',
+    initialProjectId = null,
+    onProjectIdCreated = null,
+}) {
     // ── Input state ──
-    const [brief, setBrief] = useState('');
+    const [brief, setBrief] = useState(initialBrief || '');
     const [productName, setProductName] = useState('');
     const [productImages, setProductImages] = useState([]); // { file, preview }
     const [productUrlInput, setProductUrlInput] = useState('');
@@ -148,13 +161,19 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
     // Visual branding toggle (default ON)
     const [includeBranding, setIncludeBranding] = useState(true);
     const [defaultStyle, setDefaultStyle] = useState('hyperrealistic');
-    const [format, setFormat] = useState('9:16');
-    const [duration, setDuration] = useState(10);
+    const [format, setFormat] = useState(initialFormat || '9:16');
+    const [duration, setDuration] = useState(initialDuration || 10);
     const [model, setModel] = useState('seedance-2.0-fast');
     const [resolution, setResolution] = useState('480p');
     const [directorModel, setDirectorModel] = useState('claude');
     const [imageModel, setImageModel] = useState('nanobanana-2');
     const [dialogueLanguage, setDialogueLanguage] = useState('English');
+
+    useEffect(() => {
+        if (initialBrief) setBrief(initialBrief);
+        if (initialDuration) setDuration(initialDuration);
+        if (initialFormat) setFormat(initialFormat);
+    }, [initialBrief, initialDuration, initialFormat]);
 
     // Legacy compat: avatarImage getter (first avatar) — kept for AvatarPicker
     const avatarImage = avatarImages[0] || null;
@@ -472,6 +491,9 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
             fd.append('directorModel', directorModel);
             fd.append('imageModel', imageModel);
             fd.append('dialogueLanguage', dialogueLanguage);
+            if (initialCuts) {
+                fd.append('preSeededCuts', JSON.stringify(initialCuts));
+            }
 
             setPhase('storyboarding');
 
@@ -486,6 +508,9 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
 
             setProjectId(data.projectId);
             projectIdRef.current = data.projectId;
+            if (onProjectIdCreated) {
+                onProjectIdCreated(data.projectId);
+            }
             setPlan(data.plan);
             if (data.plan) {
                 setImageUrl(data.plan.imageUrl);
@@ -608,7 +633,10 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                 if (data.allDone || data.status === 'COMPLETED') {
                     clearInterval(pollRef.current);
                     setPhase('complete');
-                    onVideoComplete?.();
+                    onVideoComplete?.({
+                        finalVideoUrl: data.finalVideoUrl,
+                        imageUrl: data.imageUrl || data.plan?.imageUrl || data.storyboard?.imageUrl
+                    });
                 } else if (data.status === 'FAILED') {
                     clearInterval(pollRef.current);
                     setError('Animation generation failed.');
@@ -695,7 +723,10 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
                     if (data.finalVideoUrl) setFinalVideoUrl(data.finalVideoUrl);
                     if (data.allDone || data.status === 'COMPLETED') {
                         setPhase('complete');
-                        onVideoComplete?.();
+                        onVideoComplete?.({
+                            finalVideoUrl: data.finalVideoUrl,
+                            imageUrl: data.imageUrl || data.plan?.imageUrl || data.storyboard?.imageUrl
+                        });
                         return; // no need to start polling loop
                     }
                 }
@@ -718,7 +749,7 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
 
     // Scan projects list for active project on load
     useEffect(() => {
-        if (hasAttemptedReconnect.current || !projects || projects.length === 0) return;
+        if (hasAttemptedReconnect.current || initialProjectId || !projects || projects.length === 0) return;
         
         const activeProj = projects.find(p => 
             p.brand === activeBrand?._id &&
@@ -731,7 +762,27 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
         if (activeProj) {
             reconnectToProject(activeProj);
         }
-    }, [projects, activeBrand?._id, reconnectToProject]);
+    }, [projects, activeBrand?._id, reconnectToProject, initialProjectId]);
+
+    // Handle initialProjectId reconnect
+    useEffect(() => {
+        if (initialProjectId) {
+            const fetchAndLoad = async () => {
+                try {
+                    const res = await fetch(`${API_BASE}/video-studio/${initialProjectId}`, {
+                        headers: { 'Authorization': `Bearer ${localStorage.getItem('mantram_token')}` }
+                    });
+                    const data = await safeJson(res);
+                    if (data.success && data.project) {
+                        reconnectToProject(data.project);
+                    }
+                } catch (e) {
+                    console.error('[Storyboard] Failed to fetch initialProjectId:', e);
+                }
+            };
+            fetchAndLoad();
+        }
+    }, [initialProjectId, reconnectToProject]);
 
     // ── Manual mode: Regenerate one segment (async — backend responds immediately) ──
     const handleRegenSegment = useCallback(async (segIdx) => {
@@ -782,7 +833,10 @@ export default function Storyboard({ activeBrand, projects = [], onVideoComplete
             if (!data.success) throw new Error(data.error || 'Compile failed');
             setFinalVideoUrl(data.finalVideoUrl);
             setPhase('complete');
-            onVideoComplete?.();
+            onVideoComplete?.({
+                finalVideoUrl: data.finalVideoUrl,
+                imageUrl: plan?.imageUrl || imageUrl
+            });
         } catch (e) {
             setError(e.message);
         } finally {

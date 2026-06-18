@@ -941,6 +941,7 @@ export const superadmin = {
     regenerateGrowthPost: (id, data) => apiFetch(`/superadmin/growth/${id}/regenerate`, { method: 'POST', body: JSON.stringify(data), timeout: 300000 }),
     generateGrowthImage: (id, data) => apiFetch(`/superadmin/growth/${id}/generate-image`, { method: 'POST', body: JSON.stringify(data), timeout: 300000 }),
     getGrowthStats: () => apiFetch('/superadmin/growth/stats'),
+    updateReelVideo: (id, data) => apiFetch(`/superadmin/growth/${id}/reel-video`, { method: 'PUT', body: JSON.stringify(data) }),
 };
 
 // ============ Credits API ============
