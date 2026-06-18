@@ -64,5 +64,18 @@
   - The API privacy level for v2 is `PUBLIC_TO_EVERYONE`, not `PUBLIC` (which was an older value and gets rejected).
   - Verify account permissions and visibility settings dynamically via the creator info query endpoint (`/v2/post/publish/creator_info/query/`) to see supported configurations.
 
+### Brand Kit Studio — Identity System & Safe Credit Routing (Sprint 8)
+- **Feature**: Identity System boards, data URI upload handling, and secure credit deduction routing.
+- **Goal**: Enable users to upload existing logos, generate comprehensive visual identity system boards (logo variations, palette swatches, type specimens) via `gpt-image-2`, and ensure they are never charged credits for failed runs.
+- **Workflow**:
+  - `identityAgent.js` maps `existingLogoUrl` and `collateralBrief` to Claude Art Director to engineer hyper-specific prompts.
+  - Image generation utilizes `laozhangGptImageWithRefs` (with image reference) or `laozhangImageGenerate` (without reference).
+  - In `laozhangClient.js`, `data:` URIs are parsed directly in-memory to base64 buffers rather than fetched, preventing network failures when using base64 uploaded files.
+  - `identityAgent.js` bypasses `mirrorUrlToS3` if the returned URL is already hosted in our S3 bucket.
+  - The `/wizard/generate` route is protected by verifying `identityResult`'s success before deducting credits from the user's account.
+- **Learnings / Gotchas**:
+  - When users upload images as base64 strings in the body, trying to fetch them via Node `fetch` will fail. Pre-parsing data URIs locally in memory avoids network exceptions and prevents fallback to lower-quality models like Gemini-3.1-flash.
+  - Credit deduction must only happen after verifying the core asset (Identity) generation. If the core visual asset fails to generate, the entire package (stationery, guide) becomes unusable, so the user should not be charged.
+
 
 
