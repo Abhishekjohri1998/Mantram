@@ -52,6 +52,15 @@ BRAND ARCHETYPES (Jung-based, pick ONE primary + ONE secondary):
 - Dark Academia: Deep neutrals, intellectual, literary references
 - Brutalist Revival: Structural, raw concrete textures, anti-aesthetic aesthetic
 
+═══ CATEGORY & BRAND STYLING INTELLIGENCE ═══
+Deeply analyze the brand's industry, product categories, target audience, and existing visual DNA:
+- Tech & Smart Electronics: Emphasize tech minimalism, raw geometry, high-fidelity metal/glass textures, matte dark/light finishes, and clean lines.
+- Wellness, Skincare & Cosmetics: Emphasize biophilic design, soft organic curves, warm lighting, natural textures (uncoated paper, stone, frosted amber/clear glass, linen).
+- Premium Fashion & Apparel: Emphasize quiet luxury, editorial grids, high-fashion contrast, minimal raw details, and heavy typography-driven layouts.
+- Food & Beverage: Emphasize cultural maximalism or New Sentimentalism, vivid sensory colors, organic warm lighting, and appetite-stimulating accents.
+- Services & SaaS/Software: Emphasize clean tech minimalism, sharp vector grids, high-contrast digital layouts, and functional hierarchy.
+Synthesize these category styling benchmarks with the brand's archetype, mission, and products.
+
 CRITICAL OUTPUT RULES:
 - Return valid JSON only
 - Be SPECIFIC — not "modern" or "clean", but "Swiss International Typographic Style with humanist san-serif grid"
@@ -76,6 +85,12 @@ Return JSON:
   "archetypeRationale": "Why these archetypes fit this specific brand...",
   "designMovement": "Exact 2026 design movement name",
   "movementRationale": "Why this movement fits...",
+  "brandCategory": "Tech/Electronics | Wellness/Cosmetics | Fashion/Apparel | Food/Beverage | SaaS/Services | Other",
+  "categoryStylingRules": [
+    "Rule 1 regarding textures, finishes, or materials characteristic of this brand category",
+    "Rule 2 regarding colors, lighting, or presentation format characteristic of this brand category",
+    "Rule 3 regarding layout structure or composition rules characteristic of this brand category"
+  ],
   "colorStrategy": {
     "primaryPsychology": "What the primary color communicates to the target audience",
     "paletteApproach": "e.g., 'Analogous with high-contrast accent', 'Monochromatic with warm neutrals'",
@@ -114,12 +129,20 @@ You specialize in writing hyper-specific, cinematic prompts for GPT-Image-2 that
 You are working within this creative strategy:
 DESIGN MOVEMENT: ${artStrategy.designMovement}
 BRAND ARCHETYPE: ${artStrategy.brandArchetype}
+BRAND CATEGORY: ${artStrategy.brandCategory || 'Generic'}
+CATEGORY STYLING RULES: ${(artStrategy.categoryStylingRules || []).join(' | ')}
 COLOR STRATEGY: ${JSON.stringify(artStrategy.colorStrategy)}
 TYPOGRAPHY: ${JSON.stringify(artStrategy.typographyStrategy)}
 MOOD: ${(artStrategy.moodKeywords || []).join(', ')}
 ART DIRECTOR NOTES: ${artStrategy.artDirectorNotes}
 ${existingLogoUrl ? `EXISTING LOGO: The brand has an existing logo that will be used as a reference image. Build all assets around it — do NOT reinvent the logo, extend its visual language.` : 'NO EXISTING LOGO: A new logo will be designed in the primary light system board, which will then serve as the visual reference image for all other assets.'}
 ${collateralBrief ? `COLLATERAL BRIEF: Additional real-world collateral to include in mockups: "${collateralBrief}"` : 'COLLATERAL: Standard brand touchpoints (packaging, bag, business card, cup).'}
+
+═══ BRAND UNDERSTANDING & CATEGORY STYLING ═══
+You must deeply analyze the BRAND CONTEXT (especially the Industry, Products, target audience, and existing Visual DNA).
+1. Identify the brand's product category (e.g. Wellness/Cosmetics, Smart Electronics, Premium Fashion, Food/Beverage) and apply the appropriate visual branding style of that category (e.g. clean glass and organic green highlights for wellness, matte black/white with sharp edges for electronics, editorial high-fashion layout for apparel).
+2. Incorporate actual products from the brand's catalog/description (e.g. if it's a skincare brand, describe amber glass dropper bottles) instead of generic placeholders.
+3. Incorporate and respect the brand's visual DNA preferences (e.g. photography style, layout preference, textures, design rules, or avoid list) if provided in the BRAND CONTEXT.
 
 ═══ CRITICAL: IMAGE-TO-IMAGE / REFERENCE MODE RULES ═══
 All prompts (except the initial 'identity-system-light' when no logo is provided) are executed in GPT-Image-2's image editing / reference mode.
@@ -143,6 +166,12 @@ For 'identity-collateral': Show the brand applied to ${collateralBrief || 'produ
 
 For 'logo-icon-mark': Isolated icon/symbol only — no system board needed.
 For 'brand-stamp': Circular seal only.
+
+═══ STATIONERY RULES (If generating stationery assets) ═══
+For business cards, letterheads, and envelopes, design elegant layouts emphasizing the brand category's material/finish rules (e.g., uncoated texture for wellness, metallic matte for tech). Place contact information clearly, cleanly, and professionally. Ensure high contrast and absolute legibility.
+
+═══ COLLECTION/CAMPAIGN RULES (If generating collection assets) ═══
+For campaign banners and square posts, design high-end, category-aligned product hero or lifestyle visual backgrounds. Ground the image in the brand's top products and highlight key ingredients or features. No actual words/text must appear on the image.
 
 ═══ PROMPT ENGINEERING RULES FOR GPT-IMAGE-2 ═══
 1. Start with LAYOUT TYPE, then ELEMENTS, then COMPOSITION, then LIGHTING, then FINISH
@@ -177,9 +206,14 @@ async function engineerAssetPrompts(artStrategy, brandContext, assetType, assetS
         // Non-critical — proceed without live trends
     }
 
+    const promptsSchemaDescription = assetSpecs.reduce((acc, spec) => {
+        acc[spec] = `Cinematic GPT-Image-2 prompt for the ${spec} asset, incorporating the brand category styling rules and product context.`;
+        return acc;
+    }, {});
+
     return callAgent(
         PROMPT_ENGINEER_SYSTEM(artStrategy, existingLogoUrl, collateralBrief),
-        `Generate precise GPT-Image-2 image prompts for a COMPLETE BRAND IDENTITY SYSTEM.
+        `Generate precise GPT-Image-2 image prompts for the requested assets.
 
 BRAND CONTEXT:
 ${brandContext}
@@ -187,12 +221,13 @@ ${brandContext}
 ASSET TYPE: ${assetType}
 ASSETS TO GENERATE: ${JSON.stringify(assetSpecs)}
 LIVE 2026 TRENDS: ${artStrategy._liveTrends || 'Use established design principles'}
-${existingLogoUrl ? `\nIMPORTANT: The brand has an existing logo (provided as reference image). For identity-system and collateral assets, instruct GPT-Image-2 to build around and incorporate the provided logo image — do not invent a new logo.` : ''}
-${collateralBrief ? `\nCOLLATERAL MATERIALS: "${collateralBrief}" — these MUST appear in the identity-collateral prompt.` : ''}
+${existingLogoUrl ? `\nIMPORTANT: The brand has an existing logo (provided as reference image). For system and collateral assets, instruct GPT-Image-2 to build around and incorporate the provided logo image — do not invent a new logo.` : ''}
+${collateralBrief ? `\nCOLLATERAL MATERIALS/MOCKUPS: "${collateralBrief}" — these MUST appear in the mockup assets.` : ''}
 
 For each asset, write a hyper-specific image generation prompt.
-Ensure 'identity-system-light' and 'identity-system-dark' prompts describe a FULL BRAND IDENTITY BOARD with logo, variations, palette, and typography — all in one composed layout.
-Return JSON: { "prompts": { "assetSubType": "full image prompt here", ... } }`,
+You MUST return a JSON object with a single "prompts" key containing the prompts. The keys in the "prompts" object MUST EXACTLY match the requested assets in ASSETS TO GENERATE: ${JSON.stringify(assetSpecs)}. Do not output any other keys.
+
+Return JSON format: { "prompts": ${JSON.stringify(promptsSchemaDescription)} }`,
         0.9, 3000,
         { provider: 'anthropic', model: CLAUDE_MODEL, timeoutMs: 90_000 }
     );
@@ -214,14 +249,23 @@ export async function runArtDirector({
 }) {
     let brandContext = '';
     let brand = null;
+    let products = [];
 
     if (brandId) {
         const ctx = await loadBrandContext(brandId);
         brandContext = ctx.brandContext || '';
         brand = ctx.brand;
+        products = ctx.products || [];
     }
 
     const activeLogoUrl = existingLogoUrl || brand?.dna?.logo?.url || null;
+
+    let activeCollateralBrief = collateralBrief;
+    if (!activeCollateralBrief && products && products.length > 0) {
+        const productNames = products.slice(0, 2).map(p => p.title).join(' and ');
+        activeCollateralBrief = `premium packaging box for ${productNames}, custom retail shopping bag, and branded products display`;
+        console.log(`🎨 ArtDirector: Synthesizing collateral brief from product catalog: "${activeCollateralBrief}"`);
+    }
 
     if (briefBrand) {
         // Zero-brand wizard mode — build context from the wizard brief
@@ -235,7 +279,7 @@ Founder Vision: ${briefBrand.vision || ''}
 Price Point: ${briefBrand.pricePoint || 'Mid-premium'}
 Country: ${briefBrand.country || 'India'}
 ${activeLogoUrl ? 'Logo Status: Brand has an existing logo — identity system must incorporate and build around it.' : 'Logo Status: No existing logo — AI will design a new logo as part of the identity system.'}
-${collateralBrief ? `Collateral Brief: ${collateralBrief}` : ''}
+${activeCollateralBrief ? `Collateral Brief: ${activeCollateralBrief}` : ''}
 </brand_bible>`;
     }
 
@@ -243,8 +287,8 @@ ${collateralBrief ? `Collateral Brief: ${collateralBrief}` : ''}
     if (activeLogoUrl && brandContext) {
         brandContext += `\n\n<logo_context>\nExisting Logo URL: ${activeLogoUrl}\nInstruction: Build the identity system around the existing logo. Do not redesign it. Extend its visual language.\n</logo_context>`;
     }
-    if (collateralBrief && brandContext) {
-        brandContext += `\n\n<collateral_brief>\n${collateralBrief}\n</collateral_brief>`;
+    if (activeCollateralBrief && brandContext) {
+        brandContext += `\n\n<collateral_brief>\n${activeCollateralBrief}\n</collateral_brief>`;
     }
 
     console.log(`🎨 ArtDirector: Analyzing brand archetype for ${assetType}...`);
@@ -261,19 +305,24 @@ ${collateralBrief ? `Collateral Brief: ${collateralBrief}` : ''}
                 moodKeywords: ['clean', 'modern', 'premium'],
                 artDirectorNotes: 'Contemporary brand identity with clean lines and premium feel.',
                 trend2026: 'Quiet Luxury',
+                brandCategory: 'Tech/Electronics',
+                categoryStylingRules: [
+                    'Emphasize tech minimalism, raw geometry, high-fidelity metal/glass textures.',
+                    'Use clean layouts with sharp contrast and structural grids.'
+                ]
             },
             prompts: {},
             brandContext,
         };
     }
 
-    console.log(`🎨 ArtDirector: Archetype=${artStrategy.brandArchetype} | Movement=${artStrategy.designMovement}`);
+    console.log(`🎨 ArtDirector: Archetype=${artStrategy.brandArchetype} | Movement=${artStrategy.designMovement} | Category=${artStrategy.brandCategory}`);
 
     // Engineer asset-specific prompts
     let prompts = {};
     if (assetSpecs && assetSpecs.length > 0) {
         console.log(`🎨 ArtDirector: Engineering ${assetSpecs.length} identity system asset prompts...`);
-        const promptData = await engineerAssetPrompts(artStrategy, brandContext, assetType, assetSpecs, activeLogoUrl, collateralBrief);
+        const promptData = await engineerAssetPrompts(artStrategy, brandContext, assetType, assetSpecs, activeLogoUrl, activeCollateralBrief);
         if (promptData) {
             if (promptData.prompts) {
                 prompts = promptData.prompts;
@@ -292,5 +341,8 @@ ${collateralBrief ? `Collateral Brief: ${collateralBrief}` : ''}
         prompts,
         brandContext,
         brand,
+        products,
+        activeLogoUrl,
+        activeCollateralBrief,
     };
 }

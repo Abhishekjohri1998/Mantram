@@ -67,6 +67,13 @@ const FALLBACK_PROMPTS = {
     'brand-stamp': 'Circular brand stamp seal. Outer ring with brand name text. Central icon mark. Professional embossed look. Single brand color on white. Premium wax seal aesthetic. Fine detail, letterpress print quality.',
 };
 
+const getFallbackPrompt = (subType, collateralBrief, brandName) => {
+    if (subType === 'identity-collateral' && collateralBrief) {
+        return `Brand identity for ${brandName || 'Brand'} applied to custom real-world objects: ${collateralBrief}. Photorealistic product mockups, flat-lay photography style, clean background, soft studio lighting, professional agency brand deck quality, brand color accents throughout.`;
+    }
+    return FALLBACK_PROMPTS[subType];
+};
+
 // ── Generate a single identity image ─────────────────────────────────────────
 async function generateIdentityImage({ prompt, size, subType, colors, existingLogoUrl }) {
     const colorCue = colors?.length > 0
@@ -121,7 +128,7 @@ export async function generateBrandIdentity({
     if (collateralBrief) console.log(`🎨 [Identity] Collateral brief: ${collateralBrief}`);
 
     // Stage 1: Art Director — brand archetype + prompt engineering
-    const { artStrategy, prompts, brandContext, brand } = await runArtDirector({
+    const { artStrategy, prompts, brandContext, brand, activeCollateralBrief } = await runArtDirector({
         brandId,
         brief,
         scope,
@@ -136,6 +143,8 @@ export async function generateBrandIdentity({
     const brandName = brand?.name || briefBrand?.name || 'Brand';
     const activeLogoUrl = existingLogoUrl || brand?.dna?.logo?.url || null;
 
+    if (activeCollateralBrief) console.log(`🎨 [Identity] Active collateral brief: ${activeCollateralBrief}`);
+
     console.log(`🎨 [Identity] Generating ${IDENTITY_ASSETS.length} identity system assets with GPT-Image-2...`);
 
     let assets = [];
@@ -146,7 +155,7 @@ export async function generateBrandIdentity({
         console.log(`🎨 [Identity] Generating all 5 identity assets in parallel using logo reference: ${activeLogoUrl}`);
         const results = await Promise.allSettled(
             IDENTITY_ASSETS.map(async (asset) => {
-                const prompt = prompts?.[asset.subType] || FALLBACK_PROMPTS[asset.subType]
+                const prompt = prompts?.[asset.subType] || getFallbackPrompt(asset.subType, activeCollateralBrief, brandName)
                     || `Professional ${asset.desc} for ${brandName} brand. Premium brand identity quality.`;
 
                 const imageUrl = await generateIdentityImage({
@@ -189,7 +198,7 @@ export async function generateBrandIdentity({
         
         // Step 1: Generate light system board first (text-only)
         const lightAssetDef = IDENTITY_ASSETS.find(a => a.subType === 'identity-system-light');
-        const lightPrompt = prompts?.[lightAssetDef.subType] || FALLBACK_PROMPTS[lightAssetDef.subType]
+        const lightPrompt = prompts?.[lightAssetDef.subType] || getFallbackPrompt(lightAssetDef.subType, activeCollateralBrief, brandName)
             || `Professional ${lightAssetDef.desc} for ${brandName} brand. Premium brand identity quality.`;
         
         const lightImageUrl = await generateIdentityImage({
@@ -230,7 +239,7 @@ export async function generateBrandIdentity({
             const remainingDefs = IDENTITY_ASSETS.filter(a => a.subType !== 'identity-system-light');
             const remainingResults = await Promise.allSettled(
                 remainingDefs.map(async (asset) => {
-                    const prompt = prompts?.[asset.subType] || FALLBACK_PROMPTS[asset.subType]
+                    const prompt = prompts?.[asset.subType] || getFallbackPrompt(asset.subType, activeCollateralBrief, brandName)
                         || `Professional ${asset.desc} for ${brandName} brand. Premium brand identity quality.`;
 
                     // Pass finalLightUrl as the existingLogoUrl reference!
@@ -276,7 +285,7 @@ export async function generateBrandIdentity({
             console.warn(`⚠️ [Identity] Primary light board failed. Falling back to parallel text-only generation for all assets.`);
             const results = await Promise.allSettled(
                 IDENTITY_ASSETS.map(async (asset) => {
-                    const prompt = prompts?.[asset.subType] || FALLBACK_PROMPTS[asset.subType]
+                    const prompt = prompts?.[asset.subType] || getFallbackPrompt(asset.subType, activeCollateralBrief, brandName)
                         || `Professional ${asset.desc} for ${brandName} brand. Premium brand identity quality.`;
 
                     const imageUrl = await generateIdentityImage({

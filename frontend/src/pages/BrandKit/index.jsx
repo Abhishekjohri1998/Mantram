@@ -15,7 +15,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { brandKitApi } from '../../services/brandKitApi'
+import { brandKitApi, API_BASE } from '../../services/brandKitApi'
 import AssetCard from './AssetCard'
 
 // ── Sub-tab definitions ───────────────────────────────────────────────────────
@@ -258,16 +258,29 @@ export default function BrandKitStudio({ brand, onBrandUpdated }) {
             let result
             const basePayload = { brandId: brand._id, brief: brief || undefined }
 
+            // Resolve the best available logo URL — user upload takes priority, then saved brand DNA logo
+            // This is passed to stationery, guide, and collection so they use the brand identity as visual reference
+            const resolvedLogoUrl = (hasExistingLogo && existingLogoUrl)
+                ? existingLogoUrl
+                : (brand?.dna?.logo?.url || undefined)
+
             if (activeTab === 'identity') {
                 result = await brandKitApi.generateIdentity({
                     ...basePayload,
-                    existingLogoUrl: hasExistingLogo && existingLogoUrl ? existingLogoUrl : undefined,
+                    existingLogoUrl: (hasExistingLogo && existingLogoUrl) ? existingLogoUrl : undefined,
                     collateralBrief: collateralBrief || undefined,
                 })
             } else if (activeTab === 'stationery') {
-                result = await brandKitApi.generateStationery({ ...basePayload, contactDetails })
+                result = await brandKitApi.generateStationery({
+                    ...basePayload,
+                    contactDetails,
+                    existingLogoUrl: resolvedLogoUrl,
+                })
             } else if (activeTab === 'guide') {
-                result = await brandKitApi.generateGuide(basePayload)
+                result = await brandKitApi.generateGuide({
+                    ...basePayload,
+                    existingLogoUrl: resolvedLogoUrl,
+                })
             } else if (activeTab === 'collection') {
                 result = await brandKitApi.generateCollection({
                     ...basePayload,
@@ -275,6 +288,7 @@ export default function BrandKitStudio({ brand, onBrandUpdated }) {
                     collectionType,
                     scopeLabel: scopeLabel || 'New Collection',
                     scope: 'campaign',
+                    existingLogoUrl: resolvedLogoUrl,
                 })
             }
 
@@ -582,7 +596,10 @@ export default function BrandKitStudio({ brand, onBrandUpdated }) {
 
                                     {/* Guide hosted link card */}
                                     {activeTab === 'guide' && savedAsset.assets?.[0]?.hostedUrl && (
-                                        <a href={savedAsset.assets[0].hostedUrl} target="_blank" rel="noopener noreferrer"
+                                        <a href={savedAsset.assets[0].hostedUrl.startsWith('/') 
+                                            ? (API_BASE.endsWith('/api') ? API_BASE.substring(0, API_BASE.length - 4) : API_BASE) + savedAsset.assets[0].hostedUrl
+                                            : savedAsset.assets[0].hostedUrl} 
+                                            target="_blank" rel="noopener noreferrer"
                                             className="flex items-center gap-3 p-4 rounded-2xl border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-all group">
                                             <span className="material-symbols-outlined text-primary text-2xl">open_in_new</span>
                                             <div>

@@ -80,5 +80,18 @@
   - Pre-parsing data URIs locally in memory avoids network exceptions and prevents fallback to lower-quality models.
   - If a brand already has a pre-existing logo in the database DNA, the agent must resolve it as the default `activeLogoUrl` (even if not passed in the request body) to prevent generating a new logo from scratch.
 
-
-
+### Brand Kit Studio — Identity Context Propagation to All Studios (Sprint 8 follow-up)
+- **Problem**: Stationery, Brand Guide, and Collection were generating assets completely disconnected from the brand's generated identity. They used plain text-to-image with no logo reference, causing every section to look like a different brand.
+- **Root Cause (4 bugs)**:
+  1. `runArtDirector()` resolved `activeLogoUrl` from DB/request internally but **never returned it** to callers — so stationery/collection had no access to it.
+  2. `stationeryAgent.js` always called `laozhangImageGenerate()` (text-only) — never the reference-image mode.
+  3. `collectionAgent.js` same problem — `laozhangImageGenerate()` only.
+  4. Wizard ran identity + stationery + guide in `Promise.allSettled()` **simultaneously** — stationery started generating before the logo even existed.
+- **Fix Architecture**:
+  - `artDirectorAgent.js` — Added `activeLogoUrl` to the return object so every caller can use it.
+  - `stationeryAgent.js` — Now uses `laozhangGptImageWithRefs(prompt, [activeLogoUrl])` when a logo exists; graceful text-only fallback when not.
+  - `collectionAgent.js` — Same pattern: reference-image mode when logo available.
+  - `brandGuideAgent.js` — Accepts `existingLogoUrl`, passes it to Art Director, and renders the actual brand identity image in the HTML Logo Usage section (not a blank placeholder).
+  - `brand-kit.js` (Wizard) — **Sequential pipeline**: identity runs first → `logo-icon-mark` URL extracted → stationery + guide run in parallel, both receiving the logo URL as `existingLogoUrl`.
+- **Key Pattern**: Every agent now follows: `existingLogoUrl (caller override)` → `resolvedLogoUrl (from artDirector/DB)` → `null (text-only fallback)`. This ensures the brand identity is always the visual source-of-truth.
+- **Verification**: 14/14 automated checks passed, server restarted cleanly.

@@ -4,6 +4,7 @@
  */
 
 import { useState } from 'react'
+import { API_BASE } from '../../services/brandKitApi'
 
 export default function AssetCard({ asset, onDelete, onRegenerate, compact = false }) {
     const [deleting, setDeleting] = useState(false)
@@ -27,7 +28,9 @@ export default function AssetCard({ asset, onDelete, onRegenerate, compact = fal
             a.target = '_blank'
             a.click()
         } else if (asset.hostedUrl) {
-            window.open(asset.hostedUrl, '_blank')
+            const apiDomain = API_BASE.endsWith('/api') ? API_BASE.substring(0, API_BASE.length - 4) : API_BASE;
+            const finalUrl = asset.hostedUrl.startsWith('/') ? `${apiDomain}${asset.hostedUrl}` : asset.hostedUrl;
+            window.open(finalUrl, '_blank')
         } else if (asset.htmlContent) {
             const blob = new Blob([asset.htmlContent], { type: 'text/html' })
             const url = URL.createObjectURL(blob)

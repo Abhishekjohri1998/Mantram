@@ -8,7 +8,7 @@
  * - 2026 print design trends
  */
 
-import { laozhangImageGenerate } from '../videoStudio/laozhangClient.js';
+import { laozhangImageGenerate, laozhangGptImageWithRefs } from '../videoStudio/laozhangClient.js';
 import { callAgentText } from '../shared/agentUtils.js';
 import { runArtDirector } from './artDirectorAgent.js';
 import { mirrorUrlToS3 } from '../../utils/s3.js';
@@ -49,7 +49,7 @@ Design rules:
 
 Return ONLY the complete HTML <table> code for the signature, nothing else.`;
 
-async function generateStationeryImage(prompt, size, subType, brandName, colors, artStrategy) {
+async function generateStationeryImage(prompt, size, subType, brandName, colors, artStrategy, activeLogoUrl = null) {
     const primaryColor = colors?.[0]?.hex || '#2B4BEE';
     const accentColor = colors?.[1]?.hex || colors?.[0]?.hex || '#FF4D00';
 
@@ -58,6 +58,17 @@ async function generateStationeryImage(prompt, size, subType, brandName, colors,
     const fullPrompt = prompt + styleEnhancer;
 
     try {
+        // If a brand logo/identity board exists, use it as a visual reference to stay on-brand
+        if (activeLogoUrl) {
+            console.log(`🎨 [Stationery] Using brand identity reference for ${subType}...`);
+            const result = await laozhangGptImageWithRefs(fullPrompt, [activeLogoUrl], {
+                model: GPT_IMAGE_MODEL,
+                size,
+            });
+            return result?.imageUrl || null;
+        }
+
+        // No reference image — generate from brand colors + strategy alone
         const result = await laozhangImageGenerate(fullPrompt, {
             model: GPT_IMAGE_MODEL,
             size,
@@ -69,19 +80,28 @@ async function generateStationeryImage(prompt, size, subType, brandName, colors,
     }
 }
 
-export async function generateStationeryKit({ brandId, brief, briefBrand, contactDetails = {}, imageModel }) {
+export async function generateStationeryKit({ brandId, brief, briefBrand, contactDetails = {}, imageModel, existingLogoUrl = null }) {
     const slug = uuidv4().substring(0, 8);
 
     console.log(`🎨 [Stationery] Running Art Director analysis...`);
 
-    const { artStrategy, prompts, brandContext, brand } = await runArtDirector({
+    const { artStrategy, prompts, brandContext, brand, activeLogoUrl: resolvedLogoUrl } = await runArtDirector({
         brandId,
         brief: brief || 'Professional stationery kit',
         scope: 'brand',
         assetType: 'stationery',
         assetSpecs: STATIONERY_ASSETS.map(a => a.subType),
         briefBrand,
+        existingLogoUrl,
     });
+
+    // Use the caller-provided logo, or the one resolved by Art Director from the Brand DB
+    const activeLogoUrl = existingLogoUrl || resolvedLogoUrl || null;
+    if (activeLogoUrl) {
+        console.log(`🎨 [Stationery] Brand identity reference found — will use for visual grounding: ${activeLogoUrl}`);
+    } else {
+        console.log(`🎨 [Stationery] No brand identity reference — generating from color/strategy context only.`);
+    }
 
     const colors = brand?.dna?.colors || briefBrand?.colors || [];
     const brandName = brand?.name || briefBrand?.name || contactDetails?.company || 'Brand';
@@ -91,10 +111,27 @@ export async function generateStationeryKit({ brandId, brief, briefBrand, contac
     // Generate stationery images in parallel
     const imageResults = await Promise.allSettled(
         STATIONERY_ASSETS.map(async (asset) => {
-            const fallbackPrompt = `Professional ${asset.name} for ${brandName} brand, ${asset.desc}, premium print design, clean layout with logo placement area, brand color blocking, ${artStrategy?.designMovement || 'modern'} aesthetic`;
-            const prompt = prompts?.[asset.subType] || fallbackPrompt;
+            let contactDetailsCue = '';
+            if (asset.subType.startsWith('business-card') || asset.subType === 'envelope' || asset.subType === 'letterhead') {
+                const parts = [];
+                if (contactDetails?.name) parts.push(`Name: ${contactDetails.name}`);
+                if (contactDetails?.title) parts.push(`Title: ${contactDetails.title}`);
+                if (contactDetails?.email) parts.push(`Email: ${contactDetails.email}`);
+                if (contactDetails?.phone) parts.push(`Phone: ${contactDetails.phone}`);
+                if (contactDetails?.website || brand?.website) parts.push(`Website: ${brand?.website || contactDetails.website}`);
+                if (parts.length > 0) {
+                    contactDetailsCue = ` The design layout must explicitly incorporate and display the following contact details clearly and legibly: ${parts.join(', ')}.`;
+                }
+            }
 
-            const imageUrl = await generateStationeryImage(prompt, asset.size, asset.subType, brandName, colors, artStrategy);
+            const logoRef = activeLogoUrl ? ` Reference the provided brand identity system image to extract the logo, color palette, and visual language — apply them faithfully to this ${asset.name} design.` : '';
+            const categoryCue = artStrategy?.brandCategory
+                ? ` Emphasize category styling for ${artStrategy.brandCategory}. Rules: ${(artStrategy.categoryStylingRules || []).join(', ')}.`
+                : '';
+            const fallbackPrompt = `Professional ${asset.name} for ${brandName} brand, ${asset.desc}, premium print design, clean layout with logo placement area, brand color blocking, ${artStrategy?.designMovement || 'modern'} aesthetic.${categoryCue}${logoRef}`;
+            const prompt = (prompts?.[asset.subType] || fallbackPrompt) + logoRef + contactDetailsCue;
+
+            const imageUrl = await generateStationeryImage(prompt, asset.size, asset.subType, brandName, colors, artStrategy, activeLogoUrl);
             let finalUrl = imageUrl;
             if (imageUrl) {
                 try {
