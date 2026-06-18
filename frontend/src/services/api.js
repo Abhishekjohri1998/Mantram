@@ -79,7 +79,11 @@ export async function apiFetch(endpoint, options = {}) {
 
     const headers = {
         'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        // Strip ALL whitespace/control chars from JWT before setting header.
+        // Safari/WebKit throws DOMException "The string did not match the expected pattern"
+        // if the Authorization header value contains newlines, tabs, or carriage returns —
+        // which can happen when tokens are stored in localStorage with trailing whitespace.
+        ...(token ? { Authorization: `Bearer ${token.replace(/[\s\r\n\t]+/g, '')}` } : {}),
         ...options.headers,
     };
 
