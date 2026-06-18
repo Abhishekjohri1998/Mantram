@@ -215,16 +215,51 @@ export async function generateStoryboardPoster(
         }
     }
 
-    const result = await generateWithGptImage2(
-        finalPrompt, ar,
-        rawProductBuffers, null, productImageUrls, null,
-        TIMEOUT_MS, logoUrl, rawLogoBuffer,
-        allRawAvatarBuffers, allAvatarUrls, avatarNames,
-        rawRefBuffers, refImageUrls,
-    );
-    if (!result) {
-        throw new Error(`GPT Image 2 generation failed.`);
+    let result = null;
+    let gptImage2Err = null;
+    try {
+        result = await generateWithGptImage2(
+            finalPrompt, ar,
+            rawProductBuffers, null, productImageUrls, null,
+            TIMEOUT_MS, logoUrl, rawLogoBuffer,
+            allRawAvatarBuffers, allAvatarUrls, avatarNames,
+            rawRefBuffers, refImageUrls,
+        );
+    } catch (err) {
+        gptImage2Err = err;
     }
+
+    if (!result) {
+        console.warn(`[SB Poster] ⚠️ GPT Image 2 generation failed ${gptImage2Err ? `(${gptImage2Err.message})` : ''}. Trying fallback to NanoBanana (Gemini Vertex)...`);
+        
+        // Ensure credentials/key check before fallback
+        const credsVar = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+        let credsExist = false;
+        try {
+            if (credsVar && fs.existsSync(credsVar)) {
+                credsExist = true;
+            }
+        } catch (e) {}
+        const devKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
+
+        if (credsExist || devKey) {
+            try {
+                result = await generateWithNanoBanana(
+                    finalPrompt, ar,
+                    rawProductBuffers, null, productImageUrls, null,
+                    TIMEOUT_MS, imageSize, logoUrl, rawLogoBuffer,
+                    allRawAvatarBuffers, allAvatarUrls, avatarNames,
+                    rawRefBuffers, refImageUrls,
+                );
+            } catch (bananaErr) {
+                console.error(`[SB Poster] ❌ Fallback to NanoBanana failed: ${bananaErr.message}`);
+                throw new Error(`GPT Image 2 failed ${gptImage2Err ? `(${gptImage2Err.message})` : ''}, and fallback to NanoBanana also failed: ${bananaErr.message}`);
+            }
+        } else {
+            throw new Error(`GPT Image 2 failed ${gptImage2Err ? `(${gptImage2Err.message})` : ''}, and no fallback credentials (GEMINI_API_KEY or GOOGLE_APPLICATION_CREDENTIALS) are configured.`);
+        }
+    }
+
     return result;
 }
 
