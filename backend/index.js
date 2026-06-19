@@ -126,7 +126,10 @@ const globalApiLimiter = rateLimit({
     max: 100,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: (req) => req.path === '/api/health' || req.path === '/health',
+    skip: (req) => {
+        const host = req.headers.host || '';
+        return host.includes('localhost') || host.includes('127.0.0.1') || req.path === '/api/health' || req.path === '/health';
+    },
     message: { success: false, error: 'Too many requests. Please slow down and try again in a minute.' },
 });
 app.use('/api/', globalApiLimiter);

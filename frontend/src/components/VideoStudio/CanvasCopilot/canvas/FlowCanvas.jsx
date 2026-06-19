@@ -91,6 +91,28 @@ const NODE_TYPES = {
 };
 
 
+// Positioning helper to prevent node stacking
+function findNonOverlappingPosition(pos, existingNodes) {
+    let currentX = pos.x;
+    let currentY = pos.y;
+    let foundCollision = true;
+
+    while (foundCollision) {
+        foundCollision = false;
+        for (const n of existingNodes) {
+            const dx = Math.abs(n.position.x - currentX);
+            const dy = Math.abs(n.position.y - currentY);
+            // Check for collision based on typical node dimensions (320px width, 240px height)
+            if (dx < 320 && dy < 240) {
+                currentX += 340; // Shift right to place side-by-side
+                foundCollision = true;
+                break;
+            }
+        }
+    }
+    return { x: currentX, y: currentY };
+}
+
 /** Convert our graph schema to React Flow nodes/edges */
 function graphToFlow(graph) {
     if (!graph) return { nodes: [], edges: [] };
@@ -130,6 +152,7 @@ function graphToFlow(graph) {
 export default function FlowCanvas({ onNodeSelect, onCanvasClick }) {
     const store = useGraphStore();
     const { emit, undo, redo } = useCommandBus();
+    const { screenToFlowPosition } = useReactFlow();
 
     const [rfNodes, setRfNodes, onNodesChange] = useNodesState([]);
     const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState([]);
@@ -349,9 +372,15 @@ export default function FlowCanvas({ onNodeSelect, onCanvasClick }) {
                     position={nodeMenuPos}
                     onSelect={(type) => {
                         setNodeMenuPos(null);
+                        const flowPos = screenToFlowPosition({
+                            x: nodeMenuPos.clientX,
+                            y: nodeMenuPos.clientY
+                        });
+                        const targetPos = { x: flowPos.x - 80, y: flowPos.y - 20 };
+                        const nonOverlappingPos = findNonOverlappingPosition(targetPos, rfNodes);
                         emit({
                             type: 'add_node',
-                            payload: { type, position: { x: nodeMenuPos.x - 80, y: nodeMenuPos.y - 20 } },
+                            payload: { type, position: nonOverlappingPos },
                             author: 'user',
                         });
                     }}

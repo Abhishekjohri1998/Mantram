@@ -119,7 +119,7 @@ export default function PromptFieldWithMentions({
         <div className="prompt-field-with-mentions-wrapper" style={{ position: 'relative' }}>
             <textarea
                 ref={textareaRef}
-                className="node-inline-textarea"
+                className="node-inline-textarea nodrag"
                 placeholder={disabled ? 'Connected prompt...' : placeholder}
                 value={text}
                 onChange={handleInputChange}

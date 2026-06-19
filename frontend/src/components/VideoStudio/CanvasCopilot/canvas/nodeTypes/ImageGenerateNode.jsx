@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Settings, Play, Image as ImageIcon, ChevronRight } from 'lucide-react';
 import BaseNode from './BaseNode';
 import PromptFieldWithMentions from './PromptFieldWithMentions';
@@ -15,11 +15,21 @@ export default function ImageGenerateNode({ data, selected }) {
     const [showEnhancer, setShowEnhancer] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
     const [running, setRunning] = useState(false);
+    const debounceTimerRef = useRef(null);
 
     // Sync prompt text parameter
     useEffect(() => {
         setPromptText(data?.params?.prompt || '');
     }, [data?.params?.prompt]);
+
+    // Clean up timer on unmount
+    useEffect(() => {
+        return () => {
+            if (debounceTimerRef.current) {
+                clearTimeout(debounceTimerRef.current);
+            }
+        };
+    }, []);
 
     // Check if prompt port is connected upstream
     const isPromptConnected = store.graph?.edges?.some(
@@ -36,13 +46,31 @@ export default function ImageGenerateNode({ data, selected }) {
 
     const displayPrompt = isPromptConnected ? getUpstreamPrompt() : promptText;
 
+    const triggerSave = useCallback((val) => {
+        if (val !== (data?.params?.prompt || '')) {
+            emit({
+                type: 'update_params',
+                payload: { nodeId: data.id, params: { ...data.params, prompt: val } },
+                author: 'user',
+            });
+        }
+    }, [data.id, data?.params, emit]);
+
     const handlePromptChange = (val) => {
         setPromptText(val);
-        emit({
-            type: 'update_params',
-            payload: { nodeId: data.id, params: { ...data.params, prompt: val } },
-            author: 'user',
-        });
+        if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+        }
+        debounceTimerRef.current = setTimeout(() => {
+            triggerSave(val);
+        }, 500);
+    };
+
+    const handleBlur = () => {
+        if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+        }
+        triggerSave(promptText);
     };
 
     // Control bar parameters updates
@@ -94,7 +122,7 @@ export default function ImageGenerateNode({ data, selected }) {
             ]}
             outputPorts={[{ id: 'image', type: 'image', label: 'Image' }]}
         >
-            <div className="generator-node-body nodrag nowheel">
+            <div className="generator-node-body nowheel">
 
                 {/* Output Preview Area */}
                 <div className="node-media-preview-container">
@@ -117,6 +145,7 @@ export default function ImageGenerateNode({ data, selected }) {
                         nodeId={data.id}
                         value={displayPrompt}
                         onChange={handlePromptChange}
+                        onBlur={handleBlur}
                         disabled={isPromptConnected}
                         placeholder="Describe the image you want to generate..."
                         onEnhanceTrigger={() => setShowEnhancer(true)}

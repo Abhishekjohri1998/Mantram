@@ -124,7 +124,7 @@ function InlineField({ paramKey, fieldSchema, initialValue, onChange }) {
             <div className="node-inline-field">
                 <span className="node-inline-label">{fieldSchema.label || paramKey}</span>
                 <select
-                    className="node-inline-input"
+                    className="node-inline-input nodrag"
                     value={localVal || ''}
                     onChange={e => {
                         setLocalVal(e.target.value);
@@ -146,7 +146,7 @@ function InlineField({ paramKey, fieldSchema, initialValue, onChange }) {
             <div className="node-inline-field node-inline-field--vertical">
                 <span className="node-inline-label">{fieldSchema.label || paramKey}</span>
                 <textarea
-                    className="node-inline-input node-inline-input--full"
+                    className="node-inline-input node-inline-input--full nodrag"
                     placeholder={`Enter ${fieldSchema.label || paramKey}...`}
                     value={displayVal}
                     onChange={e => handleLocalChange(e.target.value)}
@@ -162,7 +162,7 @@ function InlineField({ paramKey, fieldSchema, initialValue, onChange }) {
         <div className="node-inline-field">
             <span className="node-inline-label">{fieldSchema.label || paramKey}</span>
             <input
-                className="node-inline-input"
+                className="node-inline-input nodrag"
                 type={fieldSchema.type === 'number' ? 'number' : 'text'}
                 value={localVal ?? ''}
                 onChange={e => handleLocalChange(e.target.value)}
@@ -382,18 +382,43 @@ export default function BaseNode({
                     urls = [data.outputRef];
                 }
 
-                if (urls.length === 0) return null;
+                // Filter to only include valid media urls (prevents broken image box for text prompts / numbers)
+                const mediaUrls = urls.filter(url => {
+                    if (typeof url !== 'string') return false;
+                    const isVideo = url.match(/\.(mp4|webm|mov|m4v)$/i);
+                    const isAudio = url.match(/\.(mp3|wav|ogg|m4a|aac)$/i);
+                    const isImage = url.match(/\.(png|jpg|jpeg|webp|gif|svg)$/i) || url.startsWith('data:image/');
+                    return isVideo || isAudio || isImage;
+                });
+
+                if (mediaUrls.length === 0) return null;
 
                 return (
                     <div className="canvas-node__preview-gallery" style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '8px', background: 'rgba(0,0,0,0.2)' }}>
-                        {urls.map((url, idx) => (
-                            <div key={idx} className="canvas-node__preview-item" style={{ width: '100px', flexShrink: 0 }}>
-                                {url.match(/\.(mp4|webm|mov)$/i)
-                                    ? <video src={url} className="canvas-node__media" muted loop autoPlay playsInline style={{ width: '100%', borderRadius: '4px', objectFit: 'cover' }} />
-                                    : <img   src={url} className="canvas-node__media" alt="output" style={{ width: '100%', borderRadius: '4px', objectFit: 'cover' }} />
-                                }
-                            </div>
-                        ))}
+                        {mediaUrls.map((url, idx) => {
+                            const isVideo = url.match(/\.(mp4|webm|mov|m4v)$/i);
+                            const isAudio = url.match(/\.(mp3|wav|ogg|m4a|aac)$/i);
+                            
+                            if (isVideo) {
+                                return (
+                                    <div key={idx} className="canvas-node__preview-item" style={{ width: '100px', flexShrink: 0 }}>
+                                        <video src={url} className="canvas-node__media" muted loop autoPlay playsInline style={{ width: '100%', borderRadius: '4px', objectFit: 'cover' }} />
+                                    </div>
+                                );
+                            } else if (isAudio) {
+                                return (
+                                    <div key={idx} className="canvas-node__preview-item" style={{ width: '180px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                                        <audio src={url} controls style={{ width: '100%', height: '30px' }} />
+                                    </div>
+                                );
+                            } else {
+                                return (
+                                    <div key={idx} className="canvas-node__preview-item" style={{ width: '100px', flexShrink: 0 }}>
+                                        <img src={url} className="canvas-node__media" alt="output" style={{ width: '100%', borderRadius: '4px', objectFit: 'cover' }} />
+                                    </div>
+                                );
+                            }
+                        })}
                     </div>
                 );
             })()}

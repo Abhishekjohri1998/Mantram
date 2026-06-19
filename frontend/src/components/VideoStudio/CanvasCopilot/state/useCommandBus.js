@@ -46,7 +46,11 @@ export function useCommandBus() {
                 return { ok: false, error: result.message, code: result.code, suggestion: result.suggestion };
             }
 
-            // Server accepted — the SSE diff will arrive and patch the store
+            // Server accepted — update store with authoritative server response graph immediately
+            // to resolve temporary IDs to persistent IDs without waiting for SSE latency.
+            if (result.graph) {
+                store.setGraph(result.graph);
+            }
             return { ok: true, version: result.version };
         } catch (err) {
             store.rollbackGraph(snapshot);
