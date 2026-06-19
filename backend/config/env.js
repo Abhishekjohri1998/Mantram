@@ -106,6 +106,7 @@ export default {
         appId: process.env.FACEBOOK_APP_ID,
         appSecret: process.env.FACEBOOK_APP_SECRET,
         redirectUri: process.env.FACEBOOK_REDIRECT_URI,
+        authCallbackUrl: process.env.FACEBOOK_AUTH_CALLBACK_URL,
     },
 
     // Instagram Specific App

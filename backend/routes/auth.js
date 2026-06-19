@@ -921,7 +921,8 @@ router.get('/google/callback', async (req, res) => {
 /**
  * Helper: Close popup and pass token/user to opener
  */
-function closeAuthPopupScript(error, token = '', user = null, needsApproval = false) {
+function closeAuthPopupScript(error, token = '', user = null, needsApproval = false, provider = 'GOOGLE') {
+    const messageType = `${provider}_AUTH_SUCCESS`;
     return `<!DOCTYPE html>
 <html><head><title>Authenticating...</title></head>
 <body style="background:#0a0c16;color:#fff;font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
@@ -934,7 +935,7 @@ ${error
 <script>
     if (window.opener) {
         window.opener.postMessage({
-            type: 'GOOGLE_AUTH_SUCCESS',
+            type: '${messageType}',
             ${error ? `error: ${JSON.stringify(error)}, needsApproval: ${needsApproval}` : `token: '${token}', user: ${JSON.stringify(user)}`}
         }, '${Array.isArray(config.frontendUrl) ? config.frontendUrl[0] : config.frontendUrl}');
     }
@@ -942,6 +943,228 @@ ${error
 </script>
 </body></html>`;
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FACEBOOK OAUTH (Login/Signup)
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/auth/facebook
+ * Initiates Facebook OAuth flow
+ */
+router.get('/facebook', (req, res) => {
+    const appId = config.facebook.appId;
+    const redirectUri = config.facebook.authCallbackUrl || `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/auth/facebook/callback`;
+
+    if (!appId) {
+        return res.status(500).json({ success: false, error: 'Facebook App ID not configured' });
+    }
+
+    const scopes = 'email,public_profile';
+
+    const flow = req.query.flow || 'popup';
+    const state = Buffer.from(JSON.stringify({ flow })).toString('base64');
+
+    const authUrl = `https://www.facebook.com/v22.0/dialog/oauth?` +
+        `client_id=${appId}` +
+        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+        `&scope=${encodeURIComponent(scopes)}` +
+        `&state=${state}` +
+        `&response_type=code`;
+
+    // Ensure popup can communicate back (for popup flow)
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+
+    if (flow === 'redirect') {
+        return res.redirect(authUrl);
+    }
+
+    res.json({ success: true, authUrl });
+});
+
+/**
+ * GET /api/auth/facebook/callback
+ * Handles Facebook OAuth callback
+ */
+router.get('/facebook/callback', async (req, res) => {
+    // Ensure popup can communicate back
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+    try {
+        const { code, state, error_code, error_message } = req.query;
+
+        // Parse flow from state
+        let flow = 'popup';
+        try {
+            if (state) {
+                const decoded = JSON.parse(Buffer.from(state, 'base64').toString());
+                flow = decoded.flow || 'popup';
+            }
+        } catch (e) {
+            console.warn('⚠️ Failed to parse Facebook OAuth state:', e.message);
+        }
+
+        if (error_code || error_message) {
+            const errorMsg = error_message || 'Facebook authorization was cancelled.';
+            if (flow === 'redirect') {
+                const frontendUrl = config.frontendUrl[0] || 'https://mantram.ai';
+                return res.redirect(`${frontendUrl}/auth?error=${encodeURIComponent(errorMsg)}`);
+            }
+            return res.send(closeAuthPopupScript(errorMsg, '', null, false, 'FACEBOOK'));
+        }
+        if (!code) {
+            const errorMsg = 'Missing authorization code.';
+            if (flow === 'redirect') {
+                const frontendUrl = config.frontendUrl[0] || 'https://mantram.ai';
+                return res.redirect(`${frontendUrl}/auth?error=${encodeURIComponent(errorMsg)}`);
+            }
+            return res.send(closeAuthPopupScript(errorMsg, '', null, false, 'FACEBOOK'));
+        }
+
+        const appId = config.facebook.appId;
+        const appSecret = config.facebook.appSecret;
+        const redirectUri = config.facebook.authCallbackUrl || `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/auth/facebook/callback`;
+
+        // 1. Exchange code for access token
+        const tokenUrl = `https://graph.facebook.com/v22.0/oauth/access_token?` +
+            `client_id=${appId}` +
+            `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+            `&client_secret=${appSecret}` +
+            `&code=${code}`;
+
+        const tokenResp = await fetch(tokenUrl);
+        const tokenData = await tokenResp.json();
+
+        if (tokenData.error) {
+            console.error('❌ Facebook Auth token exchange failed:', {
+                error: tokenData.error.message || tokenData.error,
+                type: tokenData.error.type,
+                sentAppId: appId ? `${appId.substring(0, 10)}...` : 'MISSING',
+                sentRedirectUri: redirectUri
+            });
+            const errorMsg = `Auth failed: ${tokenData.error.message || tokenData.error}`;
+            if (flow === 'redirect') {
+                const frontendUrl = config.frontendUrl[0] || 'https://mantram.ai';
+                return res.redirect(`${frontendUrl}/auth?error=${encodeURIComponent(errorMsg)}`);
+            }
+            return res.send(closeAuthPopupScript(`${errorMsg} (Check server logs for details)`, '', null, false, 'FACEBOOK'));
+        }
+
+        const { access_token } = tokenData;
+
+        // 2. Fetch user profile from Facebook
+        const profileResp = await fetch(`https://graph.facebook.com/me?fields=id,name,email,picture.type(large)&access_token=${access_token}`);
+        const profileData = await profileResp.json();
+
+        if (!profileData.email) {
+            const errorMsg = 'Could not retrieve email from Facebook. Please ensure your Facebook account has a verified email address.';
+            if (flow === 'redirect') {
+                const frontendUrl = config.frontendUrl[0] || 'https://mantram.ai';
+                return res.redirect(`${frontendUrl}/auth?error=${encodeURIComponent(errorMsg)}`);
+            }
+            return res.send(closeAuthPopupScript(errorMsg, '', null, false, 'FACEBOOK'));
+        }
+
+        // 3. Find or Create User (normalize email to catch duplicates)
+        const normalizedFbEmail = normalizeEmail(profileData.email);
+        let user = await User.findOne({ email: normalizedFbEmail });
+
+        if (!user) {
+            const userId = await User.generateUserId();
+            user = await User.create({
+                name: profileData.name || 'Facebook User',
+                email: normalizedFbEmail,
+                avatar: profileData.picture?.data?.url || '',
+                userId,
+                isFacebookUser: true,
+                isVerified: true, // Facebook users are pre-verified
+                password: crypto.randomBytes(24).toString('hex'),
+                approvalStatus: 'approved'
+            });
+            // Assign Free Subscription for Facebook Signup
+            await assignDefaultSubscription(user);
+
+            console.log(`✨ New user signed up via Facebook: ${user.email}`);
+        } else {
+            console.log(`👋 [FACEBOOK AUTH] User found: ${user.email}`);
+            // If user existed but wasn't verified, mark as verified if they successfully OAuthed
+            if (!user.isVerified) {
+                user.isVerified = true;
+                await user.save();
+            }
+        }
+
+        // Check if account is suspended
+        if (user.approvalStatus === 'rejected' && user.role !== 'superadmin') {
+            const errorMsg = 'Your account has been suspended. Please contact support.';
+            if (flow === 'redirect') {
+                const frontendUrl = config.frontendUrl[0] || 'https://mantram.ai';
+                return res.redirect(`${frontendUrl}/auth?error=${encodeURIComponent(errorMsg)}`);
+            }
+            return res.send(closeAuthPopupScript(errorMsg, '', null, true, 'FACEBOOK'));
+        }
+
+        // 4. Generate JWT
+        let fbUserId = user?._id || user?.id;
+
+        if (!fbUserId && Array.isArray(user) && user[0]) {
+            fbUserId = user[0]._id || user[0].id;
+            user = user[0];
+        }
+
+        if (!fbUserId && profileData.email) {
+            const fallbackUser = await User.findOne({ email: normalizedFbEmail });
+            if (fallbackUser) {
+                user = fallbackUser;
+                fbUserId = user._id || user.id;
+            }
+        }
+
+        if (!fbUserId) {
+            throw new Error(`User identification failed after Facebook login (Email: ${profileData.email})`);
+        }
+
+        const stringId = fbUserId.toString();
+        // Fetch tokenVersion for Facebook OAuth logins too
+        const oauthUser = await User.findById(fbUserId).select('tokenVersion');
+        const token = generateToken(stringId, oauthUser?.tokenVersion || 0);
+
+        // Accurate brand count (Owned + Shared)
+        const ownedCount = await Brand.countDocuments({ user: fbUserId, status: { $ne: 'archived' } });
+        const sharedCount = await Brand.countDocuments({ sharedWith: fbUserId, status: { $ne: 'archived' } });
+        const brandCount = ownedCount + sharedCount;
+
+        const userData = {
+            id: stringId,
+            name: user.name,
+            email: user.email,
+            role: user.role || 'user',
+            plan: user.plan || 'starter',
+            company: user.company || '',
+            teamRole: user.teamRole || '',
+            organization: user.organization || null,
+            isTeamMember: ownedCount === 0 && sharedCount > 0,
+            planDetails: await SubscriptionPackage.findOne({ slug: user.plan || 'starter' }).lean(),
+            brandCount,
+            completedWalkthroughs: user.completedWalkthroughs || []
+        };
+
+        if (flow === 'redirect') {
+            const frontendUrl = config.frontendUrl[0] || 'https://mantram.ai';
+            const redirectParams = new URLSearchParams({
+                token,
+                user: JSON.stringify(userData)
+            });
+            return res.redirect(`${frontendUrl}/auth?${redirectParams.toString()}`);
+        }
+
+        res.send(closeAuthPopupScript(null, token, userData, false, 'FACEBOOK'));
+
+
+    } catch (error) {
+        console.error('Facebook Auth callback error:', error);
+        res.send(closeAuthPopupScript(`Internal Server Error: ${error.message}`, '', null, false, 'FACEBOOK'));
+    }
+});
 
 // ══════════════════════════════════════════════════════════════
 // STUDIO ACCESS — Public endpoint for frontend sidebar filtering
