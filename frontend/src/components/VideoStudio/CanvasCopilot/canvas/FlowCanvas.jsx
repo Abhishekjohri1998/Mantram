@@ -114,7 +114,7 @@ function findNonOverlappingPosition(pos, existingNodes) {
 }
 
 /** Convert our graph schema to React Flow nodes/edges */
-function graphToFlow(graph) {
+function graphToFlow(graph, selectedNodeId, selectedEdgeId) {
     if (!graph) return { nodes: [], edges: [] };
     const nodes = (graph.nodes || []).map(n => ({
         id: n.id,
@@ -124,7 +124,7 @@ function graphToFlow(graph) {
             ...n,
             label: n.type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
         },
-        selected: false,
+        selected: n.id === selectedNodeId,
     }));
     const edges = (graph.edges || []).map(e => {
         const sourceNode = graph.nodes.find(n => n.id === e.from.node);
@@ -144,6 +144,7 @@ function graphToFlow(graph) {
             animated: portType === 'asset_list',
             type: 'smoothstep',
             data: { author: e.author },
+            selected: e.id === selectedEdgeId,
         };
     });
     return { nodes, edges };
@@ -163,10 +164,10 @@ export default function FlowCanvas({ onNodeSelect, onCanvasClick }) {
     // Sync React Flow state from graph store
     useEffect(() => {
         if (!store.graph) return;
-        const { nodes, edges } = graphToFlow(store.graph);
+        const { nodes, edges } = graphToFlow(store.graph, store.selectedNodeId, store.selectedEdgeId);
         setRfNodes(nodes);
         setRfEdges(edges);
-    }, [store.graph]); // eslint-disable-line
+    }, [store.graph, store.selectedNodeId, store.selectedEdgeId]); // eslint-disable-line
 
     // Keyboard shortcuts
     useEffect(() => {
@@ -379,9 +380,10 @@ export default function FlowCanvas({ onNodeSelect, onCanvasClick }) {
                         });
                         const targetPos = { x: flowPos.x - 80, y: flowPos.y - 20 };
                         const nonOverlappingPos = findNonOverlappingPosition(targetPos, rfNodes);
+                        const tempId = `n_${Math.random().toString(36).substring(2, 10)}`;
                         emit({
                             type: 'add_node',
-                            payload: { type, position: nonOverlappingPos },
+                            payload: { type, position: nonOverlappingPos, _tempId: tempId },
                             author: 'user',
                         });
                     }}
