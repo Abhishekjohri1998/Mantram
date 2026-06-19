@@ -355,8 +355,9 @@ export default function BaseNode({
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     emit({ type: 'delete_node', payload: { nodeId: data.id }, author: 'user' });
+                                    store.clearSelection();
                                 }}
-                                title="Delete this node"
+                                title="Delete this node (or press Delete key)"
                             >
                                 🗑 Delete
                             </button>

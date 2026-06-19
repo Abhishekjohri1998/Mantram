@@ -318,14 +318,24 @@ function _nodeNotFound(nodeId) {
 }
 
 function _validateParamValue(key, value, schema) {
-    if (schema.type === 'number' && typeof value !== 'number') {
-        return `Param "${key}" must be a number, got ${typeof value}.`;
+    if (schema.type === 'number') {
+        // Accept both number and numeric strings (UI selects may send strings)
+        const num = typeof value === 'string' ? Number(value) : value;
+        if (isNaN(num)) {
+            return `Param "${key}" must be a number, got ${typeof value}.`;
+        }
     }
     if (schema.type === 'enum' && schema.options && !schema.options.includes(value)) {
-        return `Param "${key}" must be one of: ${schema.options.join(', ')}. Got "${value}".`;
+        // Warn but don't reject — the UI may send valid values not yet in the catalog
+        console.warn(`[CommandBus] Param "${key}" value "${value}" not in catalog options: ${schema.options.join(', ')}. Allowing through.`);
+        // Only hard-reject if the value is clearly wrong type (not a string)
+        if (typeof value !== 'string') {
+            return `Param "${key}" must be one of: ${schema.options.join(', ')}. Got non-string "${value}".`;
+        }
     }
     return null;
 }
+
 
 function deepCloneGraph(graph) {
     return JSON.parse(JSON.stringify(graph));

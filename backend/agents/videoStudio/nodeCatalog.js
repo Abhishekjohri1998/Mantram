@@ -154,6 +154,23 @@ export const NODE_CATALOG = {
         },
     },
 
+    // Alias: stitch === concat (frontend uses both names interchangeably)
+    stitch: {
+        label: 'Stitch / Concat',
+        description: 'Join multiple video clips in sequence. Alias of Concat.',
+        category: 'transform',
+        costClass: 'free',
+        icon: 'merge',
+        ports: {
+            inputs:  [{ id: 'clips', type: 'asset_list', label: 'Clips', multi: true, required: true }],
+            outputs: [{ id: 'video', type: 'video',      label: 'Joined Video' }],
+        },
+        params: {
+            transition: { type: 'enum', default: 'cut', label: 'Transition', options: ['cut', 'fade', 'dissolve'] },
+            crossfadeMs:{ type: 'number', default: 0,   label: 'Crossfade (ms)' },
+        },
+    },
+
     batch: {
         label: 'Batch Iterator',
         description: 'Fan-out: takes an asset list and runs the connected template once per item. For long-form multi-shot workflows.',
@@ -182,7 +199,7 @@ export const NODE_CATALOG = {
         icon: 'image',
         ports: {
             inputs: [
-                { id: 'prompt',    type: 'text',  label: 'Prompt',         required: true },
+                { id: 'prompt',    type: 'text',  label: 'Prompt',         required: true  },
                 { id: 'style_ref', type: 'ref',   label: 'Style Ref',      required: false },
                 { id: 'char_ref',  type: 'ref',   label: 'Character Ref',  required: false },
             ],
@@ -190,11 +207,15 @@ export const NODE_CATALOG = {
         },
         params: {
             model:       { type: 'enum',   default: 'gemini-flash', label: 'Model',
-                options: ['gemini-flash', 'gpt-image-2', 'flux-pro'] },
+                options: ['auto', 'gemini-flash', 'gpt-image-2', 'flux-pro'] },
             aspectRatio: { type: 'enum',   default: '9:16', label: 'Ratio',
                 options: ['9:16', '16:9', '1:1', '4:5'] },
             quality:     { type: 'enum',   default: 'standard', label: 'Quality',
                 options: ['draft', 'standard', 'hd'] },
+            count:       { type: 'number', default: 1, label: 'Count', min: 1, max: 4 },
+            seed:        { type: 'number', default: -1, label: 'Seed' },
+            guidanceScale: { type: 'number', default: 7.5, label: 'Guidance Scale' },
+            unlimitedMode: { type: 'boolean', default: false, label: 'Unlimited Mode' },
         },
     },
 
@@ -207,24 +228,31 @@ export const NODE_CATALOG = {
         icon: 'movie',
         ports: {
             inputs: [
-                { id: 'prompt',    type: 'text',  label: 'Prompt',          required: true },
+                { id: 'prompt',    type: 'text',  label: 'Prompt',          required: true  },
                 { id: 'image',     type: 'image', label: 'First Frame',     required: false },
+                { id: 'end_image', type: 'image', label: 'End Frame',       required: false },
                 { id: 'style_ref', type: 'ref',   label: 'Style Ref',       required: false },
                 { id: 'char_ref',  type: 'ref',   label: 'Character Ref',   required: false },
                 { id: 'audio',     type: 'audio', label: 'Audio (Veo only)',required: false },
             ],
-            outputs: [{ id: 'video', type: 'video', label: 'Video' }],
+            outputs: [
+                { id: 'video',     type: 'video', label: 'Video' },
+                { id: 'end_frame', type: 'image', label: 'End Frame' },
+            ],
         },
         params: {
             model:       { type: 'enum',   default: 'seedance-2.0', label: 'Model',
-                options: ['seedance-2.0', 'kling-3.0', 'veo-3.1', 'veo-3.1-fast', 'grok-imagine', 'gemini-flash'] },
-            duration:    { type: 'number', default: 8,     label: 'Duration (s)', min: 3, max: 120 },
-            aspectRatio: { type: 'enum',   default: '9:16', label: 'Aspect Ratio',
+                options: ['auto', 'seedance-2.0', 'kling-3.0', 'veo-3.1', 'veo-3.1-fast', 'grok-imagine', 'gemini-flash'] },
+            duration:    { type: 'number', default: 6,      label: 'Duration (s)', min: 3, max: 120 },
+            aspectRatio: { type: 'enum',   default: '16:9', label: 'Aspect Ratio',
                 options: ['9:16', '16:9', '1:1', '4:5', '21:9'] },
             resolution:  { type: 'enum',   default: '1080p', label: 'Resolution',
-                options: ['720p', '1080p', '4K'] },
+                options: ['auto', '720p', '1080p', '4K'] },
             motionMode:  { type: 'enum',   default: 'balanced', label: 'Motion',
                 options: ['subtle', 'balanced', 'dynamic'] },
+            sound:       { type: 'boolean', default: true,  label: 'Sound' },
+            seed:        { type: 'number',  default: -1,    label: 'Seed' },
+            guidanceScale: { type: 'number', default: 7.5,  label: 'Guidance Scale' },
         },
     },
 

@@ -149,14 +149,31 @@ export default function FlowCanvas({ onNodeSelect, onCanvasClick }) {
     useEffect(() => {
         const handler = (e) => {
             const tag = document.activeElement?.tagName;
-            if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+            // Don't intercept when typing in any input/textarea field
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
             if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
             if ((e.metaKey || e.ctrlKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
             if (e.key === 'Delete' || e.key === 'Backspace') {
+                // Only fire if focus is on the canvas area (not inside a node input)
+                const activeEl = document.activeElement;
+                const isCanvasFocused =
+                    !activeEl ||
+                    activeEl === document.body ||
+                    activeEl === containerRef.current ||
+                    activeEl?.closest('.flow-canvas-container');
+                if (!isCanvasFocused) return;
+
+                e.preventDefault();
                 const { selectedNodeId, selectedEdgeId } = useGraphStore.getState();
-                if (selectedNodeId) emit({ type: 'delete_node', payload: { nodeId: selectedNodeId } });
-                if (selectedEdgeId) emit({ type: 'disconnect', payload: { edgeId: selectedEdgeId } });
+                if (selectedNodeId) {
+                    emit({ type: 'delete_node', payload: { nodeId: selectedNodeId }, author: 'user' });
+                    useGraphStore.getState().clearSelection();
+                }
+                if (selectedEdgeId) {
+                    emit({ type: 'disconnect', payload: { edgeId: selectedEdgeId }, author: 'user' });
+                    useGraphStore.getState().clearSelection();
+                }
             }
         };
         window.addEventListener('keydown', handler);
@@ -190,15 +207,37 @@ export default function FlowCanvas({ onNodeSelect, onCanvasClick }) {
         }
     }, [emit, store]);
 
-    // Edge delete
+    // Edge delete — resolve REAL server edge ID before emitting disconnect
+    // React Flow edge IDs may be 'e_temp_...' from optimistic adds; we must
+    // match by source/target/handle to find the actual server-assigned ID.
     const onEdgesDelete = useCallback((edges) => {
-        edges.forEach(e => emit({ type: 'disconnect', payload: { edgeId: e.id }, author: 'user' }));
+        const graphEdges = useGraphStore.getState().graph?.edges || [];
+        edges.forEach(rfEdge => {
+            // Try exact ID match first
+            let serverEdge = graphEdges.find(e => e.id === rfEdge.id);
+            // Fallback: match by topology
+            if (!serverEdge) {
+                serverEdge = graphEdges.find(e =>
+                    e.from.node === rfEdge.source &&
+                    e.from.port === rfEdge.sourceHandle &&
+                    e.to.node   === rfEdge.target &&
+                    e.to.port   === rfEdge.targetHandle
+                );
+            }
+            if (serverEdge) {
+                emit({ type: 'disconnect', payload: { edgeId: serverEdge.id }, author: 'user' });
+            } else {
+                console.warn('[FlowCanvas] Could not resolve server edge for RF edge', rfEdge.id);
+            }
+        });
     }, [emit]);
 
-    // Node select
+    // Node select — also focuses the canvas container so Delete key works
     const onNodeClick = useCallback((_evt, node) => {
         store.selectNode(node.id);
         onNodeSelect?.(node.data);
+        // Bring canvas container into focus so keyboard handler fires
+        containerRef.current?.focus({ preventScroll: true });
     }, [store, onNodeSelect]);
 
     const onEdgeClick = useCallback((_evt, edge) => {
@@ -224,7 +263,13 @@ export default function FlowCanvas({ onNodeSelect, onCanvasClick }) {
     }, []);
 
     return (
-        <div ref={containerRef} className="flow-canvas-container">
+        <div
+            ref={containerRef}
+            className="flow-canvas-container"
+            tabIndex={0}
+            style={{ outline: 'none' }}
+            onClick={() => containerRef.current?.focus({ preventScroll: true })}
+        >
             <ReactFlow
                 nodes={rfNodes}
                 edges={rfEdges}
