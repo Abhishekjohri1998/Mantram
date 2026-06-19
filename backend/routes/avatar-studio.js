@@ -15,7 +15,7 @@ import { protect, superadmin } from '../middleware/auth.js';
 import { requireCredits } from '../middleware/credits.js';
 import { buildAvatarPrompt, buildDirectPrompt, buildReferencePrompt, RATIO_TO_SIZE } from '../agents/avatarStudio/avatarPromptBuilder.js';
 export { RATIO_TO_SIZE }; // re-export for superadmin-images.js
-import { mirrorUrlToS3, uploadToS3 } from '../utils/s3.js';
+import { mirrorUrlToS3, uploadToS3, getSignedUrlIfNeeded } from '../utils/s3.js';
 import Avatar from '../models/Avatar.js';
 
 const router = Router();
@@ -323,9 +323,18 @@ router.post('/generate', protect, requireCredits('avatarGenerate'), async (req, 
             return res.status(502).json({ success: false, error: 'Both variants failed. Check LaoZhang API key and quota.', variants });
         }
 
+        const signedVariants = await Promise.all(
+            variants.map(async (v) => {
+                if (v && !v.failed && v.url) {
+                    return { ...v, url: await getSignedUrlIfNeeded(v.url) };
+                }
+                return v;
+            })
+        );
+
         res.json({
             success: true,
-            variants,
+            variants: signedVariants,
             prompt: finalPrompt,
             mode,
             creditsUsed: req.creditsDeducted || 4,
@@ -399,9 +408,22 @@ router.post('/admin/generate', protect, superadmin, async (req, res) => {
             });
         }
 
+        const signedVariants = await Promise.all(
+            variants.map(async (v) => {
+                if (v && !v.failed && v.url) {
+                    return { ...v, url: await getSignedUrlIfNeeded(v.url) };
+                }
+                return v;
+            })
+        );
+
         res.json({
-            success: true, variants, prompt: finalPrompt,
-            aspectRatio, size, model: modelKey,
+            success: true,
+            variants: signedVariants,
+            prompt: finalPrompt,
+            aspectRatio,
+            size,
+            model: modelKey,
             creditsUsed: 0,
         });
     } catch (err) {
@@ -437,7 +459,19 @@ router.get('/library', protect, async (req, res) => {
                 .limit(50)
                 .lean(),
         ]);
-        res.json({ success: true, myAvatars, publicAvatars });
+
+        const [myAvatarsSigned, publicAvatarsSigned] = await Promise.all([
+            Promise.all(myAvatars.map(async (av) => ({
+                ...av,
+                imageUrl: await getSignedUrlIfNeeded(av.imageUrl),
+            }))),
+            Promise.all(publicAvatars.map(async (av) => ({
+                ...av,
+                imageUrl: await getSignedUrlIfNeeded(av.imageUrl),
+            }))),
+        ]);
+
+        res.json({ success: true, myAvatars: myAvatarsSigned, publicAvatars: publicAvatarsSigned });
     } catch (err) {
         console.error('❌ [AvatarStudio] /library error:', err);
         res.status(500).json({ success: false, error: err.message });
@@ -507,7 +541,14 @@ router.post('/save', protect, async (req, res) => {
         });
 
         console.log(`✅ [AvatarStudio] Avatar saved: ${avatar._id} | name=${trimmedName} | role=${effectiveRole} | published=${effectivePublished}`);
-        res.json({ success: true, avatar });
+        const signedImageUrl = await getSignedUrlIfNeeded(avatar.imageUrl);
+        res.json({
+            success: true,
+            avatar: {
+                ...avatar.toObject(),
+                imageUrl: signedImageUrl
+            }
+        });
     } catch (err) {
         console.error('❌ [AvatarStudio] /save error:', err);
         res.status(500).json({ success: false, error: err.message });

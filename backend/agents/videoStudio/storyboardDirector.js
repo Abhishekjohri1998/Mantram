@@ -174,6 +174,7 @@ RULES FOR CUTS:
 - Feature at least one TWO-SHOT or GROUP SHOT with multiple characters interacting
 - INJECT at least one unexpected, visually striking angle (e.g. extreme low-angle looking up at product, Dutch tilt energy shot, kinetic rack-focus from environment to product)
 - Preserve the product's original design, shape, color shades, and branding details faithfully in all scene descriptions and framePrompts. Do NOT simplify, stylize, or modify any physical product attributes or color values. The brand colors/color palette must ONLY be used for the environment, background, or UI elements, and must NEVER be applied to recolor or color-shift the product itself.
+- AVOID boring talking head or moving head close-ups. Presenters/models must be shown as a proper moving person explaining while actively doing something in the scene (e.g., typing on a laptop, gesturing dynamically at a screen, pointing, walking through the studio set, demonstrating the product, or interacting with props/environments) to ensure it looks very natural.
 
 ═══════════════════════════════════════════════════════
 SECTION 4 — LIGHTING / MOOD / STYLE
@@ -210,7 +211,7 @@ Section 4 (LIGHTING / MOOD / STYLE NOTES):
 - 4 small lighting panels showing soft backlight, warm glow, rim light, and bokeh details with descriptions.
 - On the right: 'MOOD KEYWORDS' list and bulleted 'CINEMATOGRAPHY NOTES'.
 
-Format: ${format} | Style: ${style === '3d' ? 'Pixar/Unreal Engine 3D animated' : style === '2d' ? 'Clean 2D flat animated illustration' : 'Hyperrealistic cinematic live-action photography'} | ${duration}s total. Negative prompt: [cartoonish styles, low quality, distorted panels, text errors, smiling models, watermarks]. Note: The product's original color shade, shape, and label must remain completely unchanged and must not be recolored with the brand colors."
+Format: ${format} | Style: ${style === '3d' ? 'Pixar/Unreal Engine 3D animated' : style === '2d' ? 'Clean 2D flat animated illustration' : 'Hyperrealistic cinematic live-action photography'} | ${duration}s total. Negative prompt: [cartoonish styles, low quality, distorted panels, text errors, smiling models, watermarks, talking head closeups, close-up heads]. Note: The product's original color shade, shape, and label must remain completely unchanged and must not be recolored with the brand colors. Panels showing presenters must depict a proper moving person explaining while doing something (e.g. typing on a laptop, gesturing at a screen, pointing, walking, demonstrating features, interacting with props/environments) and not just a talking head or moving head close-up."
 
 ${brandDNASection}
 

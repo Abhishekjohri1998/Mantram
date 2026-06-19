@@ -8,6 +8,7 @@
  * Authentication: Uses GOOGLE_APPLICATION_CREDENTIALS service account JSON.
  */
 import { GoogleAuth } from 'google-auth-library';
+import fs from 'fs';
 
 const project  = process.env.GCP_PROJECT_ID || 'mantram-vertex';
 const location = process.env.GCP_LOCATION  || 'us-central1';
@@ -19,6 +20,7 @@ const auth = new GoogleAuth({
 
 /**
  * Generate images via Vertex AI REST API with full imageConfig support.
+ * Fallback to Developer Google AI Studio API when credentials are not available.
  *
  * @param {Array}  parts                     – Content parts (text + inlineData)
  * @param {string} [modelId]                 – Model name, e.g. 'gemini-3.1-flash-image-preview'
@@ -47,10 +49,54 @@ export async function generateImageWithVertex(
         generationConfig.imageConfig = {};
         if (hasAR)   generationConfig.imageConfig.aspectRatio = imageConfig.aspectRatio;
         if (hasSize) generationConfig.imageConfig.imageSize   = imageConfig.imageSize;
-        console.log(`📐 [Vertex AI] imageConfig: AR=${imageConfig.aspectRatio || 'default'}, size=${imageConfig.imageSize || 'default'}`);
+        console.log(`📐 [Vertex AI/Developer API] imageConfig: AR=${imageConfig.aspectRatio || 'default'}, size=${imageConfig.imageSize || 'default'}`);
     }
 
-    // ── Build request body ──
+    // ── Check if Google Developer API Key fallback is needed ──
+    const credsVar = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    const hasCreds = credsVar && fs.existsSync(credsVar);
+    const apiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
+
+    if (!hasCreds && apiKey) {
+        console.log(`🔑 [Gemini API] No Vertex credentials. Using Developer API fallback...`);
+        let devModel = modelId;
+        if (modelId === 'gemini-3.1-flash-image-preview') {
+            const hasReferenceImages = parts.some(p => p.inlineData);
+            devModel = hasReferenceImages ? 'gemini-2.5-flash-image' : 'gemini-3.1-flash-image';
+        } else if (modelId === 'gemini-2.5-flash') {
+            devModel = 'gemini-2.5-flash-image';
+        } else if (modelId === 'imagen-3.0-generate-002') {
+            devModel = 'gemini-3.1-flash-image'; // Imagen 3 not supported for generateContent with key
+        }
+
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${devModel}:generateContent?key=${apiKey}`;
+        const body = {
+            contents: [{ role: 'user', parts }],
+            generationConfig,
+        };
+
+        const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(120_000),
+        });
+
+        if (!resp.ok) {
+            const errText = await resp.text().catch(() => '');
+            const errMsg = `Google Developer API ${devModel} error (${resp.status}): ${errText.substring(0, 300)}`;
+            console.error(`❌ ${errMsg}`);
+            throw new Error(errMsg);
+        }
+
+        const data = await resp.json();
+        if (data.error) {
+            throw new Error(`Google Developer API error: ${data.error.message || JSON.stringify(data.error)}`);
+        }
+        return data;
+    }
+
+    // ── Build request body for Vertex AI ──
     const body = {
         contents: [{ role: 'user', parts }],
         generationConfig,

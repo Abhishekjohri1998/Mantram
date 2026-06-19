@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import SEOHead from '../components/SEOHead'
-import { superadmin as API, social as socialAPI, getCorsUrl } from '../services/api'
+import { superadmin as API, social as socialAPI, getCorsUrl, API_BASE } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import TemplateManager from './TemplateManager'
 import QAdsManager from './QAdsManager'
 import VideoStudioManager from './VideoStudioManager'
 import UsageAnalytics from './UsageAnalytics'
 import AvatarOptionsForm from '../components/AvatarOptionsForm'
+import Storyboard from '../components/VideoStudio/Storyboard'
 
 export default function SuperAdminDashboard() {
     const navigate = useNavigate()
@@ -158,6 +159,9 @@ export default function SuperAdminDashboard() {
     const [publishModalConfig, setPublishModalConfig] = useState(null)
     const [showIgSliders, setShowIgSliders] = useState(false)
     const [growthPreviewImage, setGrowthPreviewImage] = useState(null)
+    const [growthSelectedBrandId, setGrowthSelectedBrandId] = useState('')
+    const [storyboardModalOpen, setStoryboardModalOpen] = useState(false)
+    const [preSeededStoryboardData, setPreSeededStoryboardData] = useState(null)
 
     if (user?.role !== 'superadmin') {
         return <DashboardLayout><div className="flex items-center justify-center h-screen"><div className="text-center"><span className="material-symbols-outlined text-6xl text-primary mb-4">shield</span><h2 className="text-2xl font-bold text-[var(--sys-text)] mb-2">Access Denied</h2><p className="text-[var(--sys-text-muted)]">Super Admin access required</p></div></div></DashboardLayout>
@@ -250,14 +254,21 @@ export default function SuperAdminDashboard() {
     const loadGrowthData = async () => {
         setGrowthLoading(true)
         try {
-            const [contentRes, statsRes, accountsRes] = await Promise.all([
+            const [contentRes, statsRes, accountsRes, brandsRes] = await Promise.all([
                 API.getGrowthContent(),
                 API.getGrowthStats(),
-                socialAPI.accounts().catch(() => ({ data: [] }))
+                socialAPI.accounts().catch(() => ({ data: [] })),
+                API.getBrands({ limit: 100 }).catch(() => ({ brands: [] }))
             ])
             setGrowthContent(contentRes.content)
+            if (contentRes.content && contentRes.content.brandId) {
+                setGrowthSelectedBrandId(contentRes.content.brandId)
+            }
             setGrowthStats(statsRes.stats)
             setSocialAccounts(accountsRes.data || [])
+            if (brandsRes && brandsRes.brands) {
+                setBrands(brandsRes.brands)
+            }
         } catch (e) { console.error('Growth data load failed:', e) }
         finally { setGrowthLoading(false) }
     }
@@ -272,7 +283,7 @@ export default function SuperAdminDashboard() {
     const handleGenerateGrowth = async () => {
         setGrowthGenerating(true)
         try {
-            const res = await API.generateGrowthContent()
+            const res = await API.generateGrowthContent({ brandId: growthSelectedBrandId || undefined })
             if (res.success) {
                 setGrowthContent(res.content)
                 showToast('Content generated successfully!')
@@ -281,6 +292,88 @@ export default function SuperAdminDashboard() {
         } catch (e) { showToast(e.message || 'Generation failed', 'error') }
         finally { setGrowthGenerating(false) }
     }
+
+    // Polling for active storyboard video completion in SuperAdmin dashboard
+    useEffect(() => {
+        const activeProjectId = growthContent?.instagram?.reel?.storyboardProjectId;
+        const currentVideoUrl = growthContent?.instagram?.reel?.videoUrl;
+
+        if (!activeProjectId || currentVideoUrl) return;
+
+        let pollInterval = setInterval(async () => {
+            try {
+                const res = await fetch(`${API_BASE}/video-studio/storyboard/status/${activeProjectId}`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('mantram_token')}` }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    if (data.finalVideoUrl) {
+                        clearInterval(pollInterval);
+                        // Save the video URL to the Reel Growth Content document!
+                        const updateRes = await API.updateReelVideo(growthContent._id, {
+                            videoUrl: data.finalVideoUrl,
+                            imageUrl: data.imageUrl || data.project?.storyboard?.imageUrl || data.plan?.imageUrl
+                        });
+                        if (updateRes.success) {
+                            setGrowthContent(updateRes.content);
+                            showToast('Storyboard video completed and loaded!');
+                        } else {
+                            loadGrowthData();
+                        }
+                    } else if (data.status === 'FAILED') {
+                        clearInterval(pollInterval);
+                        showToast('Video studio generation failed.', 'error');
+                    }
+                }
+            } catch (err) {
+                console.error('[Storyboard Poll] Error polling status:', err);
+            }
+        }, 8000);
+
+        return () => clearInterval(pollInterval);
+    }, [growthContent?.instagram?.reel?.storyboardProjectId, growthContent?.instagram?.reel?.videoUrl, growthContent?._id]);
+
+    const handleOpenStoryboard = () => {
+        const reel = growthContent?.instagram?.reel;
+        if (!reel) return;
+
+        // Convert scenes to cuts structure
+        const preSeededCuts = (reel.scenes || []).map((scene, i) => {
+            const durStr = scene.duration || '';
+            let durSecs = 3;
+            const parts = durStr.split(/[-–—]/);
+            if (parts.length === 2) {
+                const timeToSecs = (str) => {
+                    const t = str.trim().split(':');
+                    if (t.length === 2) return parseInt(t[0], 10) * 60 + parseInt(t[1], 10);
+                    return parseInt(str, 10) || 0;
+                };
+                const start = timeToSecs(parts[0]);
+                const end = timeToSecs(parts[1]);
+                durSecs = Math.max(2, end - start);
+            }
+
+            return {
+                id: scene.sceneNumber || (i + 1),
+                lens: '50mm prime',
+                duration: durSecs,
+                move: 'STEADICAM',
+                shot: (scene.shotType || 'Medium').toUpperCase(),
+                scene: `${scene.action || ''}. ${scene.voiceover ? `🎙️ Speak: "${scene.voiceover}"` : ''}`,
+                framePrompt: `${scene.action || ''}. ${scene.visualDescription || ''}. ${scene.textOverlay ? `Text overlay on screen: "${scene.textOverlay}"` : ''}`,
+            };
+        });
+
+        const totalDurationVal = preSeededCuts.reduce((sum, c) => sum + c.duration, 0) || 30;
+
+        setPreSeededStoryboardData({
+            brief: reel.hook ? `Hook: ${reel.hook}. Concept: ${reel.concept || ''}` : reel.concept || '',
+            preSeededCuts,
+            duration: totalDurationVal,
+            projectId: reel.storyboardProjectId || null,
+        });
+        setStoryboardModalOpen(true);
+    };
 
     const handleMarkPosted = async (platform, index = 0) => {
         if (!growthContent?._id) return
@@ -312,6 +405,7 @@ export default function SuperAdminDashboard() {
             let text = ''
             let imageUrls = []
             let imageUrl = null
+            let videoUrl = null
 
             if (platform === 'linkedin') {
                 const post = growthContent.linkedin[index]
@@ -341,15 +435,19 @@ export default function SuperAdminDashboard() {
             } else if (platform === 'instagram_reel') {
                 const reel = growthContent.instagram.reel
                 text = `${reel.caption}\n\n${reel.hashtags?.join(' ')}`
-                if (reel.slides?.[0]?.imageUrl) imageUrl = reel.slides[0].imageUrl
+                if (reel.videoUrl) videoUrl = reel.videoUrl
+                else if (reel.imageUrl) imageUrl = reel.imageUrl
+                else if (reel.slides?.[0]?.imageUrl) imageUrl = reel.slides[0].imageUrl
             }
 
             const payload = {
                 accountIds: [selectedAccountId],
                 text,
+                platform,
                 ...(imageUrls.length > 1 ? { imageUrls } : {}),
                 ...(imageUrls.length === 1 && !imageUrl ? { imageUrl: imageUrls[0] } : {}),
-                ...(imageUrl ? { imageUrl } : {})
+                ...(imageUrl ? { imageUrl } : {}),
+                ...(videoUrl ? { videoUrl } : {})
             }
 
             const res = await socialAPI.publish(payload)
@@ -4740,15 +4838,15 @@ export default function SuperAdminDashboard() {
                 {tab === 'growth' && (
                     <div className="space-y-6">
                         {/* Header */}
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[var(--sys-border)] pb-4">
                             <div>
-                                <h2 className="text-xl font-black text-[var(--sys-text)] flex items-center gap-2">
+                                <h2 className="text-xl font-black text-[var(--sys-text)] flex items-center gap-2 whitespace-nowrap">
                                     <span className="material-symbols-outlined text-emerald-500">trending_up</span>
                                     Growth Engine
                                 </h2>
                                 <p className="text-xs text-[var(--sys-text-muted)] mt-1">Auto-generated daily content • Copy, post, grow</p>
                             </div>
-                            <div className="flex items-center gap-3">
+                            <div className="flex flex-wrap items-center gap-3 lg:justify-end">
                                 {growthStats && (
                                     <div className="flex items-center gap-4 mr-4">
                                         <div className="text-center">
@@ -4765,6 +4863,22 @@ export default function SuperAdminDashboard() {
                                         </div>
                                     </div>
                                 )}
+                                <div className="flex items-center gap-2 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-2.5 py-1.5 mr-2 shrink-0 w-fit max-w-full">
+                                    <span className="text-xs font-bold text-[var(--sys-text-muted)] flex items-center gap-1 shrink-0 whitespace-nowrap">
+                                        <span className="material-symbols-outlined text-xs text-emerald-500">auto_awesome_motion</span>
+                                        Brand context:
+                                    </span>
+                                    <select
+                                        value={growthSelectedBrandId}
+                                        onChange={(e) => setGrowthSelectedBrandId(e.target.value)}
+                                        className="text-xs p-1 rounded-lg bg-[var(--sys-bg)] border border-[var(--sys-border)] text-[var(--sys-text)] outline-none font-bold cursor-pointer max-w-[120px] sm:max-w-[160px] truncate"
+                                    >
+                                        <option value="">Default (Mantram AI)</option>
+                                        {brands.map(b => (
+                                            <option key={b._id} value={b._id}>{b.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
                                 <button
                                     onClick={() => { setShowGrowthHistory(!showGrowthHistory); if (!showGrowthHistory) loadGrowthHistory() }}
                                     className="px-3 py-2 rounded-xl text-xs font-bold bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer transition-all border border-[var(--sys-border)]"
@@ -4812,9 +4926,9 @@ export default function SuperAdminDashboard() {
                                 </div>
 
                                 {/* Top Controls */}
-                                <div className="flex items-center justify-between mt-4">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mt-4">
                                     {/* Platform Tabs */}
-                                    <div className="flex gap-1 p-1 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)]" style={{ width: 'fit-content' }}>
+                                    <div className="flex flex-wrap gap-1 p-1 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] w-fit max-w-full">
                                         {[
                                             { id: 'linkedin', label: 'LinkedIn', icon: '💼', color: '#0A66C2', count: growthContent.linkedin?.length || 0 },
                                             { id: 'instagram', label: 'Instagram', icon: '📸', color: '#E4405F', count: 3 },
@@ -4824,7 +4938,7 @@ export default function SuperAdminDashboard() {
                                             <button
                                                 key={p.id}
                                                 onClick={() => setGrowthPlatformTab(p.id)}
-                                                className={`px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-2 ${
+                                                className={`px-2.5 sm:px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 ${
                                                     growthPlatformTab === p.id
                                                         ? 'text-white shadow-lg'
                                                         : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'
@@ -4838,12 +4952,12 @@ export default function SuperAdminDashboard() {
                                     </div>
 
                                     {/* Image Model Selector */}
-                                    <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)]" style={{ width: 'fit-content' }}>
+                                    <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] w-fit max-w-full shrink-0">
                                         <span className="text-xs font-bold text-[var(--sys-text-muted)] pl-2">🖼️ Image Model:</span>
                                         <select
                                             value={growthImageModel}
                                             onChange={(e) => setGrowthImageModel(e.target.value)}
-                                            className="text-xs p-1.5 rounded-xl bg-[var(--sys-bg)] border border-[var(--sys-border)] text-[var(--sys-text)] outline-none font-bold cursor-pointer"
+                                            className="text-xs p-1.5 rounded-xl bg-[var(--sys-bg)] border border-[var(--sys-border)] text-[var(--sys-text)] outline-none font-bold cursor-pointer max-w-[150px] truncate"
                                         >
                                             <option value="gpt-image-2">GPT Image 2</option>
                                             <option value="nanobanana-2">NanoBanana 2</option>
@@ -4857,14 +4971,14 @@ export default function SuperAdminDashboard() {
                                     <div className="space-y-4">
                                         {(growthContent.linkedin || []).map((post, i) => (
                                             <div key={i} className="rounded-2xl border border-[var(--sys-border)] bg-[var(--sys-surface)] overflow-hidden">
-                                                <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #0A66C210, transparent)' }}>
-                                                    <div className="flex items-center gap-2">
+                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #0A66C210, transparent)' }}>
+                                                    <div className="flex flex-wrap items-center gap-2">
                                                         <span className="text-sm">💼</span>
                                                         <span className="text-xs font-bold text-[var(--sys-text)]">LinkedIn Post {i + 1}</span>
                                                         <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-500/10 text-blue-500">{post.type?.replace(/_/g, ' ')}</span>
                                                         {post.bestTime && <span className="text-[10px] text-[var(--sys-text-muted)]">⏰ {post.bestTime}</span>}
                                                     </div>
-                                                    <div className="flex items-center gap-2">
+                                                    <div className="flex flex-wrap items-center gap-2">
                                                         <button 
                                                             onClick={() => triggerPublishModal('linkedin', i)}
                                                             disabled={isPublishing === `linkedin-${i}`}
@@ -4938,13 +5052,13 @@ export default function SuperAdminDashboard() {
                                     <div className="space-y-4">
                                         {/* Instagram Post */}
                                         <div className="rounded-2xl border border-[var(--sys-border)] bg-[var(--sys-surface)] overflow-hidden">
-                                            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #E4405F10, #833AB410, transparent)' }}>
-                                                <div className="flex items-center gap-2">
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #E4405F10, #833AB410, transparent)' }}>
+                                                <div className="flex flex-wrap items-center gap-2">
                                                     <span className="text-sm">📸</span>
                                                     <span className="text-xs font-bold text-[var(--sys-text)]">Instagram Post</span>
                                                     {growthContent.instagram?.post?.bestTime && <span className="text-[10px] text-[var(--sys-text-muted)]">⏰ {growthContent.instagram.post.bestTime}</span>}
                                                 </div>
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex flex-wrap items-center gap-2">
                                                     <button 
                                                         onClick={() => triggerPublishModal('instagram_post')}
                                                         disabled={isPublishing === `instagram_post-0`}
@@ -5141,7 +5255,7 @@ export default function SuperAdminDashboard() {
                                                 {growthContent.instagram?.post?.slides?.length > 0 && showIgSliders && (
                                                     <div className="mt-4 animate-in fade-in slide-in-from-top-4 duration-300">
                                                         <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2">📑 Carousel Slides</p>
-                                                        <div className="grid grid-cols-2 gap-2">
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                             {growthContent.instagram.post.slides.map((s, j) => (
                                                                 <div key={j} className="p-3 rounded-xl bg-[var(--sys-bg)] border border-[var(--sys-border)] flex flex-col justify-between">
                                                                     <div>
@@ -5209,13 +5323,13 @@ export default function SuperAdminDashboard() {
 
                                     {/* Instagram Story */}
                                     <div className="rounded-2xl border border-[var(--sys-border)] bg-[var(--sys-surface)] overflow-hidden">
-                                        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #833AB410, #FD1D1D10, transparent)' }}>
-                                            <div className="flex items-center gap-2">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #833AB410, #FD1D1D10, transparent)' }}>
+                                            <div className="flex flex-wrap items-center gap-2">
                                                 <span className="text-sm">📱</span>
                                                 <span className="text-xs font-bold text-[var(--sys-text)]">Instagram Story Script</span>
                                                 <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-500/10 text-purple-500">{growthContent.instagram?.story?.slides?.length || 0} slides</span>
                                             </div>
-                                                <div className="flex items-center gap-2">
+                                            <div className="flex flex-wrap items-center gap-2">
                                                     <button 
                                                         onClick={() => triggerPublishModal('instagram_story')}
                                                         disabled={isPublishing === 'instagram_story-0'}
@@ -5292,15 +5406,15 @@ export default function SuperAdminDashboard() {
 
                                         {/* Instagram Reel */}
                                         <div className="rounded-2xl border border-[var(--sys-border)] bg-[var(--sys-surface)] overflow-hidden">
-                                            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #FF006610, #FE350410, transparent)' }}>
-                                                <div className="flex items-center gap-2">
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #FF006610, #FE350410, transparent)' }}>
+                                                <div className="flex flex-wrap items-center gap-2">
                                                     <span className="text-sm">🎬</span>
                                                     <span className="text-xs font-bold text-[var(--sys-text)]">Instagram Reel Script</span>
                                                     <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-red-500/10 text-red-500">{growthContent.instagram?.reel?.scenes?.length || 0} scenes</span>
                                                     {growthContent.instagram?.reel?.totalDuration && <span className="text-[10px] text-[var(--sys-text-muted)]">⏱️ {growthContent.instagram.reel.totalDuration}</span>}
                                                     {growthContent.instagram?.reel?.bestTime && <span className="text-[10px] text-[var(--sys-text-muted)]">⏰ {growthContent.instagram.reel.bestTime}</span>}
                                                 </div>
-                                                 <div className="flex items-center gap-2">
+                                                <div className="flex flex-wrap items-center gap-2">
                                                      <button 
                                                          onClick={() => triggerPublishModal('instagram_reel')}
                                                          disabled={isPublishing === 'instagram_reel-0'}
@@ -5342,28 +5456,83 @@ export default function SuperAdminDashboard() {
                                                     <p className="text-xs text-[var(--sys-text-muted)] italic">💡 Concept: {growthContent.instagram.reel.concept}</p>
                                                 )}
 
-                                                {/* Scene-by-Scene Breakdown */}
-                                                <div>
-                                                    <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-3">🎬 Shooting Script</p>
-                                                    <div className="space-y-2">
-                                                        {(growthContent.instagram?.reel?.scenes || []).map((scene, j) => (
-                                                            <div key={j} className="flex gap-3 p-3 rounded-xl bg-[var(--sys-bg)] border border-[var(--sys-border)]">
-                                                                <div className="flex flex-col items-center flex-shrink-0 w-12">
-                                                                    <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-[10px] font-black text-red-500">{scene.sceneNumber}</div>
-                                                                    {j < (growthContent.instagram.reel.scenes.length - 1) && <div className="w-px flex-1 bg-red-500/20 mt-1" />}
-                                                                </div>
-                                                                <div className="flex-1 min-w-0">
-                                                                    <div className="flex items-center gap-2 mb-1.5">
-                                                                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-red-500/10 text-red-500">{scene.duration}</span>
-                                                                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-blue-500/10 text-blue-500">{scene.shotType}</span>
+                                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                                                    {/* Left Column: Video Preview / Storyboard Action (5 cols) */}
+                                                    <div className="lg:col-span-5 flex flex-col justify-start">
+                                                        {growthContent.instagram?.reel?.videoUrl ? (
+                                                            <div className="space-y-3">
+                                                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider">🎥 Video Preview</p>
+                                                                <div className="relative aspect-[9/16] w-full max-w-[260px] mx-auto rounded-2xl overflow-hidden bg-black border border-[var(--sys-border)] group shadow-lg">
+                                                                    <video src={growthContent.instagram.reel.videoUrl} className="w-full h-full object-cover animate-in fade-in" controls playsInline />
+                                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-3 backdrop-blur-sm">
+                                                                        <button 
+                                                                            onClick={() => handleOpenStoryboard()}
+                                                                            className="px-2.5 py-1.5 bg-white/20 hover:bg-white/40 rounded-lg text-white text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer border border-white/20 backdrop-blur-md"
+                                                                        >
+                                                                            <span className="material-symbols-outlined text-[12px]">edit</span> Edit Storyboard
+                                                                        </button>
                                                                     </div>
-                                                                    <p className="text-xs text-[var(--sys-text)] font-bold mb-1">📹 {scene.action}</p>
-                                                                    {scene.voiceover && <p className="text-[11px] text-[var(--sys-text)] mb-1">🎙️ <em>"{scene.voiceover}"</em></p>}
-                                                                    {scene.textOverlay && <p className="text-[10px] text-amber-500 font-bold mb-1">📝 {scene.textOverlay}</p>}
-                                                                    {scene.visualDescription && <p className="text-[10px] text-[var(--sys-text-muted)] italic">🎨 {scene.visualDescription}</p>}
                                                                 </div>
                                                             </div>
-                                                        ))}
+                                                        ) : (
+                                                            <div className="space-y-3">
+                                                                <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider">🎥 Video Studio</p>
+                                                                <div className="flex flex-col items-center justify-center p-6 bg-[var(--sys-bg)] rounded-2xl border border-dashed border-[var(--sys-border)] min-h-[300px]">
+                                                                    {growthContent.instagram?.reel?.storyboardProjectId ? (
+                                                                        <>
+                                                                            <span className="material-symbols-outlined text-4xl text-primary animate-spin mb-3">progress_activity</span>
+                                                                            <p className="text-xs font-bold text-[var(--sys-text)] mb-1">Generating Video Reel...</p>
+                                                                            <p className="text-[10px] text-[var(--sys-text-muted)] mb-4 text-center">Your storyboard video is rendering in the background.</p>
+                                                                            <button 
+                                                                                onClick={() => handleOpenStoryboard()}
+                                                                                className="px-4 py-2 rounded-xl text-xs font-bold bg-[var(--sys-surface)] text-[var(--sys-text)] border border-[var(--sys-border)] hover:bg-[var(--sys-surface)] transition-all flex items-center gap-1.5 cursor-pointer"
+                                                                            >
+                                                                                <span className="material-symbols-outlined text-sm">open_in_new</span> Open Storyboard Status
+                                                                            </button>
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)] mb-3">movie_creation</span>
+                                                                            <p className="text-xs font-bold text-[var(--sys-text)] mb-1 text-center">No Video Generated Yet</p>
+                                                                            <p className="text-[10px] text-[var(--sys-text-muted)] mb-4 text-center max-w-[200px]">Transform this script into an AI presenter video using Avatar Studio.</p>
+                                                                            <button 
+                                                                                onClick={() => handleOpenStoryboard()}
+                                                                                className="px-4 py-2 rounded-xl text-xs font-bold bg-primary text-white hover:bg-primary/90 transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-primary/20"
+                                                                            >
+                                                                                <span className="material-symbols-outlined text-sm">movie_edit</span> Create Storyboard
+                                                                            </button>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Right Column: Shooting Script (7 cols) */}
+                                                    <div className="lg:col-span-7 space-y-4">
+                                                        <div>
+                                                            <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-3">🎬 Shooting Script</p>
+                                                            <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
+                                                                {(growthContent.instagram?.reel?.scenes || []).map((scene, j) => (
+                                                                    <div key={j} className="flex gap-3 p-3 rounded-xl bg-[var(--sys-bg)] border border-[var(--sys-border)]">
+                                                                        <div className="flex flex-col items-center flex-shrink-0 w-12">
+                                                                            <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-[10px] font-black text-red-500">{scene.sceneNumber}</div>
+                                                                            {j < (growthContent.instagram.reel.scenes.length - 1) && <div className="w-px flex-1 bg-red-500/20 mt-1" />}
+                                                                        </div>
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <div className="flex items-center gap-2 mb-1.5">
+                                                                                <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-red-500/10 text-red-500">{scene.duration}</span>
+                                                                                <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-blue-500/10 text-blue-500">{scene.shotType}</span>
+                                                                            </div>
+                                                                            <p className="text-xs text-[var(--sys-text)] font-bold mb-1">📹 {scene.action}</p>
+                                                                            {scene.voiceover && <p className="text-[11px] text-[var(--sys-text)] mb-1">🎙️ <em>"{scene.voiceover}"</em></p>}
+                                                                            {scene.textOverlay && <p className="text-[10px] text-amber-500 font-bold mb-1">📝 {scene.textOverlay}</p>}
+                                                                            {scene.visualDescription && <p className="text-[10px] text-[var(--sys-text-muted)] italic">🎨 {scene.visualDescription}</p>}
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
 
@@ -5391,14 +5560,14 @@ export default function SuperAdminDashboard() {
                                     <div className="space-y-4">
                                         {(growthContent.twitter || []).map((post, i) => (
                                             <div key={i} className="rounded-2xl border border-[var(--sys-border)] bg-[var(--sys-surface)] overflow-hidden">
-                                                <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #1DA1F210, transparent)' }}>
-                                                    <div className="flex items-center gap-2">
+                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #1DA1F210, transparent)' }}>
+                                                    <div className="flex flex-wrap items-center gap-2">
                                                         <span className="text-sm">🐦</span>
                                                         <span className="text-xs font-bold text-[var(--sys-text)]">{post.type === 'thread' ? 'Twitter Thread' : 'Tweet'}</span>
                                                         {post.type === 'thread' && <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-sky-500/10 text-sky-500">{post.tweets?.length} tweets</span>}
                                                         {post.bestTime && <span className="text-[10px] text-[var(--sys-text-muted)]">⏰ {post.bestTime}</span>}
                                                     </div>
-                                                     <div className="flex items-center gap-2">
+                                                    <div className="flex flex-wrap items-center gap-2">
                                                          <button 
                                                              onClick={() => triggerPublishModal('twitter', i)}
                                                              disabled={isPublishing === `twitter-${i}`}
@@ -5474,14 +5643,14 @@ export default function SuperAdminDashboard() {
                                     <div className="space-y-4">
                                         {(growthContent.reddit || []).map((post, i) => (
                                             <div key={i} className="rounded-2xl border border-[var(--sys-border)] bg-[var(--sys-surface)] overflow-hidden">
-                                                <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #FF450010, transparent)' }}>
-                                                    <div className="flex items-center gap-2">
+                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-b border-[var(--sys-border)]" style={{ background: 'linear-gradient(135deg, #FF450010, transparent)' }}>
+                                                    <div className="flex flex-wrap items-center gap-2">
                                                         <span className="text-sm">🟠</span>
                                                         <span className="text-xs font-bold text-[var(--sys-text)]">{post.subreddit}</span>
                                                         <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-orange-500/10 text-orange-500">{post.tone}</span>
                                                         {post.bestTime && <span className="text-[10px] text-[var(--sys-text-muted)]">⏰ {post.bestTime}</span>}
                                                     </div>
-                                                     <div className="flex items-center gap-2">
+                                                    <div className="flex flex-wrap items-center gap-2">
                                                          <button 
                                                              onClick={() => triggerPublishModal('reddit', i)}
                                                              disabled={isPublishing === `reddit-${i}`}
@@ -5673,6 +5842,70 @@ export default function SuperAdminDashboard() {
                 {tab === 'avatars' && (
                     <div className="animate-in fade-in slide-in-from-bottom-2 duration-500" style={{ marginTop: '-20px' }}>
                         <AvatarAdmin />
+                    </div>
+                )}
+
+                {/* ── STORYBOARD FULLSCREEN MODAL ── */}
+                {storyboardModalOpen && preSeededStoryboardData && (
+                    <div className="fixed inset-0 z-[100] flex flex-col bg-black/95 backdrop-blur-md overflow-hidden" style={{ zIndex: 9999 }}>
+                        {/* Header bar */}
+                        <div className="h-16 px-6 bg-[var(--sys-surface)] border-b border-[var(--sys-border)] flex items-center justify-between flex-shrink-0">
+                            <div className="flex items-center gap-3">
+                                <span className="material-symbols-outlined text-primary text-2xl animate-pulse">movie_creation</span>
+                                <div>
+                                    <h3 className="font-bold text-[var(--sys-text)] text-base">Reel Storyboard Studio</h3>
+                                    <p className="text-xs text-[var(--sys-text-muted)]">Customize voice, avatar, and style for your generated Reel script</p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={() => setStoryboardModalOpen(false)} 
+                                className="p-2 hover:bg-[var(--sys-bg)] rounded-xl transition-all flex items-center justify-center border border-[var(--sys-border)] hover:border-red-500/30 group"
+                            >
+                                <span className="material-symbols-outlined text-[var(--sys-text-muted)] group-hover:text-red-500 transition-colors">close</span>
+                            </button>
+                        </div>
+                        {/* Content body */}
+                        <div className="flex-1 overflow-y-auto p-6">
+                            <Storyboard
+                                activeBrand={brands.find(b => (b._id || b.id) === growthSelectedBrandId)}
+                                projects={[]}
+                                canCreateVideo={true}
+                                user={user}
+                                initialBrief={preSeededStoryboardData.brief}
+                                initialCuts={preSeededStoryboardData.preSeededCuts}
+                                initialDuration={preSeededStoryboardData.duration}
+                                initialFormat="9:16"
+                                initialProjectId={preSeededStoryboardData.projectId}
+                                onProjectIdCreated={async (projectId) => {
+                                    try {
+                                        const updateRes = await API.updateReelVideo(growthContent._id, {
+                                            storyboardProjectId: projectId
+                                        });
+                                        if (updateRes.success) {
+                                            setGrowthContent(updateRes.content);
+                                        }
+                                    } catch (err) {
+                                        console.error('[Storyboard Modal] Failed to save project ID:', err);
+                                    }
+                                }}
+                                onVideoComplete={async ({ finalVideoUrl, imageUrl }) => {
+                                    try {
+                                        const updateRes = await API.updateReelVideo(growthContent._id, {
+                                            videoUrl: finalVideoUrl,
+                                            imageUrl: imageUrl
+                                        });
+                                        if (updateRes.success) {
+                                            setGrowthContent(updateRes.content);
+                                            showToast('Storyboard video compiled and saved!');
+                                        }
+                                        setStoryboardModalOpen(false);
+                                    } catch (err) {
+                                        console.error('[Storyboard Modal] Failed to save final video:', err);
+                                        showToast('Failed to save final video details', 'error');
+                                    }
+                                }}
+                            />
+                        </div>
                     </div>
                 )}
 
