@@ -95,3 +95,18 @@
   - `brand-kit.js` (Wizard) — **Sequential pipeline**: identity runs first → `logo-icon-mark` URL extracted → stationery + guide run in parallel, both receiving the logo URL as `existingLogoUrl`.
 - **Key Pattern**: Every agent now follows: `existingLogoUrl (caller override)` → `resolvedLogoUrl (from artDirector/DB)` → `null (text-only fallback)`. This ensures the brand identity is always the visual source-of-truth.
 - **Verification**: 14/14 automated checks passed, server restarted cleanly.
+
+### Video Studio Canvas Copilot — Pass 2 Remediation (Sprint 8)
+- **Feature**: Dynamic palette surfacing, list fan-out execution engine, bound handlers, and missing nodes block.
+- **Goal**: Bring all 30 nodes to DONE (V5 + L4) with real execution backings.
+- **Workflow**:
+  - **Dynamic Surfacing**: Frontend index.jsx fetches `/api/video-studio/agent/v2/node-catalog` on mount, storing it in Zustand. NodeMenu.jsx dynamically groups, sorts, and renders nodes from the Zustand store.
+  - **List Fan-Out**: ListNode.jsx saves items in `data.params.items` via Command Bus. `resolveNodeInputs` parses/flattens JSON outputs for list/multi input ports. `executeGraphAsync` topological run loops $N$ times for checked items, isolating item failures, memoizing via `inputHash` and `params._batchRuns`, and broadcasting SSE events.
+  - **Spend Gate Pricing**: Estimates and authorizes fanned-out runs as $N \times$ cost under a single spend-gate authorization.
+  - **Real Backings**: Bound Sharp Lanczos (2K) and Fal Real-ESRGAN (4K) for upscale; Fal Outpaint directional aspect ratio expansion for reframe; Fal Sync Lipsync v2 Pro for lipsync; Fal AMT Frame Interpolation for frame_interpolate.
+  - **Structured Blocked Provider Fallbacks**: Wired the 12 missing nodes (`variations`, `image_to_3d`, etc.) to throw structured `BLOCKED: provider` errors.
+- **Key Pattern / Learnings**:
+  - Always filter out unchecked items (`checked === false`) in batch loops.
+  - Standardize batch list item shapes as `{ id, value }` objects, allowing downstream nodes to resolve `value` and track progress state by `id`.
+  - Supply mock arguments or default params in test configurations to satisfy required input port checks on blocked nodes.
+

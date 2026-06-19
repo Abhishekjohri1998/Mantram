@@ -13,6 +13,7 @@ const UGCPro = lazy(() => import('../components/VideoStudio/UGCPro'))
 const QAds = lazy(() => import('../components/VideoStudio/QAds'))
 const QAdsV2 = lazy(() => import('../components/VideoStudio/QAdsV2'))
 const VideoAgent = lazy(() => import('../components/VideoStudio/VideoAgent'))
+const CanvasCopilot = lazy(() => import('../components/VideoStudio/CanvasCopilot'))
 const MotionGraphics = lazy(() => import('../components/VideoStudio/MotionGraphics'))
 const Storyboard = lazy(() => import('../components/VideoStudio/Storyboard'))
 import VideoUpgradeModal from '../components/VideoUpgradeModal'
@@ -911,6 +912,7 @@ export default function VideoStudio() {
                             // { id: 'ugc', icon: 'person_play', label: 'UGC Creator' },
                             { id: 'q-ads', icon: 'ads_click', label: 'Q-Ads' },
                             { id: 'ugc-pro', icon: 'smart_display', label: 'UGC Pro' },
+                            { id: 'canvas', icon: 'account_tree', label: '✦ Canvas' },
                             { id: 'agent', icon: 'smart_display', label: 'Video Agent' },
                             { id: 'motion-graphics', icon: 'motion_photos_auto', label: 'Motion Graphics' },
                             { id: 'storyboard', icon: 'movie_creation', label: '🎬 Storyboard' },
@@ -1307,6 +1309,24 @@ export default function VideoStudio() {
                             </div>
                         }>
                             <QAdsV2 activeBrand={activeBrand} projects={projects} projectsLoaded={projectsLoaded} onVideoComplete={() => fetchHistory(50)} initialTemplateId={initialTemplateId} canCreateVideo={canCreateVideo} onUpgradeRequired={() => setShowUpgradeModal(true)} user={user} />
+                        </Suspense>
+                    </div>
+                )}
+
+                {/* ── CANVAS COPILOT MODE ── */}
+                {visitedTabs.has('canvas') && (
+                    <div style={{ display: studioMode === 'canvas' ? 'flex' : 'none', height: 'calc(100vh - 110px)', width: '100%', flexDirection: 'column' }}>
+                        <Suspense fallback={
+                            <div className="w-full flex-1 flex flex-col items-center justify-center gap-4 text-[var(--sys-text-muted)]">
+                                <div className="w-10 h-10 border-4 border-t-primary border-r-primary border-b-[var(--sys-surface)] border-l-[var(--sys-surface)] rounded-full animate-spin"></div>
+                                <span className="text-sm">Loading Canvas…</span>
+                            </div>
+                        }>
+                            <CanvasCopilot
+                                sessionId={projectId || undefined}
+                                projectName={activeBrand?.name ? `${activeBrand.name} — Canvas` : 'Canvas Copilot'}
+                                userCredits={balance?.credits}
+                            />
                         </Suspense>
                     </div>
                 )}

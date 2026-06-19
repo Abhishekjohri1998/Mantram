@@ -31,11 +31,13 @@ try {
 
 const STITCH_TIMEOUT_MS = 120_000; // 2 minutes max for stitching
 
-/**
- * Download a remote URL to a local temp file
- */
 async function downloadToTemp(url, destPath) {
-    const resp = await fetch(url, { signal: AbortSignal.timeout(30000) });
+    const resp = await fetch(url, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+        },
+        signal: AbortSignal.timeout(30000)
+    });
     if (!resp.ok) throw new Error(`Failed to download clip: HTTP ${resp.status} for ${url.substring(0, 80)}`);
     const buffer = Buffer.from(await resp.arrayBuffer());
     await writeFile(destPath, buffer);
@@ -64,10 +66,13 @@ export async function stitchVideoClips(clipUrls, outputKey) {
     try {
         console.log(`[VideoStitcher] Downloading ${clipUrls.length} clips to temp...`);
 
-        // Download all clips
-        const localPaths = await Promise.all(
-            clipUrls.map((url, i) => downloadToTemp(url, path.join(tmpDir, `clip_${String(i).padStart(3, '0')}.mp4`)))
-        );
+        // Download all clips sequentially
+        const localPaths = [];
+        for (let i = 0; i < clipUrls.length; i++) {
+            const destPath = path.join(tmpDir, `clip_${String(i).padStart(3, '0')}.mp4`);
+            await downloadToTemp(clipUrls[i], destPath);
+            localPaths.push(destPath);
+        }
 
         // Create concat list file
         const concatList = localPaths.map(p => `file '${p}'`).join('\n');

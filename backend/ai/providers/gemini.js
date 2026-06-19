@@ -287,7 +287,7 @@ export class GeminiProvider extends BaseProvider {
         let modelId = model || this.config.defaultImageModel || 'gemini-2.5-flash-preview-05-20';
 
         // Map custom model aliases to native Gemini API models
-        if (modelId === 'nanobanana-2' || modelId === 'nanobanana' || modelId === 'gemini-3.1-flash-image-preview') {
+        if (modelId === 'nanobanana-2' || modelId === 'nanobanana' || modelId === 'gemini-3.1-flash-image-preview' || modelId === 'gemini-flash') {
             modelId = 'gemini-3.1-flash-image';
         } else if (modelId === 'nanobanana-pro') {
             modelId = 'gemini-3-pro-image';

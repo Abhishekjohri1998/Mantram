@@ -230,7 +230,7 @@ const BOT_SCAN_PATHS = [
     'secure/', 'webpages/', 'remote/', 'server-status', 'server_info',
     'trace.axd', 'Trace.axd', 'ApplicationStatus', 'login.action',
     'state/v1/', 'v1/agent', 'v1/catalog', 'v1/info', 'v1/meta', 'v1/nodes',
-    'v2/api-docs', 'v3/api-docs', 'v2/', 'dump.txt', 'sql.txt',
+    'v2/api-docs', 'v3/api-docs', 'api/v2/', 'dump.txt', 'sql.txt',
     'api/json', 'api/tags', 'api/version', 'api/status', 'api/install',
     'api/contents/', 'api/kernels', 'api/nodes', 'api/topics', 'api/p2p',
     'api/ray/', 'api/2.0/', 'api/v1.0/', 'api/v1.3/', 'api/v2.1/',

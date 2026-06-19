@@ -82,8 +82,26 @@ function PipelineProgress({ projectId, onComplete }) {
         function connectSSE() {
             if (cancelled) return
             const token = localStorage.getItem('mantram_token')
-            const es = new EventSource(`${API_BASE}/youtube-studio/${projectId}/progress?token=${token}`)
-            esRef.current = es
+            const rawUrl = `${API_BASE}/youtube-studio/${projectId}/progress?token=${token}`
+            
+            let absoluteUrl;
+            try {
+                absoluteUrl = new URL(rawUrl, window.location.origin).toString();
+            } catch (urlErr) {
+                console.error('[YouTubeStudio] Failed to construct absolute URL:', urlErr);
+                setTimeout(() => onComplete?.(), 3000)
+                return
+            }
+
+            let es;
+            try {
+                es = new EventSource(absoluteUrl)
+                esRef.current = es
+            } catch (err) {
+                console.error('[YouTubeStudio] Failed to initialize EventSource:', err);
+                setTimeout(() => onComplete?.(), 3000)
+                return
+            }
 
             es.onmessage = e => {
                 try {

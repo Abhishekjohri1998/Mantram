@@ -74,8 +74,22 @@ export function useJobPoller() {
             if (streamsRef.current.has(jobId)) return
 
             const url = jobsAPI.getJobStreamUrl(jobId)
-            const source = new EventSource(url)
-            streamsRef.current.set(jobId, source)
+            let absoluteUrl;
+            try {
+                absoluteUrl = new URL(url, window.location.origin).toString();
+            } catch (urlErr) {
+                console.error('[JobPoller] Failed to construct absolute URL:', urlErr);
+                return;
+            }
+
+            let source;
+            try {
+                source = new EventSource(absoluteUrl)
+                streamsRef.current.set(jobId, source)
+            } catch (err) {
+                console.error('[JobPoller] Failed to initialize EventSource:', err);
+                return;
+            }
 
             source.onmessage = (event) => {
                 if (event.data === 'ping') return

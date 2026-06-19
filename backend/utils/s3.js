@@ -20,40 +20,53 @@ const s3Client = new S3Client({
  * Tries Catbox.moe first, falls back to tmpfiles.org.
  */
 const uploadToPublicFallback = async (buffer, mimeType = "image/png") => {
+    const ext = mimeType.includes('wav') ? 'wav' : 
+                mimeType.includes('mpeg') || mimeType.includes('mp3') ? 'mp3' : 
+                mimeType.includes('aac') ? 'aac' : 
+                mimeType.includes('mp4') ? 'mp4' : 
+                mimeType.split('/')[1] || 'png';
+
     try {
         console.log(`📤 AWS S3 is down/unconfigured. Uploading to public fallback host (Catbox)...`);
         
         const formData = new globalThis.FormData();
         const fileBlob = new globalThis.Blob([buffer], { type: mimeType });
         formData.append("reqtype", "fileupload");
-        formData.append("fileToUpload", fileBlob, `upload-${Date.now()}.${mimeType.split('/')[1] || 'png'}`);
+        formData.append("fileToUpload", fileBlob, `upload-${Date.now()}.${ext}`);
 
-        const response = await axios.post("https://catbox.moe/user/api.php", formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
+        const response = await globalThis.fetch("https://catbox.moe/user/api.php", {
+            method: "POST",
+            body: formData
         });
 
-        if (response.data && typeof response.data === "string" && response.data.startsWith("http")) {
-            const publicUrl = response.data.trim();
+        const text = await response.text();
+        if (response.ok && text && text.startsWith("http")) {
+            const publicUrl = text.trim();
             console.log(`✅ Catbox upload success: ${publicUrl}`);
             return publicUrl;
         } else {
-            throw new Error(`Unexpected Catbox response: ${response.data}`);
+            throw new Error(`Unexpected Catbox response: ${text}`);
         }
     } catch (err) {
         console.warn("⚠️ Catbox upload failed, trying tmpfiles.org...", err.message);
         try {
             const formData = new globalThis.FormData();
             const fileBlob = new globalThis.Blob([buffer], { type: mimeType });
-            formData.append("file", fileBlob, `upload-${Date.now()}.${mimeType.split('/')[1] || 'png'}`);
+            formData.append("file", fileBlob, `upload-${Date.now()}.${ext}`);
             
-            const response = await axios.post("https://tmpfiles.org/api/v1/upload", formData);
-            if (response.data && response.data.status === "success" && response.data.data?.url) {
-                const viewerUrl = response.data.data.url;
+            const response = await globalThis.fetch("https://tmpfiles.org/api/v1/upload", {
+                method: "POST",
+                body: formData
+            });
+
+            const responseData = await response.json();
+            if (response.ok && responseData.status === "success" && responseData.data?.url) {
+                const viewerUrl = responseData.data.url;
                 const directUrl = viewerUrl.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/");
                 console.log(`✅ tmpfiles upload success: ${directUrl}`);
                 return directUrl;
             }
-            throw new Error(`Unexpected tmpfiles response: ${JSON.stringify(response.data)}`);
+            throw new Error(`Unexpected tmpfiles response: ${JSON.stringify(responseData)}`);
         } catch (tmpErr) {
             console.error("❌ Both fallback hosts failed:", tmpErr.message);
             throw new Error(`Public hosting fallback failed. Catbox error: ${err.message}. Tmpfiles error: ${tmpErr.message}`);

@@ -1960,6 +1960,207 @@ router.post('/agent/v2/generate', protect, requireCredits('videoGenerate'), aiGe
 });
 
 
+// ── GET /api/video-studio/agent/v2/node-catalog ──────────────────────────────
+router.get('/agent/v2/node-catalog', async (req, res) => {
+    try {
+        const { NODE_CATALOG } = await import('../agents/videoStudio/nodeCatalog.js');
+        res.json({ success: true, catalog: NODE_CATALOG });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+
+// ── GET /api/video-studio/agent/v2/graph/:sessionId/presets ────────────────────
+router.get('/agent/v2/graph/:sessionId/presets', protect, async (req, res) => {
+    try {
+        const { BUILTIN_PRESETS } = await import('../agents/videoStudio/presets.js');
+        const VideoGraph = (await import('../models/VideoGraph.js')).default;
+        const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
+
+        const sessionDoc = await VideoAgentSession.findOne({ sessionId: req.params.sessionId, user: req.user._id }).lean();
+        if (!sessionDoc) return res.status(404).json({ success: false, error: 'Session not found' });
+
+        const graph = await VideoGraph.findOne({ session: sessionDoc._id, user: req.user._id }).lean();
+        const customPresets = graph?.customPresets || [];
+
+        res.json({ success: true, presets: [...BUILTIN_PRESETS, ...customPresets] });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── POST /api/video-studio/agent/v2/graph/:sessionId/presets ───────────────────
+router.post('/agent/v2/graph/:sessionId/presets', protect, async (req, res) => {
+    try {
+        const { name, category, target_model, system_prompt, char_limit, style_tokens, preserve_mentions } = req.body;
+        if (!name || !system_prompt) {
+            return res.status(400).json({ success: false, error: 'Name and System Prompt are required' });
+        }
+
+        const VideoGraph = (await import('../models/VideoGraph.js')).default;
+        const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
+
+        const sessionDoc = await VideoAgentSession.findOne({ sessionId: req.params.sessionId, user: req.user._id }).lean();
+        if (!sessionDoc) return res.status(404).json({ success: false, error: 'Session not found' });
+
+        const newPreset = {
+            id: `custom_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+            name,
+            category: category || 'task',
+            target_model: target_model || null,
+            system_prompt,
+            char_limit: Number(char_limit) || 2000,
+            style_tokens: Array.isArray(style_tokens) ? style_tokens : [],
+            preserve_mentions: preserve_mentions !== false,
+            scope: 'project',
+            editable: true
+        };
+
+        const graph = await VideoGraph.findOneAndUpdate(
+            { session: sessionDoc._id, user: req.user._id },
+            { $push: { customPresets: newPreset } },
+            { new: true }
+        );
+
+        if (!graph) return res.status(404).json({ success: false, error: 'Graph not found' });
+        res.json({ success: true, preset: newPreset });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── DELETE /api/video-studio/agent/v2/graph/:sessionId/presets/:presetId ───────
+router.delete('/agent/v2/graph/:sessionId/presets/:presetId', protect, async (req, res) => {
+    try {
+        const VideoGraph = (await import('../models/VideoGraph.js')).default;
+        const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
+
+        const sessionDoc = await VideoAgentSession.findOne({ sessionId: req.params.sessionId, user: req.user._id }).lean();
+        if (!sessionDoc) return res.status(404).json({ success: false, error: 'Session not found' });
+
+        const graph = await VideoGraph.findOneAndUpdate(
+            { session: sessionDoc._id, user: req.user._id },
+            { $pull: { customPresets: { id: req.params.presetId } } },
+            { new: true }
+        );
+
+        if (!graph) return res.status(404).json({ success: false, error: 'Graph not found' });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// Helper for prompt enhancement used by both API and Copilot Agent
+export async function _enhancePromptInternal(sessionId, userId, nodeId, presetId, rawPrompt, graphObj) {
+    const { BUILTIN_PRESETS, mapModelToPresetId } = await import('../agents/videoStudio/presets.js');
+    const VideoGraph = (await import('../models/VideoGraph.js')).default;
+    const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
+
+    let graph = graphObj;
+    if (!graph) {
+        const sessionDoc = await VideoAgentSession.findOne({ sessionId, user: userId }).lean();
+        if (!sessionDoc) throw new Error('Session not found');
+        graph = await VideoGraph.findOne({ session: sessionDoc._id, user: userId }).lean();
+    }
+    if (!graph) throw new Error('Graph not found');
+
+    let targetPresetId = presetId || 'auto';
+    if (targetPresetId === 'auto') {
+        let targetModel = null;
+        const visited = new Set();
+        function traverse(id) {
+            if (visited.has(id)) return;
+            visited.add(id);
+            const nodeObj = graph.nodes.find(n => n.id === id);
+            if (!nodeObj) return;
+            if (nodeObj.type === 'image_generate' || nodeObj.type === 'video_generate') {
+                targetModel = nodeObj.params?.model || null;
+                return;
+            }
+            const outEdges = graph.edges.filter(e => e.from.node === id);
+            for (const edge of outEdges) {
+                traverse(edge.to.node);
+                if (targetModel) return;
+            }
+        }
+        traverse(nodeId);
+        targetPresetId = mapModelToPresetId(targetModel);
+    }
+
+    let preset = BUILTIN_PRESETS.find(p => p.id === targetPresetId);
+    if (!preset && graph.customPresets) {
+        preset = graph.customPresets.find(p => p.id === targetPresetId);
+    }
+    if (!preset) {
+        preset = BUILTIN_PRESETS.find(p => p.id === 'seedance');
+    }
+
+    const systemPrompt = `You are an expert AI prompt engineer. Your job is to rewrite the user idea into the perfect optimized prompt using the following preset's instruction:
+    Preset: "${preset.name}"
+    Preset instruction:
+    ${preset.system_prompt}
+
+    CRITICAL REQUIREMENT:
+    - Incorporate all @-mentions (such as @image1, @n_123, @text_input) exactly as written. Never delete, change, or strip any word starting with @. Leave it intact so it remains a functional variable link.
+    - Ensure the enhanced prompt does not exceed ${preset.char_limit} characters.
+    
+    Return a clean JSON object with this exact structure:
+    {
+      "enhancedPrompt": "The enhanced prompt text...",
+      "changes": ["List of visual enhancements made", "Description of layout additions..."]
+    }`;
+
+    const userPrompt = `User Raw Prompt: "${rawPrompt}"`;
+
+    const { callAgentText } = await import('../agents/shared/agentUtils.js');
+    const responseText = await callAgentText(systemPrompt, userPrompt, 0.7, 2048, {
+        provider: 'gemini',
+        preferFast: true
+    });
+
+    let parsed;
+    try {
+        const cleanText = responseText.replace(/```json/i, '').replace(/```/g, '').trim();
+        parsed = JSON.parse(cleanText);
+    } catch (e) {
+        parsed = {
+            enhancedPrompt: responseText.trim(),
+            changes: ['Expanded prompt based on preset style']
+        };
+    }
+
+    if (parsed.enhancedPrompt.length > preset.char_limit) {
+        parsed.enhancedPrompt = parsed.enhancedPrompt.substring(0, preset.char_limit);
+    }
+
+    return {
+        success: true,
+        presetId: preset.id,
+        presetName: preset.name,
+        rawPrompt,
+        enhancedPrompt: parsed.enhancedPrompt,
+        changes: parsed.changes || []
+    };
+}
+
+// ── POST /api/video-studio/agent/v2/graph/:sessionId/enhance-prompt ────────────
+router.post('/agent/v2/graph/:sessionId/enhance-prompt', protect, async (req, res) => {
+    try {
+        const { nodeId, presetId, rawPrompt } = req.body;
+        if (!nodeId || !presetId || !rawPrompt) {
+            return res.status(400).json({ success: false, error: 'nodeId, presetId, and rawPrompt are required' });
+        }
+
+        const enhanceResult = await _enhancePromptInternal(req.params.sessionId, req.user._id, nodeId, presetId, rawPrompt);
+        res.json(enhanceResult);
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+
 // ── GET Session State ──────────────────────────────────────────────────────────
 router.get('/agent/v2/:sessionId', protect, async (req, res) => {
     try {
@@ -2240,116 +2441,206 @@ Return ONLY the brief text — no JSON, no bullet points. Write it as a clear in
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// POST /agent/v2/chat — NLP Intent Engine
-// User sends any free-form message mid-pipeline; AI classifies intent and
-// returns { intent, action, params, agentResponse } so the frontend can route
+// POST /agent/v2/chat — Contextual AI Video Director
+// ══════════════════════════════════════════════════════════════════════════════
+// A real conversational AI that understands context, sentiment, and nuance.
+// Not keyword matching — the LLM reads the full conversation history and
+// genuinely understands what the user wants and how they feel.
 // ══════════════════════════════════════════════════════════════════════════════
 router.post('/agent/v2/chat', protect, async (req, res) => {
     try {
-        const { sessionId, stage, message, planContext = {}, storyboardContext = {}, analysisContext = {} } = req.body;
+        const {
+            sessionId,
+            stage,
+            message,
+            conversationHistory = [], // Full chat log from frontend: [{role, content}]
+            planContext = {},
+            storyboardContext = {},
+            analysisContext = {},
+        } = req.body;
         if (!message?.trim()) return res.status(400).json({ success: false, error: 'No message provided' });
 
         const { callAgent } = await import('../agents/shared/agentUtils.js');
 
-        // ── Load session for context ─────────────────────────────────────────
+        // ── Load session for rich context ─────────────────────────────────────
         // CRITICAL: sessionId is a custom string like "vas_1234_abc", NOT a
-        // MongoDB ObjectId. Using findById() would throw:
-        //   BSONError: The string did not match the expected pattern.
-        // Must use findOne({ sessionId }) instead.
+        // MongoDB ObjectId. Must use findOne({ sessionId }) not findById().
         let sessionDoc = null;
         if (sessionId) {
             const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
             sessionDoc = await VideoAgentSession.findOne({ sessionId, user: req.user._id }).lean();
         }
 
-        const brandName = sessionDoc?.brandName || planContext?.brandName || 'the brand';
-        const currentPlan = sessionDoc?.plan || planContext || {};
-        const currentStoryboard = sessionDoc?.storyboard || storyboardContext || {};
-        const currentAnalysis = sessionDoc?.analysis || analysisContext || {};
+        // ── Assemble full context ─────────────────────────────────────────────
+        const brandName = sessionDoc?.brand?.name || planContext?.brandName || 'your brand';
+        const plan      = sessionDoc?.plan       || planContext       || {};
+        const storyboard = sessionDoc?.storyboard || storyboardContext || {};
+        const analysis  = sessionDoc?.analysis   || analysisContext   || {};
+
+        // Build a readable conversation thread for context (last 12 messages)
+        const historyText = (conversationHistory.slice(-12) || [])
+            .map(m => `${m.role === 'user' ? 'User' : 'Director'}: ${m.content}`)
+            .join('\n');
+
+        // Stage-specific hints so the AI knows what actions make sense right now
+        const stageHints = {
+            idle:         'User has not started yet. Help them craft a brief or get started.',
+            analyze:      'Analysis complete. Next logical action: generate the creative plan.',
+            plan:         'Creative plan is shown. Next: generate reference images OR adjust plan details.',
+            refs:         'Reference images generated. User should review and approve them.',
+            'refs-review':'User is reviewing refs. They can approve, regenerate, or tweak.',
+            storyboard:   'Storyboard is built. Next: select the AI video model.',
+            model:        'Model selected. Next: confirm and generate the video.',
+            generate:     'Video is being generated or is done. Help user download, share, or iterate.',
+        };
 
         const MODEL_IDS = ['seedance-2.0', 'kling-3.0', 'veo-3.1', 'veo-3.1-fast', 'grok-imagine', 'gemini-flash'];
 
-        const systemPrompt = `You are Mantram's AI Video Director — an expert creative director and AI video strategist.
+        const MODEL_CONTEXT = `
+- seedance-2.0: Best for most ads. Fast, great image-to-video consistency, supports up to 120s.
+- kling-3.0: Best cinematic quality, multi-shot scripts, great for brand films. Up to 60s.
+- veo-3.1: Native audio/dialogue generation. Most realistic. Up to 30s.
+- veo-3.1-fast: Same as Veo but faster. Good for quick turnarounds.
+- grok-imagine: Fastest for short social reels & UGC. Up to 15s.
+- gemini-flash: Best for motion graphics and animated explainers.`;
 
-You are having a conversation with a user who is creating a video ad. The pipeline has distinct stages:
-- analyze: Brief analyzed, awaiting plan generation
-- plan: Creative plan shown, awaiting ref image generation  
-- refs-review: Reference images shown, awaiting user approval
-- storyboard: Storyboard building or shown, awaiting model selection
-- model: Model selected, awaiting generation
-- generate: Video generating or done
+        const systemPrompt = `You are Mantram's AI Video Director — a brilliant, warm, deeply experienced creative director who genuinely cares about making great work.
 
-CURRENT STATE:
-- Stage: ${stage}
-- Brand: ${brandName}
-- Plan title: ${currentPlan.title || 'not yet created'}
-- Duration: ${currentPlan.duration || 'unknown'}s
-- Ratio: ${currentPlan.ratio || 'unknown'}
-- Video type: ${currentPlan.videoType || 'unknown'}
-- Recommended model: ${currentPlan.modelRecommendation || 'seedance-2.0'}
-- Style: ${currentPlan.styleGuide || 'unknown'}
-- Scene count: ${currentStoryboard.cuts?.length || 'not created yet'}
+You are NOT a keyword matcher or a command parser. You are having a REAL conversation.
 
-AVAILABLE MODELS: ${MODEL_IDS.join(', ')}
+You understand:
+- What the user means, not just what they say
+- How they FEEL (excited, frustrated, confused, impatient, uncertain)
+- The full context of what has been created so far
+- When to push forward vs when to slow down and clarify
 
-INTENT CLASSIFICATION RULES:
-- APPROVE: User is happy, agrees, wants to proceed — "looks good", "yes", "perfect", "let's go", "great", "approve", "proceed", "next", "continue", "go ahead", "fire", "do it", "nice", "love it", emoji only like 👍✅
-- MODIFY_PLAN: User wants to change something about the plan — duration, ratio, type, style, audience, etc.
-- SWITCH_MODEL: User mentions a specific model name or says "use X instead"
-- ADD_CONTEXT: User wants to add more info to the brief — product details, brand info, references
-- ASK_QUESTION: User is asking something, confused, wants explanation
-- START_OVER: User wants to reset and start fresh — "start over", "reset", "different product", "scratch"
-- GENERATE_NOW: User explicitly wants to skip to generation — "just generate", "make the video now", "skip"
-- AMBIGUOUS: Message is unclear, cannot classify
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CURRENT PROJECT STATE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Stage: ${stage || 'idle'}
+What this means: ${stageHints[stage] || stageHints.idle}
 
-Extract parameters when relevant:
-- For MODIFY_PLAN: extract { duration, ratio, videoType, style, audience } — only include what changed
-- For SWITCH_MODEL: extract { model } — map to one of: ${MODEL_IDS.join(', ')}
-- For ADD_CONTEXT: extract { additionalContext } — the new info to add
+Brand: ${brandName}
+Analysis summary: ${analysis.summary || 'Not yet analyzed'}
+Content type: ${analysis.contentType || 'unknown'} | Style: ${analysis.detectedStyle || 'unknown'}
+Audience: ${analysis.audienceProfile || 'unknown'}
 
-Write agentResponse as a real, warm creative director:
-- For APPROVE: excited acknowledgment + describe what you're doing next
-- For MODIFY_PLAN: confirm the change + describe adjustment  
-- For SWITCH_MODEL: explain why that model is good/trade-offs
-- For ASK_QUESTION: answer naturally and helpfully
-- For START_OVER: acknowledge and confirm reset
-- Keep it SHORT — 1-2 sentences max. No bullet lists. First person. Warm, expert, not robotic.
+Creative Plan:
+  Title: ${plan.title || 'Not yet created'}
+  Duration: ${plan.duration ? plan.duration + 's' : 'TBD'} | Ratio: ${plan.ratio || 'TBD'}
+  Type: ${plan.videoType || 'TBD'} | Style: ${plan.style || 'TBD'}
+  Hook: ${plan.hookStrategy || 'TBD'}
+  Recommended model: ${plan.modelRecommendation || 'seedance-2.0'}
+  Scenes planned: ${Array.isArray(plan.scenePlan) ? plan.scenePlan.length : 0}
 
-EXAMPLES:
-User "looks amazing!": { intent: "APPROVE", agentResponse: "Love it! Generating your reference images now — character, product, and set design." }
-User "make it 60 seconds": { intent: "MODIFY_PLAN", params: { duration: 60 }, agentResponse: "60 seconds — gives us room for a proper narrative arc. Rebuilding the plan now." }
-User "use Kling for this": { intent: "SWITCH_MODEL", params: { model: "kling-3.0" }, agentResponse: "Kling 3.0 it is — great choice for cinematic multi-shot work. Rewriting the prompt for Kling's syntax." }
-User "what's the difference between models?": { intent: "ASK_QUESTION", agentResponse: "Seedance 2.0 is fastest and great for most ads. Kling 3.0 gives the most cinematic quality. Veo 3.1 adds native audio. Grok is fastest for short reels." }
-User "actually make it vertical for Instagram": { intent: "MODIFY_PLAN", params: { ratio: "9:16" }, agentResponse: "Switching to 9:16 vertical — perfect for Instagram Reels and TikTok. Adjusting the scene compositions." }
+Storyboard:
+  Cuts: ${Array.isArray(storyboard.cuts) ? storyboard.cuts.length : 0}
+  Color palette: ${(storyboard.colorPalette || []).join(', ') || 'not set'}
+  Environment: ${storyboard.environmentFingerprint?.substring(0, 80) || 'not set'}
 
-Return ONLY valid JSON: { "intent": "...", "params": {}, "agentResponse": "..." }`;
+${MODEL_CONTEXT}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CONVERSATION HISTORY:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${historyText || '(start of conversation)'}
 
-        const userPrompt = `User message: "${message}"
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+HOW TO RESPOND:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Read the user's message. Understand BOTH what they're saying AND how they feel.
 
-What is the intent? Return the JSON.`;
+SENTIMENT AWARENESS:
+- If they seem frustrated/impatient → acknowledge their feeling first, be efficient, cut the fluff
+- If they're excited/enthusiastic → match their energy, be celebratory
+- If they seem confused → slow down, explain clearly, offer to help
+- If they seem uncertain/hesitant → give them confidence and your honest recommendation
+- If they're being casual/playful → be warm and casual back
+- Never sound robotic, never give generic responses
+
+INTENT — Classify into ONE of:
+- APPROVE: They want to proceed with what's been shown (yes, looks good, love it, go ahead, 👍, fire, etc.)
+- MODIFY_PLAN: They want to change plan details (duration, ratio, type, style, audience, hook)
+- SWITCH_MODEL: They mention a different AI model to use
+- ADD_CONTEXT: They're adding more info to the brief (new details, references, corrections)
+- ASK_QUESTION: They're genuinely asking something (how does X work, what's the difference, why)
+- CLARIFY: Their intent is unclear — you need to ask a smart focused question to understand
+- ENCOURAGE: They need motivation or a pep talk (they seem stuck, worried, or doubting)
+- START_OVER: They explicitly want to reset (start fresh, try different product, scrap this)
+- GENERATE_NOW: They want to skip ahead to generation
+
+PARAMS — Extract only what's relevant and explicitly mentioned:
+- MODIFY_PLAN: { duration?: number, ratio?: string, videoType?: string, style?: string }
+- SWITCH_MODEL: { model?: string } — map to: ${MODEL_IDS.join(' | ')}
+- ADD_CONTEXT: { additionalContext?: string }
+
+AGENT RESPONSE — Write as a real creative director would:
+- Max 2 sentences. Natural. Warm but professional.
+- For APPROVE: say what you're doing next with specificity
+- For MODIFY_PLAN: confirm the change naturally, say what adjusting
+- For ASK_QUESTION: give a genuinely useful, direct answer
+- For CLARIFY: ask ONE specific focused question (not multiple)
+- For ENCOURAGE: be real and genuine, not generic
+- NO bullet lists. NO formatting. First person. Conversational.
+- Reference the actual brand/plan details when relevant — show you know their project
+
+Return ONLY valid JSON (no markdown, no explanation):
+{ "intent": "...", "params": {}, "agentResponse": "...", "sentiment": "excited|confident|neutral|confused|frustrated|impatient" }`;
+
+        const userPrompt = `User just said: "${message}"
+
+Given everything you know about this project and the conversation so far, what is their intent and how should you respond? Return the JSON.`;
 
         let result;
         try {
-            result = await callAgent(systemPrompt, userPrompt, 0.3, 512);
+            result = await callAgent(systemPrompt, userPrompt, 0.55, 600);
         } catch (err) {
-            console.warn('[VideoAgent/chat] Intent classification failed:', err.message);
-            result = { intent: 'AMBIGUOUS', params: {}, agentResponse: "I got that! Could you be a bit more specific so I can take the right action?" };
+            console.warn('[VideoAgent/chat] LLM call failed:', err.message);
+            result = {
+                intent: 'CLARIFY',
+                params: {},
+                agentResponse: "I want to make sure I get this right — could you tell me a bit more about what you're looking for?",
+                sentiment: 'neutral',
+            };
         }
 
-        // Ensure result has required fields
-        const intent = result?.intent || 'AMBIGUOUS';
-        const params = result?.params || {};
+        // Normalize response
+        const intent        = result?.intent       || 'CLARIFY';
+        const params        = result?.params        || {};
         const agentResponse = result?.agentResponse || "Got it! What would you like to do next?";
+        const sentiment     = result?.sentiment     || 'neutral';
 
-        console.log(`[VideoAgent/chat] stage=${stage} msg="${message.substring(0,40)}" → intent=${intent}`);
+        console.log(`[VideoAgent/chat] stage=${stage} sentiment=${sentiment} msg="${message.substring(0,50)}" → intent=${intent}`);
 
-        res.json({ success: true, intent, params, agentResponse });
+        // Save the message exchange to session history if we have a session
+        if (sessionDoc && sessionId) {
+            try {
+                const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
+                await VideoAgentSession.findOneAndUpdate(
+                    { sessionId },
+                    {
+                        $push: {
+                            messages: {
+                                $each: [
+                                    { role: 'user',  type: 'chat', content: message,       timestamp: Date.now() },
+                                    { role: 'agent', type: 'chat', content: agentResponse, timestamp: Date.now() + 1 },
+                                ],
+                            },
+                        },
+                    }
+                );
+            } catch (saveErr) {
+                console.warn('[VideoAgent/chat] Failed to save messages to session:', saveErr.message);
+            }
+        }
+
+        res.json({ success: true, intent, params, agentResponse, sentiment });
 
     } catch (error) {
         console.error('[VideoAgent/chat] Error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
+
 
 router.post('/compile', protect, async (req, res) => {
     const fs = await import('fs');
@@ -10153,5 +10444,786 @@ router.post('/storyboard/compile', protect, async (req, res) => {
         }
     }
 });
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  CANVAS COPILOT — Graph API
+//  Single-source-of-truth for the video workflow node canvas.
+//  All mutations go through the Command Bus (commandBus.js) — never direct writes.
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── In-memory SSE client registry (sessionId → Set<res>) ────────────────────
+const _sseClients = new Map();
+function _getClients(sessionId) {
+    if (!_sseClients.has(sessionId)) _sseClients.set(sessionId, new Set());
+    return _sseClients.get(sessionId);
+}
+function _broadcast(sessionId, event) {
+    for (const client of _getClients(sessionId)) {
+        try { client.write(`data: ${JSON.stringify(event)}\n\n`); } catch {}
+    }
+}
+
+
+
+// ── POST /api/video-studio/agent/v2/graph/init ───────────────────────────────
+// Create or retrieve the graph for a session (idempotent).
+router.post('/agent/v2/graph/init', protect, async (req, res) => {
+    try {
+        const { sessionId } = req.body;
+        if (!sessionId) return res.status(400).json({ success: false, error: 'sessionId required' });
+
+        const VideoGraph = (await import('../models/VideoGraph.js')).default;
+        const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
+
+        let session = await VideoAgentSession.findOne({ sessionId, user: req.user._id }).lean();
+        if (!session) {
+            // Auto-provision a default session so the canvas works even if accessed directly with a custom sessionId or projectId
+            session = await VideoAgentSession.create({
+                sessionId,
+                user: req.user._id,
+                stage: 'plan', // default stage
+                input: { brief: 'Canvas workspace session' }
+            });
+            session = session.toObject();
+            console.log(`[CanvasGraph] Auto-provisioned VideoAgentSession for ${sessionId}`);
+        }
+
+        // Idempotent: return existing graph if already created
+        let graph = await VideoGraph.findOne({ session: session._id, user: req.user._id });
+        if (!graph) {
+            const { v4: uuidv4 } = await import('uuid');
+            graph = await VideoGraph.create({
+                graphId: uuidv4(),
+                session: session._id,
+                user:    req.user._id,
+                brand:   session.brand || null,
+                version: 0,
+                nodes:   [],
+                edges:   [],
+            });
+            console.log(`[CanvasGraph] Created graph ${graph.graphId} for session ${sessionId}`);
+        }
+
+        res.json({ success: true, graph });
+    } catch (err) {
+        console.error('[CanvasGraph] init error:', err);
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── GET /api/video-studio/agent/v2/graph/:sessionId ──────────────────────────
+router.get('/agent/v2/graph/:sessionId', protect, async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        const VideoGraph = (await import('../models/VideoGraph.js')).default;
+        const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
+
+        const session = await VideoAgentSession.findOne({ sessionId, user: req.user._id }).lean();
+        if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
+
+        const graph = await VideoGraph.findOne({ session: session._id, user: req.user._id });
+        if (!graph) return res.status(404).json({ success: false, error: 'Graph not initialized — call /graph/init first' });
+
+        res.json({ success: true, graph });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── POST /api/video-studio/agent/v2/graph/:sessionId/command ─────────────────
+// Execute one Command Bus command. Validates, applies, persists, broadcasts.
+router.post('/agent/v2/graph/:sessionId/command', protect, async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        const { command, baseVersion, commandId } = req.body;
+        if (!command?.type) return res.status(400).json({ success: false, error: 'command.type required' });
+
+        const VideoGraph = (await import('../models/VideoGraph.js')).default;
+        const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
+        const { validateCommand, applyCommand, markDownstreamStale } = await import('../agents/videoStudio/commandBus.js');
+
+        const session = await VideoAgentSession.findOne({ sessionId, user: req.user._id }).lean();
+        if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
+
+        const graph = await VideoGraph.findOne({ session: session._id, user: req.user._id });
+        if (!graph) return res.status(404).json({ success: false, error: 'Graph not initialized' });
+
+        // Stale base check (tolerated when fields untouched, strict for now)
+        if (baseVersion !== undefined && graph.version > baseVersion + 5) {
+            return res.json({
+                success: false,
+                code: 'STALE_BASE',
+                message: `Graph is at version ${graph.version}, command was authored against ${baseVersion}. Please re-read the graph.`,
+                currentVersion: graph.version,
+            });
+        }
+
+        // Validate
+        const validation = validateCommand(graph.toObject(), command);
+        if (!validation.ok) {
+            return res.json({ success: false, ...validation });
+        }
+
+        // Apply
+        const author = command.author || 'user';
+        const { newGraph, inverseDiff } = applyCommand(graph.toObject(), { ...command, author });
+
+        // Mark downstream stale if params changed
+        const finalGraph = ['update_params', 'set_input', 'connect', 'disconnect'].includes(command.type)
+            ? markDownstreamStale(newGraph, command.payload?.nodeId || command.payload?.from?.node)
+            : newGraph;
+
+        // Persist (undo stack capped at 50)
+        const undoEntry = { command, inverse: inverseDiff, version: graph.version, author, commandId, ts: Date.now() };
+        await VideoGraph.updateOne(
+            { _id: graph._id },
+            {
+                $set: {
+                    nodes: finalGraph.nodes,
+                    edges: finalGraph.edges,
+                    version: finalGraph.version,
+                    redoStack: [], // clear redo on new command
+                },
+                $push: { undoStack: { $each: [undoEntry], $slice: -50 } },
+            }
+        );
+
+        const updatedGraph = await VideoGraph.findById(graph._id);
+
+        // Broadcast diff to all SSE subscribers
+        _broadcast(sessionId, {
+            type: 'graph_diff',
+            command,
+            author,
+            newVersion: finalGraph.version,
+            nodes: finalGraph.nodes,
+            edges: finalGraph.edges,
+        });
+
+        res.json({ success: true, version: finalGraph.version, graph: updatedGraph });
+    } catch (err) {
+        console.error('[CanvasGraph] command error:', err);
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── POST /api/video-studio/agent/v2/graph/:sessionId/commands ────────────────
+// Batch commands (transactional: all succeed or none apply).
+router.post('/agent/v2/graph/:sessionId/commands', protect, async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        const { commands = [], baseVersion, author = 'user' } = req.body;
+        if (!commands.length) return res.status(400).json({ success: false, error: 'commands array required' });
+
+        const VideoGraph = (await import('../models/VideoGraph.js')).default;
+        const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
+        const { validateCommand, applyCommand, markDownstreamStale } = await import('../agents/videoStudio/commandBus.js');
+
+        const session = await VideoAgentSession.findOne({ sessionId, user: req.user._id }).lean();
+        if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
+
+        const graph = await VideoGraph.findOne({ session: session._id, user: req.user._id });
+        if (!graph) return res.status(404).json({ success: false, error: 'Graph not initialized' });
+
+        // Validate all commands against a running graph state (no DB writes until all pass)
+        let runningGraph = graph.toObject();
+        const undoEntries = [];
+
+        for (let i = 0; i < commands.length; i++) {
+            const cmd = { ...commands[i], author };
+            const validation = validateCommand(runningGraph, cmd);
+            if (!validation.ok) {
+                return res.json({
+                    success: false,
+                    failedAtIndex: i,
+                    command: cmd,
+                    ...validation,
+                });
+            }
+            const { newGraph, inverseDiff } = applyCommand(runningGraph, cmd);
+            const finalG = ['update_params', 'set_input', 'connect', 'disconnect'].includes(cmd.type)
+                ? markDownstreamStale(newGraph, cmd.payload?.nodeId || cmd.payload?.from?.node)
+                : newGraph;
+            undoEntries.push({ command: cmd, inverse: inverseDiff, version: runningGraph.version, author, ts: Date.now() });
+            runningGraph = finalG;
+        }
+
+        // All valid — persist
+        await VideoGraph.updateOne(
+            { _id: graph._id },
+            {
+                $set: { nodes: runningGraph.nodes, edges: runningGraph.edges, version: runningGraph.version, redoStack: [] },
+                $push: { undoStack: { $each: undoEntries, $slice: -50 } },
+            }
+        );
+
+        // Broadcast bulk update
+        _broadcast(sessionId, {
+            type: 'graph_bulk',
+            commandCount: commands.length,
+            author,
+            newVersion: runningGraph.version,
+            nodes: runningGraph.nodes,
+            edges: runningGraph.edges,
+        });
+
+        res.json({ success: true, version: runningGraph.version, appliedCount: commands.length });
+    } catch (err) {
+        console.error('[CanvasGraph] batch commands error:', err);
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── POST /api/video-studio/agent/v2/graph/:sessionId/undo ───────────────────
+router.post('/agent/v2/graph/:sessionId/undo', protect, async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        const VideoGraph = (await import('../models/VideoGraph.js')).default;
+        const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
+        const { validateCommand, applyCommand } = await import('../agents/videoStudio/commandBus.js');
+
+        const session = await VideoAgentSession.findOne({ sessionId, user: req.user._id }).lean();
+        const graph = await VideoGraph.findOne({ session: session?._id, user: req.user._id });
+        if (!graph) return res.status(404).json({ success: false, error: 'Graph not found' });
+        if (!graph.undoStack.length) return res.json({ success: false, error: 'Nothing to undo' });
+
+        const last = graph.undoStack[graph.undoStack.length - 1];
+        const validation = validateCommand(graph.toObject(), last.inverse);
+        if (!validation.ok) return res.json({ success: false, error: `Cannot undo: ${validation.message}` });
+
+        const { newGraph } = applyCommand(graph.toObject(), last.inverse);
+        await VideoGraph.updateOne({ _id: graph._id }, {
+            $set: { nodes: newGraph.nodes, edges: newGraph.edges, version: newGraph.version },
+            $pop: { undoStack: 1 },
+            $push: { redoStack: last },
+        });
+
+        _broadcast(sessionId, { type: 'graph_undo', newVersion: newGraph.version, nodes: newGraph.nodes, edges: newGraph.edges });
+        res.json({ success: true, version: newGraph.version });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── POST /api/video-studio/agent/v2/graph/:sessionId/redo ───────────────────
+router.post('/agent/v2/graph/:sessionId/redo', protect, async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        const VideoGraph = (await import('../models/VideoGraph.js')).default;
+        const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
+        const { validateCommand, applyCommand } = await import('../agents/videoStudio/commandBus.js');
+
+        const session = await VideoAgentSession.findOne({ sessionId, user: req.user._id }).lean();
+        const graph = await VideoGraph.findOne({ session: session?._id, user: req.user._id });
+        if (!graph) return res.status(404).json({ success: false, error: 'Graph not found' });
+        if (!graph.redoStack.length) return res.json({ success: false, error: 'Nothing to redo' });
+
+        const next = graph.redoStack[graph.redoStack.length - 1];
+        const validation = validateCommand(graph.toObject(), next.command);
+        if (!validation.ok) return res.json({ success: false, error: `Cannot redo: ${validation.message}` });
+
+        const { newGraph } = applyCommand(graph.toObject(), next.command);
+        await VideoGraph.updateOne({ _id: graph._id }, {
+            $set: { nodes: newGraph.nodes, edges: newGraph.edges, version: newGraph.version },
+            $pop: { redoStack: 1 },
+            $push: { undoStack: next },
+        });
+
+        _broadcast(sessionId, { type: 'graph_redo', newVersion: newGraph.version, nodes: newGraph.nodes, edges: newGraph.edges });
+        res.json({ success: true, version: newGraph.version });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── GET /api/video-studio/agent/v2/graph/:sessionId/stream ───────────────────
+// SSE endpoint — client subscribes and receives real-time graph diffs.
+router.get('/agent/v2/graph/:sessionId/stream', protect, (req, res) => {
+    const { sessionId } = req.params;
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    // Send heartbeat to keep alive
+    const heartbeat = setInterval(() => {
+        try { res.write(': heartbeat\n\n'); } catch {}
+    }, 25000);
+
+    // Register subscriber
+    _getClients(sessionId).add(res);
+    console.log(`[CanvasGraph SSE] Client connected for session ${sessionId} (${_getClients(sessionId).size} total)`);
+
+    // Send current graph immediately
+    (async () => {
+        try {
+            const VideoGraph = (await import('../models/VideoGraph.js')).default;
+            const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
+            const session = await VideoAgentSession.findOne({ sessionId, user: req.user._id }).lean();
+            if (session) {
+                const graph = await VideoGraph.findOne({ session: session._id, user: req.user._id }).lean();
+                if (graph) res.write(`data: ${JSON.stringify({ type: 'graph_init', graph })}\n\n`);
+            }
+        } catch {}
+    })();
+
+    req.on('close', () => {
+        clearInterval(heartbeat);
+        _getClients(sessionId).delete(res);
+    });
+});
+
+async function _calculateGraphExecutionCost(nodesToRun, graphObj, isBilledNode, getCreditEstimate) {
+    const fanOutFactors = {};
+    const defaultItems = [
+        { id: '1', label: 'Scene 1: Introduction shot', checked: true },
+        { id: '2', label: 'Scene 2: Dynamic product transition', checked: true },
+        { id: '3', label: 'Scene 3: Detail zoom close-up', checked: false },
+    ];
+
+    for (const node of graphObj.nodes) {
+        fanOutFactors[node.id] = 1;
+    }
+
+    const { NODE_CATALOG } = await import('../agents/videoStudio/nodeCatalog.js');
+    const { topologicalSort } = await import('../agents/videoStudio/commandBus.js');
+
+    let nodeOrder = [];
+    try {
+        nodeOrder = topologicalSort(graphObj);
+    } catch (e) {
+        nodeOrder = nodesToRun;
+    }
+
+    for (const nodeId of nodeOrder) {
+        const node = graphObj.nodes.find(n => n.id === nodeId);
+        if (!node) continue;
+
+        let upstreamFanOutFactor = 1;
+        const catalog = NODE_CATALOG[node.type];
+        if (catalog && catalog.ports && catalog.ports.inputs) {
+            for (const port of catalog.ports.inputs) {
+                if (port.type !== 'asset_list' && !port.multi) {
+                    const edges = (graphObj.edges || []).filter(e => e.to.node === nodeId && e.to.port === port.id);
+                    for (const edge of edges) {
+                        const upstreamNodeId = edge.from.node;
+                        const upstreamNode = graphObj.nodes.find(n => n.id === upstreamNodeId);
+                        if (upstreamNode) {
+                            let factor = 1;
+                            if (upstreamNode.type === 'list') {
+                                const listItems = upstreamNode.params?.items || defaultItems;
+                                factor = listItems.filter(i => i.checked !== false).length;
+                                if (factor === 0) factor = 1;
+                            } else {
+                                factor = fanOutFactors[upstreamNodeId] || 1;
+                            }
+                            if (factor > upstreamFanOutFactor) {
+                                upstreamFanOutFactor = factor;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        fanOutFactors[node.id] = upstreamFanOutFactor;
+    }
+
+    let totalCost = 0;
+    const billedNodesDetails = [];
+    for (const nodeId of nodesToRun) {
+        const node = graphObj.nodes.find(n => n.id === nodeId);
+        if (node && isBilledNode(node.type)) {
+            const factor = fanOutFactors[node.id] || 1;
+            const singleCost = getCreditEstimate(node.type);
+            const cost = singleCost * factor;
+            totalCost += cost;
+            billedNodesDetails.push({
+                nodeId,
+                type: node.type,
+                credits: cost,
+                factor
+            });
+        }
+    }
+
+    return { totalCost, billedNodesDetails };
+}
+
+// ── POST /api/video-studio/agent/v2/graph/:sessionId/run ─────────────────────
+// Trigger graph execution. Returns cost estimate if unconfirmed (spend gate).
+router.post('/agent/v2/graph/:sessionId/run', protect, async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        const { confirmed = false, fromNodeId = null } = req.body;
+
+        const VideoGraph = (await import('../models/VideoGraph.js')).default;
+        const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
+        const { NODE_CATALOG, isBilledNode, getCreditEstimate } = await import('../agents/videoStudio/nodeCatalog.js');
+        const { topologicalSort } = await import('../agents/videoStudio/commandBus.js');
+
+        const session = await VideoAgentSession.findOne({ sessionId, user: req.user._id }).lean();
+        if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
+
+        const graph = await VideoGraph.findOne({ session: session._id, user: req.user._id });
+        if (!graph) return res.status(404).json({ success: false, error: 'Graph not initialized' });
+
+        // Determine which nodes need to run
+        const graphObj = graph.toObject();
+        let nodeOrder;
+        try {
+            nodeOrder = topologicalSort(graphObj);
+        } catch (cycleErr) {
+            return res.json({ success: false, error: cycleErr.message });
+        }
+
+        // Filter to fromNodeId subgraph if specified
+        const nodesToRun = fromNodeId
+            ? _getSubgraphFrom(graphObj, fromNodeId, nodeOrder)
+            : nodeOrder.filter(id => {
+                const n = graphObj.nodes.find(x => x.id === id);
+                return n && (n.state === 'idle' || n.state === 'stale');
+              });
+
+        // Pre-run validation: check required ports
+        const warnings = [];
+        for (const nodeId of nodesToRun) {
+            const node = graphObj.nodes.find(n => n.id === nodeId);
+            if (!node) continue;
+            const catalog = NODE_CATALOG[node.type];
+            for (const port of (catalog?.ports?.inputs || [])) {
+                if (!port.required) continue;
+                const hasEdge = graphObj.edges.some(e => e.to.node === nodeId && e.to.port === port.id);
+                const hasParam = node.params?.[port.id];
+                if (!hasEdge && !hasParam) {
+                    warnings.push({ nodeId, portId: port.id, message: `Required input "${port.label}" is not connected.` });
+                }
+            }
+        }
+
+        // Cost estimate using fanned-out calculation
+        const { totalCost: totalEstimate, billedNodesDetails } = await _calculateGraphExecutionCost(nodesToRun, graphObj, isBilledNode, getCreditEstimate);
+
+        // Spend gate: if not confirmed, return estimate for user approval
+        if (!confirmed && totalEstimate > 0) {
+            return res.json({
+                success: true,
+                gated: true,
+                message: `This run will use approximately ${totalEstimate} credits across fanned-out executions. Confirm to proceed.`,
+                estimate: totalEstimate,
+                billedNodes: billedNodesDetails,
+                warnings,
+            });
+        }
+
+        if (warnings.length > 0) {
+            return res.json({
+                success: false,
+                error: 'Graph has validation errors that must be fixed before running.',
+                warnings,
+            });
+        }
+
+        // ── Start execution (async) ──────────────────────────────────────────
+        const { v4: uuidv4 } = await import('uuid');
+        const runId = `run_${uuidv4().replace(/-/g, '').substring(0, 10)}`;
+
+        // Mark queued nodes
+        await VideoGraph.updateOne({ _id: graph._id }, {
+            $set: {
+                'activeRun.runId': runId,
+                'activeRun.startedAt': new Date(),
+                'activeRun.status': 'running',
+            }
+        });
+        for (const nodeId of nodesToRun) {
+            await VideoGraph.updateOne({ _id: graph._id, 'nodes.id': nodeId }, {
+                $set: { 'nodes.$.state': 'queued' }
+            });
+        }
+        _broadcast(sessionId, { type: 'run_started', runId, nodesToRun, estimate: totalEstimate });
+
+        // Execute asynchronously (non-blocking response)
+        res.json({ success: true, runId, nodesToRun, estimate: totalEstimate });
+
+        // Run execution in background
+        _executeGraphAsync({ graphId: graph._id, graphObj, nodesToRun, sessionId, runId, userId: req.user._id }).catch(err => {
+            console.error(`[CanvasGraph Run] Async execution failed for run ${runId}:`, err.message);
+            _broadcast(sessionId, { type: 'run_error', runId, error: err.message });
+        });
+
+    } catch (err) {
+        console.error('[CanvasGraph] run error:', err);
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── Background graph executor ─────────────────────────────────────────────────
+async function _executeGraphAsync({ graphId, graphObj, nodesToRun, sessionId, runId, userId }) {
+    const { executeGraphAsync } = await import('../agents/videoStudio/graphExecutor.js');
+    await executeGraphAsync({
+        graphId,
+        graphObj,
+        nodesToRun,
+        sessionId,
+        runId,
+        userId,
+        broadcast: (event) => _broadcast(sessionId, event)
+    });
+}
+
+function _getSubgraphFrom(graph, fromNodeId, topoOrder) {
+    // Get all nodes that are downstream of (or equal to) fromNodeId
+    const included = new Set([fromNodeId]);
+    _collectDownstreamIds(graph, fromNodeId, included);
+    return topoOrder.filter(id => included.has(id) && (() => {
+        const n = graph.nodes.find(x => x.id === id);
+        return n && (n.state === 'idle' || n.state === 'stale');
+    })());
+}
+
+function _collectDownstreamIds(graph, startId, collected) {
+    for (const edge of graph.edges.filter(e => e.from.node === startId)) {
+        if (!collected.has(edge.to.node)) {
+            collected.add(edge.to.node);
+            _collectDownstreamIds(graph, edge.to.node, collected);
+        }
+    }
+}
+
+// ── DELETE /api/video-studio/agent/v2/graph/:sessionId/run/:runId ────────────
+router.delete('/agent/v2/graph/:sessionId/run/:runId', protect, async (req, res) => {
+    try {
+        const { sessionId, runId } = req.params;
+        const VideoGraph = (await import('../models/VideoGraph.js')).default;
+        const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
+
+        const session = await VideoAgentSession.findOne({ sessionId, user: req.user._id }).lean();
+        const graph = await VideoGraph.findOne({ session: session?._id, user: req.user._id });
+        if (!graph) return res.status(404).json({ success: false, error: 'Graph not found' });
+        if (graph.activeRun?.runId !== runId) return res.json({ success: false, error: 'Run not active' });
+
+        await VideoGraph.updateOne({ _id: graph._id }, { $set: { 'activeRun.status': 'cancelled' } });
+
+        // Reset queued nodes back to idle
+        for (const node of graph.nodes.filter(n => n.state === 'queued' || n.state === 'running')) {
+            await VideoGraph.updateOne({ _id: graph._id, 'nodes.id': node.id }, { $set: { 'nodes.$.state': 'idle' } });
+        }
+
+        _broadcast(sessionId, { type: 'run_cancelled', runId });
+        res.json({ success: true, message: 'Run cancelled' });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── GET /api/video-studio/agent/v2/graph/:sessionId/run/:runId/status ────────
+router.get('/agent/v2/graph/:sessionId/run/:runId/status', protect, async (req, res) => {
+    try {
+        const { sessionId, runId } = req.params;
+        const VideoGraph = (await import('../models/VideoGraph.js')).default;
+        const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
+
+        const session = await VideoAgentSession.findOne({ sessionId, user: req.user._id }).lean();
+        const graph = await VideoGraph.findOne({ session: session?._id, user: req.user._id }).lean();
+        if (!graph) return res.status(404).json({ success: false, error: 'Graph not found' });
+
+        const nodeStates = graph.nodes.map(n => ({ id: n.id, state: n.state, outputRef: n.outputRef, error: n.error }));
+        res.json({ success: true, runId, activeRun: graph.activeRun, nodeStates });
+    } catch (err) {
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+
+// ── POST /api/video-studio/agent/v2/copilot ──────────────────────────────────
+// The brain of the Canvas Copilot.
+// Receives: natural language message + current graph state + conversation history
+// Returns: { agentResponse, commands[] } — text narration + Command Bus commands
+// The frontend applies commands via emitBatch (validated, reversible, attributed).
+router.post('/agent/v2/copilot', protect, async (req, res) => {
+    try {
+        const {
+            sessionId,
+            message,
+            graph,
+            conversationHistory = [],
+        } = req.body;
+
+        if (!message?.trim()) return res.status(400).json({ success: false, error: 'No message' });
+
+        const { callAgent } = await import('../agents/shared/agentUtils.js');
+        const { NODE_CATALOG, getAllTypes } = await import('../agents/videoStudio/nodeCatalog.js');
+
+        // Load session for brand/project context
+        let sessionDoc = null, brandCtx = null;
+        if (sessionId) {
+            const VideoAgentSession = (await import('../models/VideoAgentSession.js')).default;
+            sessionDoc = await VideoAgentSession.findOne({ sessionId, user: req.user._id }).lean();
+            if (sessionDoc?.brand) {
+                try { brandCtx = await loadBrandContext(sessionDoc.brand.toString()); } catch {}
+            }
+        }
+
+        // Build a readable summary of the current canvas
+        const nodeCount = graph?.nodes?.length || 0;
+        const edgeCount = graph?.edges?.length || 0;
+        const nodesSummary = (graph?.nodes || []).map(n =>
+            `  - ${n.id} (${n.type}) state=${n.state}${n.params?.model ? ` model=${n.params.model}` : ''}${n.params?.duration ? ` dur=${n.params.duration}s` : ''}`
+        ).join('\n');
+        const edgesSummary = (graph?.edges || []).map(e =>
+            `  - ${e.from.node}[${e.from.port}] → ${e.to.node}[${e.to.port}]`
+        ).join('\n');
+
+        const historyText = conversationHistory.slice(-10)
+            .map(m => `${m.role === 'user' ? 'User' : 'Director'}: ${m.content}`)
+            .join('\n');
+
+        const catalogSummary = Object.entries(NODE_CATALOG).map(([type, def]) =>
+            `  ${type}: ${def.description.slice(0, 80)} | cost=${def.costClass} | inputs=[${def.ports.inputs.map(p => `${p.id}:${p.type}`).join(',')}] | outputs=[${def.ports.outputs.map(p => `${p.id}:${p.type}`).join(',')}]`
+        ).join('\n');
+
+        const systemPrompt = `You are the Mantram Canvas Copilot — an AI video creative director that operates a node-based workflow canvas.
+
+Your role: turn the user's natural language into a PLAN + CANVAS COMMANDS that build, modify, or explain their video workflow.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CURRENT CANVAS STATE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Nodes (${nodeCount}):
+${nodesSummary || '  (empty canvas)'}
+
+Edges (${edgeCount}):
+${edgesSummary || '  (no connections)'}
+
+Graph version: ${graph?.version || 0}
+${brandCtx ? `\nBrand context: ${brandCtx.name || ''} — ${brandCtx.description || ''}` : ''}
+${sessionDoc?.analysis?.summary ? `\nProject analysis: ${sessionDoc.analysis.summary}` : ''}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NODE CATALOG (what you can create):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${catalogSummary}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CONVERSATION:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${historyText || '(start)'}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RULES (non-negotiable):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Only use node types from the catalog above. Never invent types.
+2. Port connections must be type-compatible: text→text, image→image, video→video, ref→ref, asset_list accepts image/video/audio.
+3. Never connect a port type to an incompatible one.
+4. For acyclical workflows: data flows LEFT→RIGHT (inputs → generators → transforms → output).
+5. When a user says "make a video" or gives a brief → build a COMPLETE workflow: text_input → prompt_expand → video_generate → output.
+6. Long-form (>30s) → use batch node pattern: text_input → batch → video_generate (loop per shot) → concat → output.
+7. For character/style consistency across shots → add character_ref and/or style_ref nodes, wire refs to video_generate.
+8. agentResponse must be 1-3 sentences. Short. Specific. Reference the actual nodes you're creating.
+9. Position nodes logically: inputs at x=100, generators at x=400-600, transforms at x=700-900, output at x=1100.
+10. Separate parallel branches vertically (y spacing: ~200px per branch).
+11. If the user asks a question (no canvas action needed) → return empty commands array.
+12. If the canvas already has a good structure → prefer the smallest change (add/modify) over rebuilding.
+
+COMMANDS you can emit (these go through the Command Bus and are validated):
+- { type: "add_node", payload: { type: "<catalog_type>", position: {x,y}, params: {...} } }
+- { type: "connect",  payload: { from: {node:"<id>",port:"<portId>"}, to: {node:"<id>",port:"<portId>"} } }
+- { type: "update_params", payload: { nodeId:"<id>", params:{...} } }
+- { type: "delete_node", payload: { nodeId:"<id>" } }
+- { type: "disconnect", payload: { edgeId:"<id>" } }
+- { type: "enhance_prompt", payload: { nodeId: "<id>", presetId: "<presetId>" } } (Instructs the studio to enhance the node's prompt. presetId is optional and defaults to "auto".)
+
+Node IDs for NEW nodes you create: use descriptive temp IDs like "n_text1", "n_expand1", "n_video1", "n_output1".
+Node IDs for EXISTING nodes: use the exact IDs from the canvas state above.
+
+Return ONLY valid JSON:
+{
+  "agentResponse": "...",
+  "commands": [...]
+}`;
+
+        const userPrompt = `User: "${message}"
+
+Based on the current canvas and catalog, what commands should I emit? Return the JSON.`;
+
+        let result;
+        try {
+            result = await callAgent(systemPrompt, userPrompt, 0.6, 2000);
+        } catch (err) {
+            console.warn('[Copilot] LLM error:', err.message);
+            result = { agentResponse: "I ran into a problem planning that. Could you try rephrasing?", commands: [] };
+        }
+
+        const agentResponse = result?.agentResponse || "Done!";
+        const commands = Array.isArray(result?.commands) ? result.commands : [];
+
+        // Intercept and expand enhance_prompt commands before validation
+        const processedCommands = [];
+        for (const cmd of commands) {
+            if (cmd.type === 'enhance_prompt') {
+                try {
+                    const { nodeId, presetId = 'auto' } = cmd.payload || {};
+                    const node = (graph?.nodes || []).find(n => n.id === nodeId);
+                    const rawPrompt = node?.params?.rawPrompt || node?.params?.text || node?.params?.prompt || '';
+                    if (rawPrompt) {
+                        const enhanceResult = await _enhancePromptInternal(sessionId, req.user._id, nodeId, presetId, rawPrompt, graph);
+                        if (enhanceResult.success) {
+                            processedCommands.push({
+                                type: 'update_params',
+                                payload: {
+                                    nodeId,
+                                    params: {
+                                        prompt: enhanceResult.enhancedPrompt,
+                                        rawPrompt,
+                                        enhancedPrompt: enhanceResult.enhancedPrompt,
+                                        selectedPresetId: enhanceResult.presetId
+                                    }
+                                },
+                                author: 'agent'
+                            });
+                        }
+                    }
+                } catch (err) {
+                    console.error('[Copilot Tool enhance_prompt] failed to process:', err);
+                }
+            } else {
+                processedCommands.push(cmd);
+            }
+        }
+
+        // Validate commands before returning (reject structurally invalid ones)
+        const { validateCommand } = await import('../agents/videoStudio/commandBus.js');
+        let runningGraph = graph || { nodes: [], edges: [], version: 0 };
+        const validCommands = [];
+
+        for (const cmd of processedCommands) {
+            const v = validateCommand(runningGraph, { ...cmd, author: 'agent' });
+            if (v.ok) {
+                validCommands.push({ ...cmd, author: 'agent' });
+                // Simulate apply for subsequent validation
+                const { applyCommand } = await import('../agents/videoStudio/commandBus.js');
+                try {
+                    const { newGraph } = applyCommand(runningGraph, { ...cmd, author: 'agent' });
+                    runningGraph = newGraph;
+                } catch {}
+            } else {
+                console.warn(`[Copilot] Command rejected: ${cmd.type} — ${v.message}`);
+            }
+        }
+
+        console.log(`[Copilot] msg="${message.slice(0,50)}" → ${validCommands.length}/${commands.length} valid commands`);
+
+        res.json({ success: true, agentResponse, commands: validCommands, intent: 'canvas_op' });
+
+    } catch (error) {
+        console.error('[Copilot] Error:', error);
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
 
 export default router;

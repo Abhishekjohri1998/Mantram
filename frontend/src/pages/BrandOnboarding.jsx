@@ -94,7 +94,23 @@ function WebsiteScan({ onComplete, onBack, initialUrl = '' }) {
         try {
             // Try SSE streaming first
             const streamUrl = agents.getScanStreamUrl(normalizedUrl)
-            const eventSource = new EventSource(streamUrl)
+            let absoluteUrl;
+            try {
+                absoluteUrl = new URL(streamUrl, window.location.origin).toString();
+            } catch (urlErr) {
+                console.error('[BrandOnboarding] Failed to construct absolute URL:', urlErr);
+                fallbackToPost(normalizedUrl);
+                return;
+            }
+
+            let eventSource;
+            try {
+                eventSource = new EventSource(absoluteUrl)
+            } catch (err) {
+                console.error('[BrandOnboarding] Failed to initialize EventSource:', err);
+                fallbackToPost(normalizedUrl);
+                return;
+            }
             let lastPhase = ''
 
             eventSource.addEventListener('progress', (e) => {

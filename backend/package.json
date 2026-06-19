@@ -6,7 +6,7 @@
     "scripts": {
         "start": "node index.js",
         "dev": "node --watch index.js",
-        "test": "node --experimental-vm-modules --test __tests__/unit.test.js",
+        "test": "node --experimental-vm-modules --test __tests__/unit.test.js __tests__/presets.test.js __tests__/promptEnhancer.test.js",
         "backup": "node scripts/syncS3ToLocal.js && node scripts/backupMongoToLocal.js",
         "backup:auto": "node scripts/cronBackup.js",
         "restore:s3": "node scripts/restoreS3FromLocal.js",
