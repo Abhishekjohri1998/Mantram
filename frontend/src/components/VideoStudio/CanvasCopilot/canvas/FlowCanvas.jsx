@@ -233,11 +233,14 @@ export default function FlowCanvas({ onNodeSelect, onCanvasClick }) {
     }, [emit]);
 
     // Node select — also focuses the canvas container so Delete key works
-    const onNodeClick = useCallback((_evt, node) => {
+    const onNodeClick = useCallback((evt, node) => {
         store.selectNode(node.id);
         onNodeSelect?.(node.data);
-        // Bring canvas container into focus so keyboard handler fires
-        containerRef.current?.focus({ preventScroll: true });
+        // Only bring canvas container into focus if they didn't click an input, button, select, handle, etc.
+        const isInputOrInteractive = evt?.target?.closest('input, textarea, select, button, [contenteditable="true"], .nodrag, .react-flow__handle');
+        if (!isInputOrInteractive) {
+            containerRef.current?.focus({ preventScroll: true });
+        }
     }, [store, onNodeSelect]);
 
     const onEdgeClick = useCallback((_evt, edge) => {
@@ -268,7 +271,13 @@ export default function FlowCanvas({ onNodeSelect, onCanvasClick }) {
             className="flow-canvas-container"
             tabIndex={0}
             style={{ outline: 'none' }}
-            onClick={() => containerRef.current?.focus({ preventScroll: true })}
+            onClick={(e) => {
+                // Focus container only if click target isn't inside input/textarea/select/button/nodrag/handle
+                const isInputOrInteractive = e.target.closest('input, textarea, select, button, [contenteditable="true"], .nodrag, .react-flow__handle');
+                if (!isInputOrInteractive) {
+                    containerRef.current?.focus({ preventScroll: true });
+                }
+            }}
         >
             <ReactFlow
                 nodes={rfNodes}
@@ -322,6 +331,8 @@ export default function FlowCanvas({ onNodeSelect, onCanvasClick }) {
                     <button
                         className="canvas-add-btn"
                         onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
                             const rect = e.currentTarget.getBoundingClientRect();
                             setNodeMenuPos({ x: rect.right + 8, y: rect.top, clientX: rect.right + 8, clientY: rect.top });
                         }}
