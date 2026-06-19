@@ -317,6 +317,7 @@ export default function FlowCanvas({ onNodeSelect, onCanvasClick }) {
                 onEdgesDelete={onEdgesDelete}
                 defaultViewport={{ x: 80, y: 80, zoom: 1 }}
                 deleteKeyCode={null} // handled manually via keyboard handler
+                panActivationKeyCode={null} // prevent spacebar from hijacking text input focus
                 minZoom={0.2}
                 maxZoom={2.5}
                 defaultEdgeOptions={{
