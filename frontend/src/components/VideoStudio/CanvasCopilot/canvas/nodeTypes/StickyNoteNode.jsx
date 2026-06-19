@@ -16,9 +16,12 @@ export default function StickyNoteNode({ data, selected }) {
     const [text, setText] = useState(textVal);
     const { emit } = useCommandBus();
     const debounceTimerRef = useRef(null);
+    const textareaRef = useRef(null);
 
     useEffect(() => {
-        setText(textVal);
+        if (document.activeElement !== textareaRef.current) {
+            setText(textVal);
+        }
     }, [textVal]);
 
     useEffect(() => {
@@ -111,6 +114,7 @@ export default function StickyNoteNode({ data, selected }) {
             )}
 
             <textarea
+                ref={textareaRef}
                 className="sticky-note-node__textarea nodrag nowheel"
                 style={{ fontSize: `${fontSize}px` }}
                 placeholder="Write note..."

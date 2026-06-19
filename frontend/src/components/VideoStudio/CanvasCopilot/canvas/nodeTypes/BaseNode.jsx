@@ -57,9 +57,12 @@ function getPortIcon(type, size = 11) {
 function InlineField({ paramKey, fieldSchema, initialValue, onChange }) {
     const [localVal, setLocalVal] = useState(initialValue);
     const debounceTimerRef = useRef(null);
+    const inputRef = useRef(null);
 
     useEffect(() => {
-        setLocalVal(initialValue);
+        if (document.activeElement !== inputRef.current) {
+            setLocalVal(initialValue);
+        }
     }, [initialValue]);
 
     useEffect(() => {
@@ -124,6 +127,7 @@ function InlineField({ paramKey, fieldSchema, initialValue, onChange }) {
             <div className="node-inline-field">
                 <span className="node-inline-label">{fieldSchema.label || paramKey}</span>
                 <select
+                    ref={inputRef}
                     className="node-inline-input nodrag"
                     value={localVal || ''}
                     onChange={e => {
@@ -146,6 +150,7 @@ function InlineField({ paramKey, fieldSchema, initialValue, onChange }) {
             <div className="node-inline-field node-inline-field--vertical">
                 <span className="node-inline-label">{fieldSchema.label || paramKey}</span>
                 <textarea
+                    ref={inputRef}
                     className="node-inline-input node-inline-input--full nodrag"
                     placeholder={`Enter ${fieldSchema.label || paramKey}...`}
                     value={displayVal}
@@ -162,6 +167,7 @@ function InlineField({ paramKey, fieldSchema, initialValue, onChange }) {
         <div className="node-inline-field">
             <span className="node-inline-label">{fieldSchema.label || paramKey}</span>
             <input
+                ref={inputRef}
                 className="node-inline-input nodrag"
                 type={fieldSchema.type === 'number' ? 'number' : 'text'}
                 value={localVal ?? ''}

@@ -19,8 +19,15 @@ export default function ImageGenerateNode({ data, selected }) {
 
     // Sync prompt text parameter
     useEffect(() => {
-        setPromptText(data?.params?.prompt || '');
-    }, [data?.params?.prompt]);
+        const activeEl = document.activeElement;
+        const isFocusedInThisNode = activeEl && 
+            (activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'INPUT') &&
+            activeEl.closest('.react-flow__node')?.getAttribute('data-id') === data.id;
+
+        if (!isFocusedInThisNode) {
+            setPromptText(data?.params?.prompt || '');
+        }
+    }, [data?.params?.prompt, data.id]);
 
     // Clean up timer on unmount
     useEffect(() => {

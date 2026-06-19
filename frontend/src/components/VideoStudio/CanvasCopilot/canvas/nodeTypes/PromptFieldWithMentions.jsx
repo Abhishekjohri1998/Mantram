@@ -23,7 +23,9 @@ export default function PromptFieldWithMentions({
     const store = useGraphStore();
 
     useEffect(() => {
-        setText(value || '');
+        if (document.activeElement !== textareaRef.current) {
+            setText(value || '');
+        }
     }, [value]);
 
     // Track cursor position to trigger suggestion popup
