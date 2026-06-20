@@ -272,6 +272,9 @@ function buildUserPrompt({
     logoDescription = '',
     productImageUrls = [],
     includeBranding = true,
+    // Brochure pipeline
+    brochureExtractedText = '',
+    isBrochure = false,
 }) {
     const logoDetails = (includeBranding && logoUrl)
         ? `\nBRAND LOGO DETAILS: description="${logoDescription}"`
@@ -316,6 +319,24 @@ function buildUserPrompt({
         ? `\nLOCATION/ELEMENT REFS: ${refImageUrls.length} reference image(s) provided for set design, background, or prop inspiration.`
         : '';
 
+    const documentSection = (isBrochure && brochureExtractedText) ? `
+
+═══════════════════════════════════════════════════════
+DOCUMENT CONTENT (VERBATIM — MANDATORY SCRIPT SOURCE)
+═══════════════════════════════════════════════════════
+The user uploaded a brochure/document. Below is ALL the text extracted from it verbatim.
+You MUST use the specific facts, numbers, prices, feature names, and copy from this document
+when writing scene descriptions and dialogues — do NOT paraphrase or generalize.
+
+${brochureExtractedText}
+
+CRITICAL RULES for document-sourced storyboards:
+- Every cut's scene MUST reference actual product/property/feature names from the document
+- Dialogue and voiceover lines MUST include specific numbers: prices, specs, dates, area sq ft, etc.
+- The narrative arc MUST follow the document's own structure (e.g. intro → features → pricing → CTA)
+- Do NOT invent specs or prices — only use what is in the document above
+` : '';
+
     return `CREATIVE BRIEF: "${brief || 'Create an incredibly creative, high-energy ad for this product.'}"
 ${imageMappingText}
 
@@ -326,7 +347,7 @@ FORMAT: ${format}
 VISUAL STYLE: ${style}
 DIALOGUE LANGUAGE: ${dialogueLanguage}
 AVATAR/PRESENTER(S): ${avatarInstruction}${refImageInstruction}
-BRAND NAME: ${brandName}${logoDetails}
+BRAND NAME: ${brandName}${logoDetails}${documentSection}
 
 Now act as the VISIONARY award-winning storyboard director. Deeply analyse every reference image, the brief, and the brand DNA.
 Write the complete 4-section structured storyboard JSON. Channel the energy of the world's best ad directors:
@@ -449,6 +470,9 @@ export async function runStoryboardDirector({
     style = 'hyperrealistic', duration = 30, format = '9:16', userId, directorModel = 'claude',
     dialogueLanguage = 'English',
     includeBranding = true,
+    // Brochure pipeline
+    brochureExtractedText = '',
+    isBrochure = false,
     // Legacy single-avatar compat
     avatarUrl = null,
 }) {
@@ -458,6 +482,10 @@ export async function runStoryboardDirector({
         : (avatarUrl ? [avatarUrl] : []);
 
     console.log(`[Storyboard Director] Starting — ${duration}s, style=${style}, format=${format}, avatars=${resolvedAvatarUrls.length}, refs=${refImageUrls.length}, branding=${includeBranding}`);
+    console.log(`[Storyboard Director] isBrochure=${isBrochure} brochureExtractedText.length=${(brochureExtractedText || '').length}`);
+    if (brochureExtractedText) {
+        console.log(`[Storyboard Director] brochureExtractedText preview: "${brochureExtractedText.substring(0, 300)}"`);
+    }
 
     // 1. Load brand DNA (even if not injecting into prompt — we need logoUrl)
     const { brand, brandContext } = await loadBrandContext(brandId);
@@ -507,6 +535,9 @@ export async function runStoryboardDirector({
         logoDescription: includeBranding ? logoDescription : '',
         productImageUrls,
         includeBranding,
+        // Brochure pipeline
+        brochureExtractedText,
+        isBrochure,
     });
 
     // 4. Build image URLs for multimodal agent — ALL product images + avatars + ref images

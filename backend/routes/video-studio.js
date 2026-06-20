@@ -8918,6 +8918,302 @@ router.get('/long-form/estimate', protect, (req, res) => {
 });
 
 
+
+// ══════════════════════════════════════════════════════════════════════════════
+// POST /api/video-studio/storyboard/analyze-brief-media
+// Analyzes an uploaded image (brochure/flyer/photo) or audio file and returns
+// a structured creative brief + full extracted text for the storyboard pipeline.
+//
+// KEY DESIGN DECISION: Brand DNA is NOT injected into the OCR system prompt.
+// Injecting brandName/brandCategory causes GPT-4o to hallucinate brand-aligned
+// content instead of faithfully reading the actual brochure. Brand name is only
+// used as a fallback if OCR fails to identify a product name.
+// ══════════════════════════════════════════════════════════════════════════════
+const storyboardBriefUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 100 * 1024 * 1024 }, // 100MB max (high-quality audio)
+}).single('file');
+
+router.post('/storyboard/analyze-brief-media', protect, (req, res) => {
+    storyboardBriefUpload(req, res, async (uploadErr) => {
+        if (uploadErr) {
+            return res.status(400).json({ success: false, error: uploadErr.message || 'File upload failed' });
+        }
+        try {
+            const file = req.file;
+            const brandId = req.body?.brandId || null;
+
+            if (!file) return res.status(400).json({ success: false, error: 'No file uploaded' });
+
+            const mime = file.mimetype || '';
+            const isImage = mime.startsWith('image/');
+            const isAudio = mime.startsWith('audio/') || /mpeg|mp4|m4a|ogg|wav|webm/.test(mime);
+
+            if (!isImage && !isAudio) {
+                return res.status(400).json({ success: false, error: 'Unsupported file type. Upload an image (JPG/PNG/WEBP) or audio (MP3/WAV/M4A).' });
+            }
+
+            console.log(`\n🎦 [analyze-brief-media] type=${mime} size=${(file.size / 1024).toFixed(0)}KB brand=${brandId}`);
+
+            // Brand name used ONLY as fallback — never injected into OCR prompt
+            const { loadBrandContext } = await import('../agents/shared/agentUtils.js');
+            const { brand } = await loadBrandContext(brandId);
+            const brandNameFallback = brand?.name || '';
+
+            // ── Upload to S3 ──────────────────────────────────────────────────
+            const { uploadToS3 } = await import('../utils/s3.js').catch(() => ({ uploadToS3: null }));
+            let mediaUrl = '';
+            if (uploadToS3) {
+                try {
+                    const ext = mime.split('/')[1]?.split(';')[0]?.replace('mpeg', 'mp3') || 'bin';
+                    const s3Key = `storyboard/brief-media/${req.user._id}/${Date.now()}.${ext}`;
+                    mediaUrl = await uploadToS3(file.buffer, s3Key, mime);
+                    console.log(`📤 [analyze-brief-media] S3: ${mediaUrl?.substring(0, 60)}`);
+                } catch (s3Err) {
+                    console.warn('[analyze-brief-media] S3 upload failed:', s3Err.message);
+                }
+            }
+
+            // ══════════════════════════════════════════════════════════════
+            // IMAGE PATH — Document OCR + Creative Brief (via GPT-4o vision)
+            // ══════════════════════════════════════════════════════════════
+            if (isImage) {
+                try {
+                    console.log('[analyze-brief-media] 🖼️ Starting image OCR + brief generation...');
+                    const sharp = (await import('sharp')).default;
+
+                    // 1600px preserves text for dense brochures
+                    const resized = await sharp(file.buffer)
+                        .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
+                        .jpeg({ quality: 88 })
+                        .toBuffer();
+                    const base64 = resized.toString('base64');
+
+                    const { getRouter } = await import('../ai/router.js');
+                    const router = getRouter();
+
+                    const systemPrompt = `You are a highly accurate document OCR engine AND a creative advertising strategist.
+Your PRIMARY JOB: Read and extract every single word, number, and symbol that is PRINTED OR WRITTEN on this image.
+
+This image may be a real estate brochure, product flyer, marketing pamphlet, pitch deck slide, printed catalogue, or business card.
+
+STEP 1 — FULL TEXT EXTRACTION (mandatory):
+Read the ENTIRE image like a high-resolution scanner. Extract ALL visible text:
+- Headlines and sub-headlines
+- Body copy and descriptions
+- Prices (₹1.2 Cr, $299, €599, etc.)
+- Specifications (2 BHK, 1250 sq ft, 500mg, etc.)
+- RERA numbers, license IDs, legal text
+- Location details, landmark names, distances (e.g. "5 min from Metro")
+- Amenities and feature bullet points
+- Phone numbers, websites, emails
+- Fine print, disclaimers, CTAs
+- ANY other printed or handwritten text, even if small
+
+STEP 2 — ADVERTISING BRIEF:
+Based ONLY on what you READ in the image (no external knowledge), write a 4-6 sentence director-ready video advertising brief.
+
+STEP 3 — JSON RESPONSE:
+Return ONLY a valid JSON object:
+{
+  "brief": "4-6 sentence director-ready brief based ONLY on what is in the image",
+  "productName": "Exact name as it ACTUALLY APPEARS in the image",
+  "productFeatures": "Comma-separated features EXACTLY as written (prices, specs, amenities)",
+  "suggestedDuration": 30,
+  "suggestedFormat": "9:16",
+  "extractedText": "COMPLETE verbatim text, every word in reading order, separated by | characters"
+}
+
+CRITICAL RULES:
+- extractedText MUST contain EVERY word from the image — used for video voiceover scripting
+- Do NOT hallucinate or invent facts not in the image
+- Do NOT use external brand knowledge — only read what is written
+- suggestedDuration: 15 (simple photo), 30 (single-page flyer), 60 (content-rich brochure), 90 (dense/multi-page)
+- suggestedFormat: "9:16" portrait/brochure, "16:9" landscape/presentation, "1:1" square
+- suggestedDuration MUST be one of: 15, 30, 60, 90
+- suggestedFormat MUST be one of: "9:16", "16:9", "1:1"`;
+
+                    // ═══════════════════════════════════════════════════════════════
+                    // VISION: Use router.nativeGemini directly — exact same pattern
+                    // as callMultimodalAgent() used in YouTube Studio, Creative Studio,
+                    // and all other studios. nativeGemini = real GeminiProvider (direct
+                    // Google API, NOT the Laozhang OpenAI-format proxy in providers.gemini).
+                    //
+                    // GeminiProvider.generateText accepts images[] as data: URIs or
+                    // http URLs — it fetches/decodes them into inlineData automatically.
+                    // ═══════════════════════════════════════════════════════════════
+                    const { getRouter: getVisionRouter } = await import('../ai/router.js');
+                    const visionRouter = getVisionRouter();
+
+                    // Prefer nativeGemini (direct Google API) — always has vision support.
+                    // Fall back to providers.gemini only if nativeGemini isn't initialised.
+                    const geminiVision = visionRouter.nativeGemini || visionRouter.providers.gemini;
+
+                    if (!geminiVision?.isAvailable()) {
+                        return res.status(503).json({
+                            success: false,
+                            error: 'Image analysis unavailable — GEMINI_API_KEY not configured. Please add it to .env or type your brief manually.',
+                        });
+                    }
+
+                    console.log(`[analyze-brief-media] 🔍 Calling Gemini vision (base64 length=${base64.length})...`);
+
+                    // Pass the image as a data: URI — GeminiProvider.generateText() handles
+                    // the base64 extraction and inlineData formatting automatically.
+                    const geminiResult = await geminiVision.generateText({
+                        systemPrompt,
+                        userPrompt: 'Read every word from this image. Extract ALL text verbatim and generate the advertising brief.',
+                        images: [`data:image/jpeg;base64,${base64}`],
+                        temperature: 0.1,
+                        maxTokens: 1500,
+                        model: 'gemini-2.5-flash-preview-05-20',
+                    });
+
+                    const raw = geminiResult?.text || '';
+                    const visionProviderUsed = 'gemini-flash';
+
+                    // ── Total failure: surface the error, don't hallucinate ────────────
+                    if (!raw) {
+                        console.error('[analyze-brief-media] ❌ All vision providers failed');
+                        return res.status(503).json({
+                            success: false,
+                            error: 'Image analysis failed — all AI vision providers are currently unavailable (quota/503). Please try again in a few minutes or type your brief manually.',
+                        });
+                    }
+
+                    console.log(`[analyze-brief-media] ✅ Vision by ${visionProviderUsed} — raw (first 300): ${raw.substring(0, 300)}`);
+
+                    // Strip markdown fences if present
+                    const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+                    let parsed;
+                    try {
+                        // Some models wrap in extra text — extract the JSON object
+                        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+                        parsed = JSON.parse(jsonMatch ? jsonMatch[0] : cleaned);
+                    } catch {
+                        // Regex key-by-key fallback if JSON is malformed
+                        const m = (key) => cleaned.match(new RegExp(`"${key}"\\s*:\\s*"([^"]+)"`))?.[1] || '';
+                        parsed = {
+                            brief: m('brief') || '',
+                            productName: m('productName') || brandNameFallback || '',
+                            productFeatures: m('productFeatures') || '',
+                            suggestedDuration: 30,
+                            suggestedFormat: '9:16',
+                            extractedText: m('extractedText') || cleaned.substring(0, 2000),
+                        };
+                    }
+
+                    console.log(`✅ [analyze-brief-media] provider=${visionProviderUsed} productName="${parsed.productName}" brief="${(parsed.brief || '').substring(0, 80)}"`);
+                    console.log(`📄 [analyze-brief-media] extractedText length=${parsed.extractedText?.length || 0} preview: "${(parsed.extractedText || '').substring(0, 300)}"`);
+
+                    return res.json({
+                        success: true,
+                        mediaType: 'image',
+                        brief: parsed.brief || '',
+                        productName: parsed.productName || brandNameFallback || '',
+                        productFeatures: parsed.productFeatures || '',
+                        suggestedDuration: [15, 30, 60, 90].includes(Number(parsed.suggestedDuration)) ? Number(parsed.suggestedDuration) : 30,
+                        suggestedFormat: ['9:16', '16:9', '1:1'].includes(parsed.suggestedFormat) ? parsed.suggestedFormat : '9:16',
+                        extractedText: parsed.extractedText || '',
+                        productImageUrl: mediaUrl || null,
+                        visionProvider: visionProviderUsed,
+                    });
+
+                } catch (visionErr) {
+                    console.error('[analyze-brief-media] ❌ Vision analysis threw:', visionErr.message);
+                    return res.status(503).json({
+                        success: false,
+                        error: `Image analysis failed: ${visionErr.message}. Please try again or type your brief manually.`,
+                    });
+                }
+            }
+
+            // ══════════════════════════════════════════════════════════════
+            // AUDIO PATH — Whisper transcription → creative brief
+            // ══════════════════════════════════════════════════════════════
+            if (isAudio) {
+                try {
+                    console.log('[analyze-brief-media] 🎙️ Transcribing audio brief...');
+                    const FormData = (await import('form-data')).default;
+                    const fetch = (await import('node-fetch')).default;
+
+                    const form = new FormData();
+                    const ext = mime.split('/')[1]?.split(';')[0]?.replace('mpeg', 'mp3') || 'mp3';
+                    form.append('file', file.buffer, { filename: `brief.${ext}`, contentType: mime });
+                    form.append('model', 'whisper-1');
+                    form.append('language', 'en');
+
+                    const whisperRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+                            ...form.getHeaders(),
+                        },
+                        body: form,
+                    });
+
+                    if (!whisperRes.ok) {
+                        const err = await whisperRes.text();
+                        throw new Error(`Whisper failed: ${err.substring(0, 200)}`);
+                    }
+
+                    const whisperData = await whisperRes.json();
+                    const transcript = whisperData.text || '';
+                    console.log(`[analyze-brief-media] Transcript (${transcript.length} chars): "${transcript.substring(0, 200)}"`);
+
+                    if (!transcript) {
+                        return res.json({
+                            success: true,
+                            mediaType: 'audio',
+                            brief: 'Create a video ad based on the uploaded audio brief.',
+                            productName: brandNameFallback || '',
+                            productFeatures: '',
+                            suggestedDuration: 30,
+                            suggestedFormat: '9:16',
+                            extractedText: '',
+                            productImageUrl: null,
+                        });
+                    }
+
+                    // Use transcript as the brief
+                    return res.json({
+                        success: true,
+                        mediaType: 'audio',
+                        brief: transcript,
+                        productName: brandNameFallback || '',
+                        productFeatures: '',
+                        suggestedDuration: 30,
+                        suggestedFormat: '9:16',
+                        extractedText: transcript,
+                        productImageUrl: null,
+                    });
+
+                } catch (audioErr) {
+                    console.error('[analyze-brief-media] Audio transcription failed:', audioErr.message);
+                    return res.json({
+                        success: true,
+                        mediaType: 'audio',
+                        brief: 'Create a compelling video ad based on the uploaded audio brief.',
+                        productName: brandNameFallback || '',
+                        productFeatures: '',
+                        suggestedDuration: 30,
+                        suggestedFormat: '9:16',
+                        extractedText: '',
+                        productImageUrl: null,
+                    });
+                }
+            }
+
+            return res.status(400).json({ success: false, error: 'Could not process file type.' });
+
+        } catch (err) {
+            console.error('[analyze-brief-media] Unexpected error:', err.message);
+            return res.status(500).json({ success: false, error: safeErrorMessage(err) });
+        }
+    });
+});
+
 // ══════════════════════════════════════════════════════════════════════════════
 // STORYBOARD STUDIO — AI Ad Film Director → Frame Generation → Animation
 // ══════════════════════════════════════════════════════════════════════════════
@@ -8949,11 +9245,24 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
             includeBranding: bodyIncludeBranding,
             directorModel = 'claude',
             imageModel = 'gpt-image-2',
-            dialogueLanguage = 'English'
+            dialogueLanguage = 'English',
+            // Brochure pipeline: full extracted text + flag from analyze-brief-media
+            brochureExtractedText = '',
+            isBrochure: bodyIsBrochure = 'false',
         } = req.body;
+
+        const isBrochure = bodyIsBrochure === 'true' || bodyIsBrochure === true;
 
         // Parse includeBranding (default true — branding ON by default)
         const includeBranding = bodyIncludeBranding === 'false' || bodyIncludeBranding === false ? false : true;
+
+        // 🔍 DIAGNOSTIC: Log what brochure data was received
+        console.log(`\n📌 [storyboard/create] isBrochure=${isBrochure} brochureExtractedText.length=${(brochureExtractedText || '').length}`);
+        if (brochureExtractedText) {
+            console.log(`📌 [storyboard/create] brochureExtractedText preview: "${brochureExtractedText.substring(0, 300)}"`);
+        } else {
+            console.log('⚠️  [storyboard/create] NO brochureExtractedText received — check frontend FormData');
+        }
 
         // Parse avatar names array
         let avatarNames = [];
@@ -9192,6 +9501,9 @@ Format: ${format} | Style: ${style === '3d' ? 'Pixar/Unreal Engine 3D animated' 
                 userId: req.user._id,
                 directorModel,
                 dialogueLanguage,
+                // Brochure pipeline
+                brochureExtractedText,
+                isBrochure,
             });
         }
 
