@@ -14,8 +14,15 @@ export default function TextInputNode({ data, selected }) {
 
     // Sync state with incoming graph data updates (e.g. from copilot)
     useEffect(() => {
-        setText(data?.params?.text || '');
-    }, [data?.params?.text]);
+        const activeEl = document.activeElement;
+        const isFocusedInThisNode = activeEl && 
+            (activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'INPUT') &&
+            activeEl.closest('.react-flow__node')?.getAttribute('data-id') === data.id;
+
+        if (!isFocusedInThisNode) {
+            setText(data?.params?.text || '');
+        }
+    }, [data?.params?.text, data.id]);
 
     // Clean up timer on unmount
     useEffect(() => {

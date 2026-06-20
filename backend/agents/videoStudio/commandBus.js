@@ -219,10 +219,26 @@ function _applyAddNode(g, payload, author) {
     for (const [k, schema] of Object.entries(catalog.params || {})) {
         defaults[k] = schema.default;
     }
+
+    // Coordinate collision avoidance
+    let { x, y } = position;
+    let collision = true;
+    while (collision) {
+        collision = false;
+        for (const n of g.nodes) {
+            if (n.id !== id && Math.abs((n.position?.x ?? 0) - x) < 20 && Math.abs((n.position?.y ?? 0) - y) < 20) {
+                x += 40;
+                y += 40;
+                collision = true;
+                break;
+            }
+        }
+    }
+
     const newNode = {
         id,
         type,
-        position: { ...position },
+        position: { x, y },
         params: { ...defaults, ...params },
         ports: catalog.ports,
         state: 'idle',

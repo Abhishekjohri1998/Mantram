@@ -178,18 +178,37 @@ export default function NodeInspector({ onRunNode }) {
             </div>
 
             {/* ── Output preview ── */}
-            {node.state === 'done' && node.outputRef && (
-                <div className="inspector-section">
-                    <div className="inspector-section-title">Output</div>
-                    {node.outputRef.match(/\.(mp4|webm|mov)$/i)
-                        ? <video src={node.outputRef} className="inspector-media" controls />
-                        : <img   src={node.outputRef} className="inspector-media" alt="output" />
-                    }
-                    <a href={node.outputRef} download className="inspector-download-btn">
-                        ⬇ Download
-                    </a>
-                </div>
-            )}
+            {node.state === 'done' && node.outputRef && (() => {
+                const url = node.outputRef;
+                if (typeof url !== 'string') return null;
+
+                const isVideo = url.match(/\.(mp4|webm|mov|m4v)$/i);
+                const isAudio = url.match(/\.(mp3|wav|ogg|m4a|aac)$/i);
+                const isImage = url.match(/\.(png|jpg|jpeg|webp|gif|svg)$/i) || url.startsWith('data:image/');
+
+                return (
+                    <div className="inspector-section">
+                        <div className="inspector-section-title">Output</div>
+                        {isVideo && <video src={url} className="inspector-media" controls />}
+                        {isAudio && <audio src={url} className="inspector-media-audio" controls style={{ width: '100%', marginBottom: '8px' }} />}
+                        {isImage && <img src={url} className="inspector-media" alt="output" />}
+                        {!isVideo && !isAudio && !isImage && (
+                            <textarea
+                                className="inspector-input inspector-input--ta"
+                                readOnly
+                                value={url}
+                                rows={6}
+                                style={{ background: 'rgba(0,0,0,0.15)', cursor: 'text', fontSize: '11px', fontFamily: 'monospace' }}
+                            />
+                        )}
+                        {(isVideo || isAudio || isImage) && (
+                            <a href={url} download className="inspector-download-btn">
+                                ⬇ Download
+                            </a>
+                        )}
+                    </div>
+                );
+            })()}
 
             {/* ── Actions ── */}
             <div className="inspector-section">

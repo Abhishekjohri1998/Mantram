@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Settings, Play, Film, Volume2, VolumeX } from 'lucide-react';
 import BaseNode from './BaseNode';
 import PromptFieldWithMentions from './PromptFieldWithMentions';
@@ -15,11 +15,28 @@ export default function VideoGenerateNode({ data, selected }) {
     const [showEnhancer, setShowEnhancer] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
     const [running, setRunning] = useState(false);
+    const debounceTimerRef = useRef(null);
 
     // Sync prompt text parameter
     useEffect(() => {
-        setPromptText(data?.params?.prompt || '');
-    }, [data?.params?.prompt]);
+        const activeEl = document.activeElement;
+        const isFocusedInThisNode = activeEl && 
+            (activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'INPUT') &&
+            activeEl.closest('.react-flow__node')?.getAttribute('data-id') === data.id;
+
+        if (!isFocusedInThisNode) {
+            setPromptText(data?.params?.prompt || '');
+        }
+    }, [data?.params?.prompt, data.id]);
+
+    // Clean up timer on unmount
+    useEffect(() => {
+        return () => {
+            if (debounceTimerRef.current) {
+                clearTimeout(debounceTimerRef.current);
+            }
+        };
+    }, []);
 
     // Check if prompt port is connected upstream
     const isPromptConnected = store.graph?.edges?.some(
@@ -36,13 +53,31 @@ export default function VideoGenerateNode({ data, selected }) {
 
     const displayPrompt = isPromptConnected ? getUpstreamPrompt() : promptText;
 
+    const triggerSave = useCallback((val) => {
+        if (val !== (data?.params?.prompt || '')) {
+            emit({
+                type: 'update_params',
+                payload: { nodeId: data.id, params: { ...data.params, prompt: val } },
+                author: 'user',
+            });
+        }
+    }, [data.id, data?.params, emit]);
+
     const handlePromptChange = (val) => {
         setPromptText(val);
-        emit({
-            type: 'update_params',
-            payload: { nodeId: data.id, params: { ...data.params, prompt: val } },
-            author: 'user',
-        });
+        if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+        }
+        debounceTimerRef.current = setTimeout(() => {
+            triggerSave(val);
+        }, 500);
+    };
+
+    const handleBlur = () => {
+        if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+        }
+        triggerSave(promptText);
     };
 
     const updateParam = (key, val) => {
@@ -101,7 +136,7 @@ export default function VideoGenerateNode({ data, selected }) {
                 { id: 'end_frame', type: 'image', label: 'End Frame' }
             ]}
         >
-            <div className="generator-node-body nodrag nowheel">
+            <div className="generator-node-body nowheel">
 
                 {/* Output Preview Area */}
                 <div className="node-media-preview-container">
@@ -124,6 +159,7 @@ export default function VideoGenerateNode({ data, selected }) {
                         nodeId={data.id}
                         value={displayPrompt}
                         onChange={handlePromptChange}
+                        onBlur={handleBlur}
                         disabled={isPromptConnected}
                         placeholder="Describe the video you want to generate..."
                         onEnhanceTrigger={() => setShowEnhancer(true)}

@@ -23,7 +23,9 @@ export default function PromptFieldWithMentions({
     const store = useGraphStore();
 
     useEffect(() => {
-        setText(value || '');
+        if (document.activeElement !== textareaRef.current) {
+            setText(value || '');
+        }
     }, [value]);
 
     // Track cursor position to trigger suggestion popup
@@ -119,7 +121,7 @@ export default function PromptFieldWithMentions({
         <div className="prompt-field-with-mentions-wrapper" style={{ position: 'relative' }}>
             <textarea
                 ref={textareaRef}
-                className="node-inline-textarea"
+                className="node-inline-textarea nodrag"
                 placeholder={disabled ? 'Connected prompt...' : placeholder}
                 value={text}
                 onChange={handleInputChange}

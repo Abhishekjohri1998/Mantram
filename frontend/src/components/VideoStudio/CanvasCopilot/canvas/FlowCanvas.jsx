@@ -91,8 +91,30 @@ const NODE_TYPES = {
 };
 
 
+// Positioning helper to prevent node stacking
+function findNonOverlappingPosition(pos, existingNodes) {
+    let currentX = pos.x;
+    let currentY = pos.y;
+    let foundCollision = true;
+
+    while (foundCollision) {
+        foundCollision = false;
+        for (const n of existingNodes) {
+            const dx = Math.abs(n.position.x - currentX);
+            const dy = Math.abs(n.position.y - currentY);
+            // Check for collision based on typical node dimensions (320px width, 240px height)
+            if (dx < 320 && dy < 240) {
+                currentX += 340; // Shift right to place side-by-side
+                foundCollision = true;
+                break;
+            }
+        }
+    }
+    return { x: currentX, y: currentY };
+}
+
 /** Convert our graph schema to React Flow nodes/edges */
-function graphToFlow(graph) {
+function graphToFlow(graph, selectedNodeId, selectedEdgeId) {
     if (!graph) return { nodes: [], edges: [] };
     const nodes = (graph.nodes || []).map(n => ({
         id: n.id,
@@ -102,7 +124,7 @@ function graphToFlow(graph) {
             ...n,
             label: n.type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
         },
-        selected: false,
+        selected: n.id === selectedNodeId,
     }));
     const edges = (graph.edges || []).map(e => {
         const sourceNode = graph.nodes.find(n => n.id === e.from.node);
@@ -122,6 +144,7 @@ function graphToFlow(graph) {
             animated: portType === 'asset_list',
             type: 'smoothstep',
             data: { author: e.author },
+            selected: e.id === selectedEdgeId,
         };
     });
     return { nodes, edges };
@@ -130,6 +153,7 @@ function graphToFlow(graph) {
 export default function FlowCanvas({ onNodeSelect, onCanvasClick }) {
     const store = useGraphStore();
     const { emit, undo, redo } = useCommandBus();
+    const { screenToFlowPosition } = useReactFlow();
 
     const [rfNodes, setRfNodes, onNodesChange] = useNodesState([]);
     const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState([]);
@@ -140,10 +164,10 @@ export default function FlowCanvas({ onNodeSelect, onCanvasClick }) {
     // Sync React Flow state from graph store
     useEffect(() => {
         if (!store.graph) return;
-        const { nodes, edges } = graphToFlow(store.graph);
+        const { nodes, edges } = graphToFlow(store.graph, store.selectedNodeId, store.selectedEdgeId);
         setRfNodes(nodes);
         setRfEdges(edges);
-    }, [store.graph]); // eslint-disable-line
+    }, [store.graph, store.selectedNodeId, store.selectedEdgeId]); // eslint-disable-line
 
     // Keyboard shortcuts
     useEffect(() => {
@@ -233,11 +257,14 @@ export default function FlowCanvas({ onNodeSelect, onCanvasClick }) {
     }, [emit]);
 
     // Node select — also focuses the canvas container so Delete key works
-    const onNodeClick = useCallback((_evt, node) => {
+    const onNodeClick = useCallback((evt, node) => {
         store.selectNode(node.id);
         onNodeSelect?.(node.data);
-        // Bring canvas container into focus so keyboard handler fires
-        containerRef.current?.focus({ preventScroll: true });
+        // Only bring canvas container into focus if they didn't click an input, button, select, handle, etc.
+        const isInputOrInteractive = evt?.target?.closest('input, textarea, select, button, [contenteditable="true"], .nodrag, .react-flow__handle');
+        if (!isInputOrInteractive) {
+            containerRef.current?.focus({ preventScroll: true });
+        }
     }, [store, onNodeSelect]);
 
     const onEdgeClick = useCallback((_evt, edge) => {
@@ -268,7 +295,13 @@ export default function FlowCanvas({ onNodeSelect, onCanvasClick }) {
             className="flow-canvas-container"
             tabIndex={0}
             style={{ outline: 'none' }}
-            onClick={() => containerRef.current?.focus({ preventScroll: true })}
+            onClick={(e) => {
+                // Focus container only if click target isn't inside input/textarea/select/button/nodrag/handle
+                const isInputOrInteractive = e.target.closest('input, textarea, select, button, [contenteditable="true"], .nodrag, .react-flow__handle');
+                if (!isInputOrInteractive) {
+                    containerRef.current?.focus({ preventScroll: true });
+                }
+            }}
         >
             <ReactFlow
                 nodes={rfNodes}
@@ -285,6 +318,7 @@ export default function FlowCanvas({ onNodeSelect, onCanvasClick }) {
                 onEdgesDelete={onEdgesDelete}
                 defaultViewport={{ x: 80, y: 80, zoom: 1 }}
                 deleteKeyCode={null} // handled manually via keyboard handler
+                panActivationKeyCode={null} // prevent spacebar from hijacking text input focus
                 minZoom={0.2}
                 maxZoom={2.5}
                 defaultEdgeOptions={{
@@ -322,6 +356,8 @@ export default function FlowCanvas({ onNodeSelect, onCanvasClick }) {
                     <button
                         className="canvas-add-btn"
                         onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
                             const rect = e.currentTarget.getBoundingClientRect();
                             setNodeMenuPos({ x: rect.right + 8, y: rect.top, clientX: rect.right + 8, clientY: rect.top });
                         }}
@@ -338,9 +374,16 @@ export default function FlowCanvas({ onNodeSelect, onCanvasClick }) {
                     position={nodeMenuPos}
                     onSelect={(type) => {
                         setNodeMenuPos(null);
+                        const flowPos = screenToFlowPosition({
+                            x: nodeMenuPos.clientX,
+                            y: nodeMenuPos.clientY
+                        });
+                        const targetPos = { x: flowPos.x - 80, y: flowPos.y - 20 };
+                        const nonOverlappingPos = findNonOverlappingPosition(targetPos, rfNodes);
+                        const tempId = `n_${Math.random().toString(36).substring(2, 10)}`;
                         emit({
                             type: 'add_node',
-                            payload: { type, position: { x: nodeMenuPos.x - 80, y: nodeMenuPos.y - 20 } },
+                            payload: { type, position: nonOverlappingPos, _tempId: tempId },
                             author: 'user',
                         });
                     }}

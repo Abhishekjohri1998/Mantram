@@ -24,6 +24,10 @@ const loginLimiter = rateLimit({
     message: { success: false, error: 'Too many login attempts. Please try again in 15 minutes.' },
     standardHeaders: true,
     legacyHeaders: false,
+    skip: (req) => {
+        const host = req.headers.host || '';
+        return host.includes('localhost') || host.includes('127.0.0.1');
+    }
 });
 
 // Registration: 3 per hour per IP (prevents spam accounts)
