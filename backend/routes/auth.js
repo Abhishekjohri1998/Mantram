@@ -1074,17 +1074,23 @@ router.get('/facebook/callback', async (req, res) => {
         const profileResp = await fetch(`https://graph.facebook.com/me?fields=id,name,email,picture.type(large)&access_token=${access_token}`);
         const profileData = await profileResp.json();
 
-        if (!profileData.email) {
-            const errorMsg = 'Could not retrieve email from Facebook. Please ensure your Facebook account has a verified email address.';
-            if (flow === 'redirect') {
-                const frontendUrl = config.frontendUrl[0] || 'https://mantram.ai';
-                return res.redirect(`${frontendUrl}/auth?error=${encodeURIComponent(errorMsg)}`);
+        let fbEmail = profileData.email;
+        if (!fbEmail) {
+            if (profileData.id) {
+                fbEmail = `${profileData.id}@facebook.mantram.ai`;
+                console.log(`ℹ️ No email returned from Facebook. Using fallback email: ${fbEmail}`);
+            } else {
+                const errorMsg = 'Could not retrieve email or profile ID from Facebook. Please ensure your Facebook account has a verified email address.';
+                if (flow === 'redirect') {
+                    const frontendUrl = config.frontendUrl[0] || 'https://mantram.ai';
+                    return res.redirect(`${frontendUrl}/auth?error=${encodeURIComponent(errorMsg)}`);
+                }
+                return res.send(closeAuthPopupScript(errorMsg, '', null, false, 'FACEBOOK'));
             }
-            return res.send(closeAuthPopupScript(errorMsg, '', null, false, 'FACEBOOK'));
         }
 
         // 3. Find or Create User (normalize email to catch duplicates)
-        const normalizedFbEmail = normalizeEmail(profileData.email);
+        const normalizedFbEmail = normalizeEmail(fbEmail);
         let user = await User.findOne({ email: normalizedFbEmail });
 
         if (!user) {
@@ -1130,7 +1136,7 @@ router.get('/facebook/callback', async (req, res) => {
             user = user[0];
         }
 
-        if (!fbUserId && profileData.email) {
+        if (!fbUserId && fbEmail) {
             const fallbackUser = await User.findOne({ email: normalizedFbEmail });
             if (fallbackUser) {
                 user = fallbackUser;
@@ -1139,7 +1145,7 @@ router.get('/facebook/callback', async (req, res) => {
         }
 
         if (!fbUserId) {
-            throw new Error(`User identification failed after Facebook login (Email: ${profileData.email})`);
+            throw new Error(`User identification failed after Facebook login (Email: ${fbEmail})`);
         }
 
         const stringId = fbUserId.toString();
