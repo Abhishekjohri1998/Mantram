@@ -9066,7 +9066,7 @@ CRITICAL RULES:
                         images: [`data:image/jpeg;base64,${base64}`],
                         temperature: 0.1,
                         maxTokens: 1500,
-                        model: 'gemini-2.5-flash-preview-05-20',
+                        model: 'gemini-2.5-flash',
                     });
 
                     const raw = geminiResult?.text || '';
@@ -9130,77 +9130,115 @@ CRITICAL RULES:
             }
 
             // ══════════════════════════════════════════════════════════════
-            // AUDIO PATH — Whisper transcription → creative brief
+            // AUDIO PATH — Gemini transcription → creative brief
             // ══════════════════════════════════════════════════════════════
             if (isAudio) {
                 try {
-                    console.log('[analyze-brief-media] 🎙️ Transcribing audio brief...');
-                    const FormData = (await import('form-data')).default;
-                    const fetch = (await import('node-fetch')).default;
+                    console.log('[analyze-brief-media] 🎙️ Starting audio transcription + brief generation via Gemini...');
+                    const base64 = file.buffer.toString('base64');
+                    const dataUri = `data:${mime};base64,${base64}`;
 
-                    const form = new FormData();
-                    const ext = mime.split('/')[1]?.split(';')[0]?.replace('mpeg', 'mp3') || 'mp3';
-                    form.append('file', file.buffer, { filename: `brief.${ext}`, contentType: mime });
-                    form.append('model', 'whisper-1');
-                    form.append('language', 'en');
+                    const { getRouter } = await import('../ai/router.js');
+                    const router = getRouter();
 
-                    const whisperRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-                            ...form.getHeaders(),
-                        },
-                        body: form,
-                    });
+                    // Prefer nativeGemini (direct Google API) — always has direct audio/multimodal support.
+                    const geminiAudio = router.nativeGemini || router.providers.gemini;
 
-                    if (!whisperRes.ok) {
-                        const err = await whisperRes.text();
-                        throw new Error(`Whisper failed: ${err.substring(0, 200)}`);
-                    }
-
-                    const whisperData = await whisperRes.json();
-                    const transcript = whisperData.text || '';
-                    console.log(`[analyze-brief-media] Transcript (${transcript.length} chars): "${transcript.substring(0, 200)}"`);
-
-                    if (!transcript) {
-                        return res.json({
-                            success: true,
-                            mediaType: 'audio',
-                            brief: 'Create a video ad based on the uploaded audio brief.',
-                            productName: brandNameFallback || '',
-                            productFeatures: '',
-                            suggestedDuration: 30,
-                            suggestedFormat: '9:16',
-                            extractedText: '',
-                            productImageUrl: null,
+                    if (!geminiAudio?.isAvailable()) {
+                        return res.status(503).json({
+                            success: false,
+                            error: 'Audio analysis unavailable — GEMINI_API_KEY not configured. Please add it to .env or type your brief manually.',
                         });
                     }
 
-                    // Use transcript as the brief
+                    console.log(`[analyze-brief-media] 🔍 Calling Gemini audio transcription (base64 length=${base64.length}, mime=${mime})...`);
+
+                    const systemPrompt = `You are a highly accurate audio transcription engine AND a creative advertising strategist.
+Your PRIMARY JOB: Listen to the audio and extract/transcribe every single word verbatim. Do not summarize, skip, or paraphrase the spoken words.
+
+STEP 1 — VERBATIM TRANSCRIPTION (mandatory):
+Transcribe the entire audio content exactly as it is spoken. Keep all original words.
+
+STEP 2 — ADVERTISING BRIEF:
+Based ONLY on what you transcribed from the audio (no external knowledge), write a 4-6 sentence director-ready video advertising brief.
+
+STEP 3 — JSON RESPONSE:
+Return ONLY a valid JSON object:
+{
+  "brief": "4-6 sentence director-ready brief based ONLY on what is in the audio content",
+  "productName": "Exact name of the product or brand mentioned in the audio (if any, otherwise empty string)",
+  "productFeatures": "Comma-separated features, offerings, or specifications spoken in the audio",
+  "suggestedDuration": 30,
+  "suggestedFormat": "9:16",
+  "extractedText": "VERBATIM transcription of the entire audio clip"
+}
+
+CRITICAL RULES:
+- extractedText MUST contain the COMPLETE verbatim transcript of the audio — this is crucial for downstream video voiceover scripting.
+- Do NOT hallucinate or invent facts not in the audio.
+- Do NOT use external brand knowledge.
+- suggestedDuration MUST be one of: 15, 30, 60, 90.
+- suggestedFormat MUST be one of: "9:16" portrait, "16:9" landscape, "1:1" square.
+- Return ONLY JSON. Do not include any explanations or markdown wrappers outside the JSON object.`;
+
+                    const geminiResult = await geminiAudio.generateText({
+                        systemPrompt,
+                        userPrompt: 'Transcribe the audio verbatim and extract key details into the specified JSON format.',
+                        images: [dataUri], // GeminiProvider accepts any inlineData data URI in the images list
+                        temperature: 0.1,
+                        maxTokens: 1500,
+                        model: 'gemini-2.5-flash',
+                    });
+
+                    const raw = geminiResult?.text || '';
+                    const audioProviderUsed = 'gemini-flash';
+
+                    if (!raw) {
+                        throw new Error('Gemini returned an empty response for audio analysis');
+                    }
+
+                    console.log(`[analyze-brief-media] ✅ Audio processed by ${audioProviderUsed} — raw (first 300): ${raw.substring(0, 300)}`);
+
+                    // Strip markdown fences if present
+                    const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+                    let parsed;
+                    try {
+                        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+                        parsed = JSON.parse(jsonMatch ? jsonMatch[0] : cleaned);
+                    } catch {
+                        const m = (key) => cleaned.match(new RegExp(`"${key}"\\s*:\\s*"([^"]+)"`))?.[1] || '';
+                        parsed = {
+                            brief: m('brief') || '',
+                            productName: m('productName') || brandNameFallback || '',
+                            productFeatures: m('productFeatures') || '',
+                            suggestedDuration: 30,
+                            suggestedFormat: '9:16',
+                            extractedText: m('extractedText') || cleaned.substring(0, 2000),
+                        };
+                    }
+
+                    console.log(`✅ [analyze-brief-media] provider=${audioProviderUsed} productName="${parsed.productName}" brief="${(parsed.brief || '').substring(0, 80)}"`);
+                    console.log(`📄 [analyze-brief-media] extractedText length=${parsed.extractedText?.length || 0} preview: "${(parsed.extractedText || '').substring(0, 300)}"`);
+
                     return res.json({
                         success: true,
                         mediaType: 'audio',
-                        brief: transcript,
-                        productName: brandNameFallback || '',
-                        productFeatures: '',
-                        suggestedDuration: 30,
-                        suggestedFormat: '9:16',
-                        extractedText: transcript,
+                        brief: parsed.brief || '',
+                        productName: parsed.productName || brandNameFallback || '',
+                        productFeatures: parsed.productFeatures || '',
+                        suggestedDuration: [15, 30, 60, 90].includes(Number(parsed.suggestedDuration)) ? Number(parsed.suggestedDuration) : 30,
+                        suggestedFormat: ['9:16', '16:9', '1:1'].includes(parsed.suggestedFormat) ? parsed.suggestedFormat : '9:16',
+                        extractedText: parsed.extractedText || '',
                         productImageUrl: null,
+                        visionProvider: audioProviderUsed,
                     });
 
                 } catch (audioErr) {
-                    console.error('[analyze-brief-media] Audio transcription failed:', audioErr.message);
-                    return res.json({
-                        success: true,
-                        mediaType: 'audio',
-                        brief: 'Create a compelling video ad based on the uploaded audio brief.',
-                        productName: brandNameFallback || '',
-                        productFeatures: '',
-                        suggestedDuration: 30,
-                        suggestedFormat: '9:16',
-                        extractedText: '',
-                        productImageUrl: null,
+                    console.error('[analyze-brief-media] ❌ Audio transcription/analysis failed:', audioErr.message);
+                    return res.status(503).json({
+                        success: false,
+                        error: `Audio transcription failed: ${audioErr.message}. Please try again or type your brief manually.`,
                     });
                 }
             }
