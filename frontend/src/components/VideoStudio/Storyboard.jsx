@@ -216,6 +216,15 @@ export default function Storyboard({
     const directAvatarInputRef = useRef();
     const refInputRef = useRef();
 
+    // ── Brief-from-media state (Image / Audio input modes) ──
+    const [inputMode, setInputMode] = useState('text'); // 'text' | 'image' | 'audio'
+    const [briefSourceFile, setBriefSourceFile] = useState(null); // { file, preview, name, type }
+    const [isAnalyzingBrief, setIsAnalyzingBrief] = useState(false);
+    const [briefAnalysisResult, setBriefAnalysisResult] = useState(null); // last API response
+    const [preSeededCuts, setPreSeededCuts] = useState(null); // from long audio
+    const [briefAudioDuration, setBriefAudioDuration] = useState(null); // set for long audio
+    const briefSourceInputRef = useRef(); // hidden file input for brief source
+
     // ── Reuse Project Settings ──
     const handleReuse = useCallback((project) => {
         if (!project) return;
@@ -371,6 +380,95 @@ export default function Storyboard({
         });
     };
 
+    // ── Brief from Media: upload + analyze ───────────────────────────────────
+    const handleBriefMediaAnalysis = async (file) => {
+        if (!file) return;
+        const isImg = file.type.startsWith('image/');
+        const isAud = file.type.startsWith('audio/') || /\.(mp3|wav|m4a|ogg|webm|mp4)$/i.test(file.name);
+        if (!isImg && !isAud) {
+            setError('Unsupported file type. Upload an image (JPG/PNG/WEBP) or audio (MP3/WAV/M4A).');
+            return;
+        }
+
+        const preview = isImg ? URL.createObjectURL(file) : null;
+        setBriefSourceFile({ file, preview, name: file.name, type: isImg ? 'image' : 'audio' });
+        // Auto-switch inputMode to match file type (covers cross-type drag-and-drop)
+        setInputMode(isImg ? 'image' : 'audio');
+        setIsAnalyzingBrief(true);
+        setError('');
+
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            if (activeBrand?._id) fd.append('brandId', activeBrand._id);
+
+            const res = await fetch(`${API}/storyboard/analyze-brief-media`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${localStorage.getItem('mantram_token')}` },
+                body: fd,
+            });
+
+            const data = await safeJson(res);
+            if (!data.success) throw new Error(data.error || 'Analysis failed');
+
+            setBriefAnalysisResult(data);
+
+            // Pre-fill brief (always editable) — keep it clean and concise.
+            // productFeatures and extractedText are sent SEPARATELY to the backend
+            // so the director LLM gets full verbatim document content without truncation.
+            if (data.brief) {
+                setBrief(data.brief);
+            }
+
+            // Pre-fill product name if not already set
+            if (data.productName && !productName) setProductName(data.productName);
+
+            // Pre-fill format
+            if (data.suggestedFormat) setFormat(data.suggestedFormat);
+
+            // Pre-fill duration (rounded to nearest 5s slider step)
+            if (data.suggestedDuration) setDuration(data.suggestedDuration);
+
+            // Long audio: store preSeededCuts + display duration notice
+            if (data.preSeededCuts?.length) {
+                setPreSeededCuts(data.preSeededCuts);
+                setBriefAudioDuration(data.audioDuration || null);
+            } else {
+                setPreSeededCuts(null);
+                setBriefAudioDuration(null);
+            }
+
+            // NOTE: We intentionally do NOT add the brief source image to productImages.
+            // A brochure/flyer/document uploaded here is for text content extraction only.
+            // Adding it as a product image causes frame-generation models (Gemini/GPT-Image)
+            // to embed the literal brochure page inside video frames, which is wrong.
+            // Users who want a product photo as a visual reference should upload it in the
+            // Products section on the left column.
+
+        } catch (err) {
+            console.error('[BriefMedia]', err);
+            setError(err.message || 'Failed to analyze file. You can still type your brief manually.');
+        } finally {
+            setIsAnalyzingBrief(false);
+        }
+    };
+
+    const handleBriefSourceDrop = (e) => {
+        e.preventDefault();
+        if (isAnalyzingBrief) return; // ignore drops while analysis is in-flight
+        const file = e.dataTransfer.files?.[0];
+        if (file) handleBriefMediaAnalysis(file);
+    };
+
+    const handleClearBriefSource = () => {
+        if (briefSourceFile?.preview?.startsWith('blob:')) URL.revokeObjectURL(briefSourceFile.preview);
+        setBriefSourceFile(null);
+        setBriefAnalysisResult(null);
+        setPreSeededCuts(null);
+        setBriefAudioDuration(null);
+        if (briefSourceInputRef.current) briefSourceInputRef.current.value = '';
+    };
+
     const handleProductUrlAdd = async () => {
         if (!productUrlInput.trim() || isScrapingUrl) return;
         const url = productUrlInput.trim();
@@ -491,7 +589,20 @@ export default function Storyboard({
             fd.append('directorModel', directorModel);
             fd.append('imageModel', imageModel);
             fd.append('dialogueLanguage', dialogueLanguage);
-            if (initialCuts) {
+            // Brochure/document analysis data — send FULL content, no truncation
+            // briefAnalysisResult is persisted in state from handleBriefMediaAnalysis
+            if (briefAnalysisResult?.productFeatures) {
+                fd.append('productFeatures', briefAnalysisResult.productFeatures);
+            }
+            if (briefAnalysisResult?.extractedText) {
+                // Full verbatim text from brochure — NOT truncated, sent as dedicated field
+                fd.append('brochureExtractedText', briefAnalysisResult.extractedText);
+                fd.append('isBrochure', 'true');
+            }
+            // preSeededCuts: from long-audio analysis (takes precedence over initialCuts)
+            if (preSeededCuts?.length) {
+                fd.append('preSeededCuts', JSON.stringify(preSeededCuts));
+            } else if (initialCuts) {
                 fd.append('preSeededCuts', JSON.stringify(initialCuts));
             }
 
@@ -532,6 +643,14 @@ export default function Storyboard({
                     });
                 }
             }
+            // Clean up brief-media state now that generation has consumed it
+            if (briefSourceFile?.preview?.startsWith('blob:')) URL.revokeObjectURL(briefSourceFile.preview);
+            setBriefSourceFile(null);
+            setBriefAnalysisResult(null);
+            // Keep preSeededCuts + briefAudioDuration cleared ONLY after successful submit
+            // (they were already sent to the backend; keep them visible in UI until now)
+            setPreSeededCuts(null);
+            setBriefAudioDuration(null);
             setPhase('review');
         } catch (e) {
             setError(e.message || 'Failed to generate storyboard');
@@ -893,14 +1012,135 @@ export default function Storyboard({
 
                         {/* ── Row 1: Brief Input (full width) ── */}
                         <div className="scott-brief-row">
-                            <span className="material-symbols-outlined" style={{ color: 'rgba(255,255,255,0.3)', fontSize: 18 }}>edit</span>
-                            <DebouncedInput
-                                className="scott-input"
-                                placeholder="Describe your ad film... e.g. 'Create a 30s emotional ad for our protein powder targeting young fitness enthusiasts...'"
-                                value={brief}
-                                onChange={setBrief}
-                                disabled={isLoading}
-                            />
+
+                            {/* Input mode toggle pills */}
+                            <div className="sb-input-mode-bar">
+                                <button
+                                    type="button"
+                                    className={`sb-mode-source-btn ${inputMode === 'text' ? 'active' : ''}`}
+                                    onClick={() => { setInputMode('text'); handleClearBriefSource(); }}
+                                    title="Type your brief"
+                                >
+                                    <span className="material-symbols-outlined">edit</span>
+                                    Write
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`sb-mode-source-btn ${inputMode === 'image' ? 'active' : ''}`}
+                                    onClick={() => setInputMode('image')}
+                                    title="Upload a brochure, flyer, or product image"
+                                >
+                                    <span className="material-symbols-outlined">image</span>
+                                    Image
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`sb-mode-source-btn ${inputMode === 'audio' ? 'active' : ''}`}
+                                    onClick={() => setInputMode('audio')}
+                                    title="Upload a voice brief or audio pitch"
+                                >
+                                    <span className="material-symbols-outlined">mic</span>
+                                    Audio
+                                </button>
+                            </div>
+
+                            {/* Brief text input (always visible, editable) */}
+                            <div className="sb-brief-input-area">
+                                {briefAnalysisResult && (
+                                    <div className="sb-brief-ai-badge">
+                                        <span className="material-symbols-outlined">auto_awesome</span>
+                                        AI-generated · editable
+                                    </div>
+                                )}
+                                <DebouncedInput
+                                    className="scott-input"
+                                    placeholder={inputMode === 'image' ? 'Upload an image below — AI will fill this brief for you...' : inputMode === 'audio' ? 'Upload audio below — AI will transcribe and create your brief...' : "Describe your ad film... e.g. 'Create a 30s emotional ad for our protein powder targeting young fitness enthusiasts...'"}
+                                    value={brief}
+                                    onChange={setBrief}
+                                    disabled={isLoading || isAnalyzingBrief}
+                                />
+                            </div>
+
+                            {/* Drop zone (image/audio modes only) */}
+                            {inputMode !== 'text' && (
+                                <div
+                                    className={`sb-brief-source-zone ${isAnalyzingBrief ? 'analyzing' : ''} ${briefSourceFile ? 'has-file' : ''}`}
+                                    onDragOver={e => e.preventDefault()}
+                                    onDrop={handleBriefSourceDrop}
+                                    onClick={() => !briefSourceFile && !isAnalyzingBrief && briefSourceInputRef.current?.click()}
+                                >
+                                    {isAnalyzingBrief ? (
+                                        <div className="sb-brief-source-loading">
+                                            <div className="sb-brief-shimmer" />
+                                            <div className="sb-brief-source-loading-text">
+                                                <span className="material-symbols-outlined spin" style={{ fontSize: 18, color: 'var(--sys-primary)' }}>autorenew</span>
+                                                {briefSourceFile?.type === 'audio' ? 'Transcribing audio & building shot plan…' : 'Analyzing image & extracting brief…'}
+                                            </div>
+                                        </div>
+                                    ) : briefSourceFile ? (
+                                        <div className="sb-brief-source-preview">
+                                            {briefSourceFile.type === 'image' && briefSourceFile.preview && (
+                                                <img src={briefSourceFile.preview} alt="Source" className="sb-brief-source-thumb" />
+                                            )}
+                                            {briefSourceFile.type === 'audio' && (
+                                                <div className="sb-brief-source-audio-icon">
+                                                    <span className="material-symbols-outlined">graphic_eq</span>
+                                                </div>
+                                            )}
+                                            <div className="sb-brief-source-meta">
+                                                <span className="sb-brief-source-filename">{briefSourceFile.name}</span>
+                                                {briefAudioDuration && (
+                                                    <span className="sb-brief-source-chip">
+                                                        <span className="material-symbols-outlined">schedule</span>
+                                                        {preSeededCuts?.length} shots · {Math.round(briefAudioDuration)}s audio
+                                                    </span>
+                                                )}
+                                                {briefAnalysisResult && !preSeededCuts && (
+                                                    <span className="sb-brief-source-chip sb-brief-source-chip--done">
+                                                        <span className="material-symbols-outlined">check_circle</span>
+                                                        Brief extracted
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <button
+                                                type="button"
+                                                className="sb-brief-source-clear"
+                                                onClick={e => { e.stopPropagation(); handleClearBriefSource(); }}
+                                                title="Remove file"
+                                            >
+                                                <span className="material-symbols-outlined">close</span>
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="sb-brief-source-empty">
+                                            <span className="material-symbols-outlined">{inputMode === 'image' ? 'add_photo_alternate' : 'upload_file'}</span>
+                                            <span className="sb-brief-source-empty-title">
+                                                {inputMode === 'image' ? 'Drop brochure, flyer, or product image' : 'Drop voice brief or audio pitch'}
+                                            </span>
+                                            <span className="sb-brief-source-empty-hint">
+                                                {inputMode === 'image' ? 'JPG · PNG · WEBP — AI reads all text & creates brief' : 'MP3 · WAV · M4A · OGG — AI transcribes & maps shots'}
+                                            </span>
+                                            <button type="button" className="sb-brief-source-browse-btn">
+                                                Browse Files
+                                            </button>
+                                        </div>
+                                    )}
+                                    {/* Hidden file input */}
+                                    <input
+                                        ref={briefSourceInputRef}
+                                        type="file"
+                                        accept={inputMode === 'image' ? 'image/*' : 'audio/*,.mp3,.wav,.m4a,.ogg,.mp4,.webm'}
+                                        hidden
+                                        onChange={e => {
+                                            const f = e.target.files?.[0];
+                                            // Reset so same file can be re-selected after clearing
+                                            if (briefSourceInputRef.current) briefSourceInputRef.current.value = '';
+                                            if (f) handleBriefMediaAnalysis(f);
+                                        }}
+                                    />
+                                </div>
+                            )}
+
                         </div>
 
                         {/* ── Row 2: 3-column settings grid ── */}
@@ -1065,12 +1305,18 @@ export default function Storyboard({
                                         max={MAX_DURATION}
                                         step={DURATION_STEP}
                                         value={duration}
-                                        onChange={e => setDuration(Number(e.target.value))}
+                                        onChange={e => { setDuration(Number(e.target.value)); setBriefAudioDuration(null); }}
                                         disabled={isLoading}
                                     />
                                     <div className="scott-duration-range">
                                         <span>5s</span><span>120s</span>
                                     </div>
+                                    {briefAudioDuration && preSeededCuts?.length && (
+                                        <div className="sb-audio-dur-notice">
+                                            <span className="material-symbols-outlined">timer</span>
+                                            Set to match your audio ({Math.round(briefAudioDuration)}s). Drag to adjust.
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -1148,7 +1394,7 @@ export default function Storyboard({
                             </div>
 
                             {/* Generate CTA */}
-                            <button className="scott-generate" onClick={handleGenerate} disabled={isLoading}>
+                            <button className="scott-generate" onClick={handleGenerate} disabled={isLoading || isAnalyzingBrief}>
                                 {isLoading ? (
                                     <><span className="material-symbols-outlined spin" style={{ fontSize: 15 }}>autorenew</span> Writing…</>
                                 ) : (
@@ -1535,6 +1781,10 @@ export default function Storyboard({
                                     <button className="sb-btn-ghost" onClick={() => {
                                         setPhase('input'); setPlan(null); setImageUrl(''); setImagePrompt(''); setGeneratedVideoPrompt(''); setStructuredPlan(null);
                                         setProjectId(null); setFinalVideoUrl(null);
+                                        // Clear any lingering brief-media state so next job starts clean
+                                        if (briefSourceFile?.preview?.startsWith('blob:')) URL.revokeObjectURL(briefSourceFile.preview);
+                                        setBriefSourceFile(null); setBriefAnalysisResult(null);
+                                        setPreSeededCuts(null); setBriefAudioDuration(null);
                                     }}>
                                         <span className="material-symbols-outlined">add</span>
                                         New Storyboard
