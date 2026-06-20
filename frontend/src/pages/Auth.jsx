@@ -25,6 +25,7 @@ export default function Auth() {
     const [forgotMessage, setForgotMessage] = useState('')
     const [successMessage, setSuccessMessage] = useState('')
     const [forgotLoading, setForgotLoading] = useState(false)
+    const [showFbConsent, setShowFbConsent] = useState(false)
     const pollingRef = useRef(null)
 
     const redirect = searchParams.get('redirect') || '/templates'
@@ -176,6 +177,11 @@ export default function Auth() {
 
     const handleFacebookLogin = () => {
         setError('');
+        setShowFbConsent(true);
+    };
+
+    const handleFacebookConsent = () => {
+        setShowFbConsent(false);
         setIsSocialLoading(true);
         window.location.href = `${API_BASE}/auth/facebook?flow=redirect`;
     };
@@ -391,6 +397,74 @@ export default function Auth() {
                         )}
                         Continue with Facebook
                     </button>
+
+                    {/* Facebook Consent Modal */}
+                    {showFbConsent && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowFbConsent(false)}>
+                            <div
+                                className="relative w-full max-w-sm mx-4 rounded-2xl p-6 border border-[var(--sys-border)] shadow-2xl"
+                                style={{ background: 'var(--sys-bg, #0e1025)' }}
+                                onClick={e => e.stopPropagation()}
+                            >
+                                {/* Header */}
+                                <div className="flex items-center gap-3 mb-5">
+                                    <div className="size-10 rounded-xl bg-[#1877F2]/15 flex items-center justify-center shrink-0">
+                                        <svg className="size-5" viewBox="0 0 24 24"><path fill="#1877F2" d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" /></svg>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-[var(--sys-text)] text-sm font-bold">Connect with Facebook</h3>
+                                        <p className="text-[var(--sys-text-muted)] text-xs">Authorization details</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setShowFbConsent(false)}
+                                        className="absolute top-4 right-4 text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer"
+                                    >
+                                        <span className="material-symbols-outlined text-lg">close</span>
+                                    </button>
+                                </div>
+
+                                {/* Consent Details */}
+                                <div className="rounded-xl p-4 mb-5 border border-[var(--sys-border)]" style={{ background: 'var(--sys-surface, #161830)' }}>
+                                    <p className="text-[var(--sys-text)] text-xs font-semibold mb-3">By connecting your account:</p>
+                                    <ul className="space-y-2.5">
+                                        {[
+                                            { icon: 'publish', text: 'You authorize Mantram AI to publish posts and reels to your Instagram business account' },
+                                            { icon: 'pages', text: 'You allow Mantram AI to manage and publish content to your connected Facebook Pages' },
+                                            { icon: 'settings', text: 'You can manage content posting settings and disconnect at any time' },
+                                            { icon: 'verified_user', text: 'All content will comply with Meta\'s Community Guidelines and Platform Terms' },
+                                            { icon: 'shield', text: 'You maintain full control over your accounts and can revoke access anytime' },
+                                        ].map((item, i) => (
+                                            <li key={i} className="flex items-start gap-2.5">
+                                                <span className="material-symbols-outlined text-primary text-sm mt-0.5 shrink-0">{item.icon}</span>
+                                                <span className="text-[var(--sys-text-muted)] text-xs leading-relaxed">{item.text}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => setShowFbConsent(false)}
+                                        className="flex-1 py-2.5 rounded-xl text-xs font-semibold border border-[var(--sys-border)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition-colors cursor-pointer"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleFacebookConsent}
+                                        className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white cursor-pointer transition-all hover:opacity-90"
+                                        style={{ background: '#1877F2' }}
+                                    >
+                                        Continue →
+                                    </button>
+                                </div>
+
+                                <p className="text-center text-[10px] text-[var(--sys-text-muted)]/50 mt-4">
+                                    By continuing, you agree to Mantram AI's <a href="/terms" className="underline hover:text-[var(--sys-text-muted)]">Terms of Service</a> and <a href="/privacy" className="underline hover:text-[var(--sys-text-muted)]">Privacy Policy</a>.
+                                </p>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Forgot Password Overlay */}
                     {showForgot && (
