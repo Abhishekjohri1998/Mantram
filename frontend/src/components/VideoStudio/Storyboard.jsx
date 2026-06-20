@@ -599,6 +599,9 @@ export default function Storyboard({
                 fd.append('brochureExtractedText', briefAnalysisResult.extractedText);
                 fd.append('isBrochure', 'true');
             }
+            if (briefAnalysisResult?.briefAudioUrl) {
+                fd.append('briefAudioUrl', briefAnalysisResult.briefAudioUrl);
+            }
             // preSeededCuts: from long-audio analysis (takes precedence over initialCuts)
             if (preSeededCuts?.length) {
                 fd.append('preSeededCuts', JSON.stringify(preSeededCuts));

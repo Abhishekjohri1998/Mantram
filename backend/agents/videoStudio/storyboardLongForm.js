@@ -149,6 +149,7 @@ export function startStoryboardLongForm({
     structuredPlan = null,
     // Generation mode — 'automatic' | 'manual'
     generateMode = 'automatic',
+    refAudio = '',
 }) {
     const jobId = `sb-lf-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
@@ -179,6 +180,7 @@ export function startStoryboardLongForm({
         avatarUrls, avatarNames, refImageUrls,
         includeBranding, characterRefSheetUrl,
         structuredPlan, generateMode,
+        refAudio,
     }).catch(err => {
         const j = activeJobs.get(jobId);
         if (j) { j.status = 'FAILED'; j.error = err.message; j.progress = 0; }
@@ -622,7 +624,7 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
         
         // Build valid durations for the successful segments
         const validDurations = segmentVideoUrls
-            .map((url, idx) => url ? durations[idx] : null)
+            .map((url, idx) => url ? sceneDurations[idx] : null)
             .filter(v => v !== null);
 
         const stitchedPath = await _stitchWithCrossfade(tmpDir, segmentPaths, params.format, validDurations, jobId);
@@ -630,9 +632,29 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
 
         if (job.cancelled) throw new Error('Cancelled by user');
 
+        let finalPath = stitchedPath;
+        if (params.refAudio) {
+            _setProgress(jobId, 'STITCHING', 'Mixing brief audio ref...', 60);
+            try {
+                console.log(`[SB LongForm ${jobId}] 🎧 Mixing brief audio ref: ${params.refAudio}`);
+                const refAudioLocalPath = path.join(tmpDir, 'brief-audio-ref.mp3');
+                const signedRefAudio = await getSignedUrlIfNeeded(params.refAudio);
+                const audioResp = await fetch(signedRefAudio);
+                if (!audioResp.ok) throw new Error(`HTTP ${audioResp.status} downloading brief audio`);
+                fs.writeFileSync(refAudioLocalPath, Buffer.from(await audioResp.arrayBuffer()));
+
+                const { mixAudioAndMux } = await import('../../utils/ffmpegUtils.js');
+                finalPath = await mixAudioAndMux(stitchedPath, refAudioLocalPath, null, tmpDir);
+                console.log(`[SB LongForm ${jobId}] 🎧 Audio brief successfully mixed: ${finalPath}`);
+            } catch (mixErr) {
+                console.error(`[SB LongForm ${jobId}] ⚠️ Failed to mix brief audio: ${mixErr.message}`);
+                finalPath = stitchedPath;
+            }
+        }
+
         _setProgress(jobId, 'STITCHING', 'Uploading to S3...', 75);
 
-        const finalBuffer = fs.readFileSync(stitchedPath);
+        const finalBuffer = fs.readFileSync(finalPath);
         const s3Key = `storyboard/longform/${params.projectId || jobId}/final-${Date.now()}.mp4`;
         const videoUrl = await uploadToS3(finalBuffer, s3Key, 'video/mp4');
 
