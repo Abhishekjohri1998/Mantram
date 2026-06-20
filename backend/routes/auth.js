@@ -960,17 +960,32 @@ router.get('/facebook', (req, res) => {
         return res.status(500).json({ success: false, error: 'Facebook App ID not configured' });
     }
 
-    const scopes = 'email,public_profile';
-
     const flow = req.query.flow || 'popup';
     const state = Buffer.from(JSON.stringify({ flow })).toString('base64');
 
-    const authUrl = `https://www.facebook.com/v22.0/dialog/oauth?` +
-        `client_id=${appId}` +
-        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-        `&scope=${encodeURIComponent(scopes)}` +
-        `&state=${state}` +
-        `&response_type=code`;
+    // Facebook Login for Business requires config_id instead of scope
+    const loginConfigId = config.facebook.loginConfigId;
+
+    let authUrl;
+    if (loginConfigId) {
+        // Business App flow — use config_id (scopes are defined in the Meta Dashboard configuration)
+        authUrl = `https://www.facebook.com/v22.0/dialog/oauth?` +
+            `client_id=${appId}` +
+            `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+            `&config_id=${loginConfigId}` +
+            `&state=${state}` +
+            `&response_type=code` +
+            `&override_default_response_type=true`;
+    } else {
+        // Standard Consumer App flow — use scope
+        const scopes = 'email,public_profile';
+        authUrl = `https://www.facebook.com/v22.0/dialog/oauth?` +
+            `client_id=${appId}` +
+            `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+            `&scope=${encodeURIComponent(scopes)}` +
+            `&state=${state}` +
+            `&response_type=code`;
+    }
 
     // Ensure popup can communicate back (for popup flow)
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
