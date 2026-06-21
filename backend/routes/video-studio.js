@@ -9138,6 +9138,35 @@ CRITICAL RULES:
                     const base64 = file.buffer.toString('base64');
                     const dataUri = `data:${mime};base64,${base64}`;
 
+                    // Write buffer to temp file to extract duration via FFmpeg
+                    const os = (await import('os')).default;
+                    const fs = (await import('fs')).default;
+                    const path = (await import('path')).default;
+                    const { execFile } = await import('child_process');
+                    const { promisify } = await import('util');
+                    const ffmpegPath = (await import('ffmpeg-static')).default;
+                    const execFileAsync = promisify(execFile);
+
+                    const tmpAudioPath = path.join(os.tmpdir(), `temp-brief-${Date.now()}.mp3`);
+                    fs.writeFileSync(tmpAudioPath, file.buffer);
+
+                    let audioDuration = 30;
+                    try {
+                        const { stderr } = await execFileAsync(ffmpegPath, ['-i', tmpAudioPath]);
+                        const match = stderr.match(/Duration: (\d{2}):(\d{2}):(\d{2}\.\d{2,3})/);
+                        if (match) {
+                            audioDuration = (parseInt(match[1], 10) * 3600) + (parseInt(match[2], 10) * 60) + parseFloat(match[3]);
+                        }
+                    } catch (err) {
+                        const match = err.message.match(/Duration: (\d{2}):(\d{2}):(\d{2}\.\d{2,3})/);
+                        if (match) {
+                            audioDuration = (parseInt(match[1], 10) * 3600) + (parseInt(match[2], 10) * 60) + parseFloat(match[3]);
+                        }
+                    } finally {
+                        try { fs.unlinkSync(tmpAudioPath); } catch {}
+                    }
+                    console.log(`[analyze-brief-media] Measured audio duration: ${audioDuration} seconds`);
+
                     const { getRouter } = await import('../ai/router.js');
                     const router = getRouter();
 
@@ -9156,28 +9185,45 @@ CRITICAL RULES:
                     const systemPrompt = `You are a highly accurate audio transcription engine AND a creative advertising strategist.
 Your PRIMARY JOB: Listen to the audio and extract/transcribe every single word verbatim. Do not summarize, skip, or paraphrase the spoken words.
 
+The total duration of the audio clip is exactly ${Math.round(audioDuration)} seconds.
+
 STEP 1 — VERBATIM TRANSCRIPTION (mandatory):
 Transcribe the entire audio content exactly as it is spoken. Keep all original words.
 
-STEP 2 — ADVERTISING BRIEF:
-Based ONLY on what you transcribed from the audio (no external knowledge), write a 4-6 sentence director-ready video advertising brief.
+STEP 2 — SCENE BREAKDOWN (mandatory):
+Decompose the verbatim transcript into distinct sequential cuts/scenes based on natural semantic boundaries.
+For each cut:
+- Provide a detailed visual scene description (what to show on screen). Must directly illustrate the verbatim words spoken.
+- Provide the exact verbatim portion of the transcript (dialogue) spoken during this cut.
+- Allocate a duration in seconds for this cut. The sum of all cut durations MUST equal exactly ${Math.round(audioDuration)} seconds. No cut should be less than 2 seconds or more than 15 seconds.
 
 STEP 3 — JSON RESPONSE:
 Return ONLY a valid JSON object:
 {
-  "brief": "4-6 sentence director-ready brief based ONLY on what is in the audio content",
+  "brief": "A 4-6 sentence summary/ad brief based ONLY on the audio content",
   "productName": "Exact name of the product or brand mentioned in the audio (if any, otherwise empty string)",
   "productFeatures": "Comma-separated features, offerings, or specifications spoken in the audio",
-  "suggestedDuration": 30,
+  "suggestedDuration": ${Math.round(audioDuration)},
   "suggestedFormat": "9:16",
-  "extractedText": "VERBATIM transcription of the entire audio clip"
+  "extractedText": "VERBATIM transcription of the entire audio clip",
+  "preSeededCuts": [
+    {
+      "id": 1,
+      "lens": "50mm prime",
+      "duration": 5,
+      "move": "STEADICAM",
+      "shot": "MEDIUM",
+      "scene": "Visual description of what to show on screen. Must directly illustrate the dialogue for this cut.",
+      "framePrompt": "Detailed prompt for generating the image frame.",
+      "dialogue": "The exact verbatim portion of the transcript spoken during this cut"
+    }
+  ]
 }
 
 CRITICAL RULES:
-- extractedText MUST contain the COMPLETE verbatim transcript of the audio — this is crucial for downstream video voiceover scripting.
-- Do NOT hallucinate or invent facts not in the audio.
+- extractedText MUST contain the COMPLETE verbatim transcript of the audio.
+- The sum of all cut durations in preSeededCuts MUST equal exactly ${Math.round(audioDuration)} seconds.
 - Do NOT use external brand knowledge.
-- suggestedDuration MUST be one of: 15, 30, 60, 90.
 - suggestedFormat MUST be one of: "9:16" portrait, "16:9" landscape, "1:1" square.
 - Return ONLY JSON. Do not include any explanations or markdown wrappers outside the JSON object.`;
 
@@ -9212,9 +9258,10 @@ CRITICAL RULES:
                             brief: m('brief') || '',
                             productName: m('productName') || brandNameFallback || '',
                             productFeatures: m('productFeatures') || '',
-                            suggestedDuration: 30,
+                            suggestedDuration: Math.round(audioDuration),
                             suggestedFormat: '9:16',
                             extractedText: m('extractedText') || cleaned.substring(0, 2000),
+                            preSeededCuts: null,
                         };
                     }
 
@@ -9227,11 +9274,14 @@ CRITICAL RULES:
                         brief: parsed.brief || '',
                         productName: parsed.productName || brandNameFallback || '',
                         productFeatures: parsed.productFeatures || '',
-                        suggestedDuration: [15, 30, 60, 90].includes(Number(parsed.suggestedDuration)) ? Number(parsed.suggestedDuration) : 30,
+                        suggestedDuration: [15, 30, 60, 90, 120, 180, 240, 300].includes(Number(parsed.suggestedDuration)) ? Number(parsed.suggestedDuration) : Math.round(audioDuration),
                         suggestedFormat: ['9:16', '16:9', '1:1'].includes(parsed.suggestedFormat) ? parsed.suggestedFormat : '9:16',
                         extractedText: parsed.extractedText || '',
                         productImageUrl: null,
                         visionProvider: audioProviderUsed,
+                        briefAudioUrl: mediaUrl || null,
+                        audioDuration: audioDuration,
+                        preSeededCuts: parsed.preSeededCuts || null,
                     });
 
                 } catch (audioErr) {
@@ -9287,6 +9337,7 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
             // Brochure pipeline: full extracted text + flag from analyze-brief-media
             brochureExtractedText = '',
             isBrochure: bodyIsBrochure = 'false',
+            briefAudioUrl = '',
         } = req.body;
 
         const isBrochure = bodyIsBrochure === 'true' || bodyIsBrochure === true;
@@ -9661,6 +9712,7 @@ Format: ${format} | Style: ${style === '3d' ? 'Pixar/Unreal Engine 3D animated' 
             brand: brandId || null,
             studioMode: 'storyboard',
             status: 'storyboard-ready',
+            refAudio: briefAudioUrl || '',
             title: `Storyboard — ${productName || brief?.substring(0, 40) || 'Ad Film'}`,
             input: {
                 brief,
@@ -10192,6 +10244,7 @@ router.post('/storyboard/animate', protect, async (req, res) => {
         let dbStructuredPlan = null;
         let dbIncludeBranding = true;    // branding flag — read from DB below
         let dbCharRefSheetUrl = null;    // pre-generated character reference sheet URL
+        let dbRefAudio = '';
 
         if (projectId) {
             const project = await VideoProject.findById(projectId)
@@ -10208,6 +10261,7 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                 dbBrief              = project.input?.brief || '';
                 dbProductName        = project.input?.productName || '';
                 dbProductFeatures    = project.input?.productFeatures || '';
+                dbRefAudio           = project.refAudio || '';
                 dbFormat             = project.storyboard?.format || format;
                 dbStyle              = project.storyboard?.style || 'hyperrealistic';
                 dbDialogueLanguage   = project.storyboard?.dialogueLanguage || 'English';
@@ -10406,6 +10460,8 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                 structuredPlan: dbStructuredPlan || null,
                 // ── Generation mode (automatic | manual) ──
                 generateMode,
+                // ── Uploaded audio brief ──
+                refAudio: dbRefAudio || '',
             });
 
             if (projectId) {
@@ -10889,8 +10945,27 @@ router.post('/storyboard/compile', protect, async (req, res) => {
         const { filePath, tmpDir: dir } = await stitchSegments(orderedUrls, format, String(projectId).slice(-6));
         tmpDir = dir;
 
+        let finalPath = filePath;
+        const refAudio = project.refAudio || '';
+        if (refAudio) {
+            try {
+                console.log(`[SB Compile] Mixing brief audio ref: ${refAudio}`);
+                const refAudioLocalPath = path.join(tmpDir, 'brief-audio-ref.mp3');
+                const signedRefAudio = await getSignedUrlIfNeeded(refAudio);
+                const audioResp = await fetch(signedRefAudio);
+                if (audioResp.ok) {
+                    fs.writeFileSync(refAudioLocalPath, Buffer.from(await audioResp.arrayBuffer()));
+                    const { mixAudioAndMux } = await import('../../utils/ffmpegUtils.js');
+                    finalPath = await mixAudioAndMux(filePath, refAudioLocalPath, null, tmpDir);
+                    console.log(`[SB Compile] Audio mixed: ${finalPath}`);
+                }
+            } catch (mixErr) {
+                console.warn(`[SB Compile] Failed to mix audio: ${mixErr.message}`);
+            }
+        }
+
         // Upload to S3 (statically imported at top of file)
-        const finalBuffer = fs.readFileSync(filePath);
+        const finalBuffer = fs.readFileSync(finalPath);
         const s3Key = `storyboard/longform/${projectId}/manual-compile-${Date.now()}.mp4`;
         const finalVideoUrl = await uploadToS3(finalBuffer, s3Key, 'video/mp4');
 
