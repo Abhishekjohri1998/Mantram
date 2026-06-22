@@ -11,7 +11,7 @@ export async function mirrorBrandAssets(dna, brandId) {
     if (!dna) return dna;
 
     // 1. Mirror Logo
-    if (dna.logo?.url && !dna.logo.url.includes('s3.amazonaws.com') && !dna.logo.url.startsWith('data:')) {
+    if (dna.logo?.url && (!dna.logo.url.includes('s3.amazonaws.com') || dna.logo.url.includes('mantram-assets')) && !dna.logo.url.startsWith('data:')) {
         const s3Url = await mirrorUrlToS3(dna.logo.url, `brands/${brandId}/logo.png`);
         if (s3Url) dna.logo.url = s3Url;
     }
@@ -30,7 +30,7 @@ export async function mirrorBrandAssets(dna, brandId) {
     // 3. Mirror Brand Images
     if (dna.brandImages && dna.brandImages.length > 0) {
         dna.brandImages = await Promise.all(dna.brandImages.map(async (img, idx) => {
-            if (!img.url || img.url.includes('s3.amazonaws.com') || img.url.startsWith('data:')) return img;
+            if (!img.url || (img.url.includes('s3.amazonaws.com') && !img.url.includes('mantram-assets')) || img.url.startsWith('data:')) return img;
             
             // Clean extension from URL
             const ext = img.url.split('?')[0].split('.').pop()?.toLowerCase() || 'png';
@@ -44,7 +44,7 @@ export async function mirrorBrandAssets(dna, brandId) {
     // 4. Mirror Banner Images
     if (dna.bannerImages && dna.bannerImages.length > 0) {
         dna.bannerImages = await Promise.all(dna.bannerImages.map(async (img, idx) => {
-            if (!img.url || img.url.includes('s3.amazonaws.com') || img.url.startsWith('data:')) return img;
+            if (!img.url || (img.url.includes('s3.amazonaws.com') && !img.url.includes('mantram-assets')) || img.url.startsWith('data:')) return img;
             
             const ext = img.url.split('?')[0].split('.').pop()?.toLowerCase() || 'png';
             const validExt = ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext) ? ext : 'png';
@@ -64,7 +64,7 @@ export async function mirrorBrandAssets(dna, brandId) {
  * @returns {Promise<string>} - S3 URL or original URL
  */
 export async function mirrorSingleAsset(url, path) {
-    if (!url || url.includes('s3.amazonaws.com') || url.startsWith('data:')) return url;
+    if (!url || (url.includes('s3.amazonaws.com') && !url.includes('mantram-assets')) || url.startsWith('data:')) return url;
     const s3Url = await mirrorUrlToS3(url, path);
     return s3Url || url;
 }
