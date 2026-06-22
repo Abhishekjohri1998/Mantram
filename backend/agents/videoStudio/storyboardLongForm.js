@@ -475,7 +475,7 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
 
             try {
                 let genResult;
-                if (params.model === 'gemini-flash') {
+                if (params.model === 'gemini-flash' || params.model === 'gemini-omni-flash') {
                     genResult = await submitGeminiFlashVideoGeneration({
                         prompt: segPrompt,
                         imageUrl: segmentFirstFrameUrl,
@@ -544,7 +544,7 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
                 try {
                     console.log(`[SB LongForm ${jobId}] 🔄 Retrying segment ${i+1}...`);
                     let retryResult;
-                    if (params.model === 'gemini-flash') {
+                    if (params.model === 'gemini-flash' || params.model === 'gemini-omni-flash') {
                         retryResult = await submitGeminiFlashVideoGeneration({
                             prompt: segPrompt,
                             imageUrl: segmentFirstFrameUrl,

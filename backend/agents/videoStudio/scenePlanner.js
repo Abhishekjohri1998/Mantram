@@ -23,6 +23,7 @@ const OPTIMAL_SEGMENT_DURATION = {
     'hunyuan': 8,
     'sora-2': 10,
     'gemini-flash': 6,
+    'gemini-omni-flash': 6,
 };
 
 const MAX_SEGMENT_DURATION = {
@@ -37,6 +38,7 @@ const MAX_SEGMENT_DURATION = {
     'hunyuan': 10,
     'sora-2': 15,
     'gemini-flash': 10,
+    'gemini-omni-flash': 10,
 };
 
 /**

@@ -411,7 +411,7 @@ export const IMAGE_MODELS = [
 
 // ── Animate Models ──
 export const ANIMATE_MODELS = {
-    'gemini-flash': { name: 'Gemini Flash Video', icon: '⚡', dur: [4, 10], ratios: ['16:9', '9:16'], firstFrame: true, refImages: false, nativeAudio: false, desc: 'Google Gemini Flash Video' },
+    'gemini-flash': { name: 'Gemini Flash Video', icon: '⚡', dur: [4, 10], ratios: ['16:9', '9:16'], firstFrame: true, refImages: true, nativeAudio: false, desc: 'Google Gemini Flash Video' },
     'happyhorse-1.0': { name: 'HappyHorse 1.0', icon: '🐴', dur: [3, 15], ratios: ['16:9', '9:16', '1:1', '4:3', '3:4'], firstFrame: true, refImages: true, nativeAudio: false, desc: 'Premium cinematic motion' },
     'grok-imagine': { name: 'Grok Imagine', icon: '🤖', dur: [1, 15], ratios: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'], firstFrame: true, refImages: false, nativeAudio: true, desc: 'Fast, affordable, image-to-video' },
     'seedance-2.0': { name: 'Seedance 2.0', icon: '🎞️', dur: [4, 15], ratios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'], firstFrame: true, refImages: true, nativeAudio: true, desc: 'Cinematic, camera control' },

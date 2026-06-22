@@ -1796,7 +1796,7 @@ router.post('/agent/v2/generate', protect, requireCredits('videoGenerate'), aiGe
 
         console.log(`🤖 [VideoAgent V2] Stage 6: Generating... session=${sessionId} model=${model} duration=${duration}s`);
 
-        const isLongForm = duration > 15;
+        const isLongForm = (model === 'gemini-flash' || model === 'gemini-omni-flash') ? duration > 10 : duration > 15;
         const sceneProjects = [];
 
         if (isLongForm) {
@@ -2494,7 +2494,7 @@ router.post('/agent/v2/chat', protect, async (req, res) => {
             generate:     'Video is being generated or is done. Help user download, share, or iterate.',
         };
 
-        const MODEL_IDS = ['seedance-2.0', 'kling-3.0', 'veo-3.1', 'veo-3.1-fast', 'grok-imagine', 'gemini-flash'];
+        const MODEL_IDS = ['seedance-2.0', 'kling-3.0', 'veo-3.1', 'veo-3.1-fast', 'grok-imagine', 'gemini-flash', 'gemini-omni-flash'];
 
         const MODEL_CONTEXT = `
 - seedance-2.0: Best for most ads. Fast, great image-to-video consistency, supports up to 120s.
@@ -4747,12 +4747,12 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), aiGe
         console.log(`[UGC Generate] Final prompt @image check — @image1: ${prompt.includes('@image1')}, @image2: ${prompt.includes('@image2')}`);
         console.log(`[UGC Generate] Submitting — ${duration}s, model=${selectedModel}, ${imageUrls.length} images, prompt ${prompt.split(/\s+/).length}w`);
 
-        const isLongForm = (selectedModel === 'gemini-flash' && duration > 10) ||
+        const isLongForm = ((selectedModel === 'gemini-flash' || selectedModel === 'gemini-omni-flash') && duration > 10) ||
                            ((selectedModel === 'seedance-2.0' || selectedModel === 'seedance-2.0-fast') && duration > 15);
 
         if (isLongForm) {
             console.log(`[UGC Generate] Routing to LONG-FORM generation: duration=${duration}s, model=${selectedModel}`);
-            const allRefImages = selectedModel === 'gemini-flash' ? imageUrls.slice(0, 7) : imageUrls.slice(0, 9);
+            const allRefImages = (selectedModel === 'gemini-flash' || selectedModel === 'gemini-omni-flash') ? imageUrls.slice(0, 7) : imageUrls.slice(0, 9);
             const longFormRefs = allRefImages.map((url, idx) => ({
                 url,
                 role: idx === 0 ? 'avatar' : 'product'
@@ -4839,14 +4839,14 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), aiGe
             });
             usedProvider = 'atlascloud';
 
-        } else if (selectedModel === 'gemini-flash') {
+        } else if (selectedModel === 'gemini-flash' || selectedModel === 'gemini-omni-flash') {
             // Gemini Omni Flash: pass ALL images as referenceImages (up to 7)
             // @image1 = avatar (first), @image2-7 = product angles
             // submitGeminiFlashVideoGeneration handles: imageUrl[0] → first, rest → refs
             const allRefImages = imageUrls.slice(0, 7);
             console.log(`[UGC Generate] Gemini Flash I2V: ${allRefImages.length} images (@image1=avatar, @image2+=product)`);
             const result = await submitVideoGeneration({
-                model: 'gemini-flash',
+                model: selectedModel,
                 prompt,
                 imageUrl: allRefImages[0] || null,      // avatar as primary firstFrame
                 duration: Math.min(duration, 10),        // Gemini Flash max = 10s per segment
@@ -10319,7 +10319,8 @@ Write the final video prompt now. Follow the cut plan timings exactly. Ensure ev
 router.post('/storyboard/animate', protect, async (req, res) => {
     try {
         const rawDuration  = parseInt(req.body.duration) || 10;
-        const isLongForm   = rawDuration > 15;
+        const modelParam   = req.body.model || 'seedance-2.0-fast';
+        const isLongForm   = (modelParam === 'gemini-flash' || modelParam === 'gemini-omni-flash') ? rawDuration > 10 : rawDuration > 15;
         const creditAction = isLongForm ? 'storyboardAnimateLongForm' : 'storyboardAnimate';
 
         await new Promise((resolve, reject) =>

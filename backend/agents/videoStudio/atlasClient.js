@@ -295,7 +295,7 @@ async function submitAtlasCloudPayload(payload) {
     const atlasModel   = payload.task_type || payload.model || 'atlascloud/workflow/seedance-2.0-fast/text-to-video';
     
     let atlasPayload;
-    if (payload.model === 'gemini-flash') {
+    if (payload.model === 'gemini-flash' || payload.model === 'gemini-omni-flash') {
         atlasPayload = {
             model: payload.input.model,
             prompt: payload.input.prompt,
@@ -903,8 +903,8 @@ export async function resubmitAtlasCloudTask(storedPayload) {
     console.log(`🔄 [Atlas] Auto-retry resubmit...`);
     const taskId = await submitAtlasCloudPayload(storedPayload);
     let model = 'seedance-2.0';
-    if (storedPayload?.model === 'gemini-flash') {
-        model = 'gemini-flash';
+    if (storedPayload?.model === 'gemini-flash' || storedPayload?.model === 'gemini-omni-flash') {
+        model = storedPayload.model;
     } else if (storedPayload?.task_type?.includes('happyhorse')) {
         model = 'happyhorse-1.0';
     }

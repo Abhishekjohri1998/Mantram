@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, startTransition } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import AvatarPicker from './AvatarPicker'
 import PublishModal from '../PublishModal'
 import VideoHoverActions from './VideoHoverActions'
@@ -530,16 +530,49 @@ const css = `
 function CfgMenu({ value, onChange, options, icon }) {
     const [open, setOpen] = useState(false); const ref = useRef(null)
     useEffect(() => { const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }; document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h) }, [])
-    const sel = options.find(o => o.value === value) || options[0]
+    const sel = options.find(o => {
+        const oVal = o.value !== undefined ? o.value : o;
+        if (oVal == value) return true;
+        if ((oVal === 'gemini-flash' || oVal === 'gemini-omni-flash') &&
+            (value === 'gemini-flash' || value === 'gemini-omni-flash')) {
+            return true;
+        }
+        return false;
+    }) || options[0]
     return <div style={{ position: 'relative' }} ref={ref}>
         <button type="button" className="scott-btn-cfg" onClick={() => setOpen(!open)}>
             {icon && <span className="material-symbols-outlined">{icon}</span>}
             <span>{sel?.label || value}</span>
         </button>
         {open && <div className="qv2-cmenu" style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: 8, background: '#2a2a2a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: 8, zIndex: 9999, minWidth: 100, maxHeight: 300, overflowY: 'auto' }}>
-            {options.map(o => <button key={o.value || o} type="button" className="qv2-copt" style={{ width: '100%', padding: '8px', background: 'transparent', border: 'none', color: '#fff', textAlign: 'left', cursor: 'pointer', borderRadius: 6 }} onClick={() => { startTransition(() => { onChange(o.value || o) }); setOpen(false) }}>
-                {o.label || o}
-            </button>)}
+            {options.map(o => {
+                const oVal = o.value !== undefined ? o.value : o;
+                const isSelected = oVal == value ||
+                    ((oVal === 'gemini-flash' || oVal === 'gemini-omni-flash') &&
+                     (value === 'gemini-flash' || value === 'gemini-omni-flash'));
+                return <button
+                    key={oVal}
+                    type="button"
+                    className="qv2-copt"
+                    style={{
+                        width: '100%',
+                        padding: '8px',
+                        background: isSelected ? 'rgba(255,255,255,0.08)' : 'transparent',
+                        border: 'none',
+                        color: isSelected ? '#10b981' : '#fff',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        borderRadius: 6,
+                        fontWeight: isSelected ? '700' : 'normal'
+                    }}
+                    onClick={() => {
+                        onChange(oVal);
+                        setOpen(false);
+                    }}
+                >
+                    {o.label || o}
+                </button>
+            })}
         </div>}
     </div>
 }

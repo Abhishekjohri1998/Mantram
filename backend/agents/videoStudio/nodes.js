@@ -949,8 +949,136 @@ export async function advancedGenerateNode(state) {
     const prompt = (state.enhancedPrompt || state.prompt || '').trim();
     const model = state.model || 'kling-3.0';
     const cap = MODEL_CAPABILITIES[model];
-    
-    // Safety check for duration to prevent NaN
+
+    if (!prompt) {
+        throw new Error('Video generation failed: Prompt is missing or empty after processing.');
+    }
+
+    const isGemini = model === 'gemini-flash' || model === 'gemini-omni-flash';
+    const isGeminiLongForm = isGemini && Number(state.duration) > 10;
+
+    if (isGeminiLongForm) {
+        console.log(`🎬 Advanced Generate: Gemini Long-Form Pipeline started. Target Duration=${state.duration}s`);
+        
+        // 1. Determine segment durations (min = 4s, max = 10s per Gemini Flash Atlas API docs)
+        const segmentDurations = [];
+        let remaining = Number(state.duration) || 12;
+        while (remaining > 0) {
+            const segDur = Math.min(10, remaining);
+            if (segDur < 4 && segmentDurations.length > 0) {
+                const diff = 4 - segDur;
+                segmentDurations[segmentDurations.length - 1] -= diff;
+                segmentDurations.push(4);
+            } else {
+                segmentDurations.push(segDur);
+            }
+            remaining -= segDur;
+        }
+        const segCount = segmentDurations.length;
+        console.log(`[Gemini LongForm] Planned ${segCount} segments: [${segmentDurations.join(', ')}]`);
+
+        // 2. Loop over segments sequentially
+        let currentFirstFrame = state.firstImageUrl || undefined;
+        if (currentFirstFrame && (currentFirstFrame.includes('localhost') || currentFirstFrame.includes('127.0.0.1'))) {
+            currentFirstFrame = undefined;
+        }
+
+        const segmentVideoUrls = [];
+        for (let i = 0; i < segCount; i++) {
+            const segDur = segmentDurations[i];
+            console.log(`🎬 Generating Gemini segment ${i + 1}/${segCount} for duration ${segDur}s`);
+
+            // Build segment-specific prompt
+            const isLast = i === segCount - 1;
+            const positionHint = i === 0
+                ? 'This is the OPENING segment — establish the visual world and hook the viewer immediately.'
+                : isLast
+                ? 'This is the FINAL segment — build to a strong cinematic close.'
+                : 'This is a CONTINUATION segment — maintain exact visual style and continue the action.';
+            const segPrompt = `${prompt}\n\n${positionHint}\nSegment ${i + 1} of ${segCount}.`;
+
+            // Submit generation
+            const result = await submitVideoGeneration({
+                model,
+                prompt: segPrompt,
+                imageUrl: currentFirstFrame,
+                duration: segDur,
+                resolution: state.resolution || '1080p',
+                mode: state.qualityMode || 'fast',
+                generateAudio: false, // Gemini Flash does not generate audio natively
+                aspectRatio: state.aspectRatio || '16:9',
+                referenceImages: state.referenceImages || [],
+                shots: state.shots || [],
+                refAudio: state.refAudio || undefined,
+                refVideo: state.refVideo || undefined,
+            });
+
+            const taskId = result.requestId;
+            if (!taskId) throw new Error(`Failed to submit video generation segment ${i + 1}`);
+
+            // Poll for segment completion
+            const start = Date.now();
+            const timeoutMs = 240000; // 4 mins per segment
+            let segmentVideoUrl = null;
+
+            while (Date.now() - start < timeoutMs) {
+                const status = await getAtlasCloudGenerationStatus(taskId);
+                if (status.status === 'COMPLETED') {
+                    segmentVideoUrl = status.videoUrl;
+                    break;
+                }
+                if (status.status === 'FAILED') {
+                    throw new Error(status.error || `Segment ${i + 1} generation failed.`);
+                }
+                await new Promise(r => setTimeout(r, 6000));
+            }
+
+            if (!segmentVideoUrl) {
+                throw new Error(`Segment ${i + 1} generation timed out.`);
+            }
+
+            segmentVideoUrls.push(segmentVideoUrl);
+            console.log(`✅ Segment ${i + 1}/${segCount} done: ${segmentVideoUrl}`);
+
+            // Extract last frame for the next segment if there is one
+            if (i < segCount - 1) {
+                try {
+                    const { extractLastFrameToS3 } = await import('../../utils/ffmpegUtils.js');
+                    currentFirstFrame = await extractLastFrameToS3(segmentVideoUrl);
+                    console.log(`🖼️ Extracted last frame for segment ${i + 1}: ${currentFirstFrame}`);
+                } catch (frameErr) {
+                    console.warn(`⚠️ Last frame extraction failed for segment ${i + 1}: ${frameErr.message} — using default/fallback`);
+                    currentFirstFrame = state.firstImageUrl || undefined;
+                    if (currentFirstFrame && (currentFirstFrame.includes('localhost') || currentFirstFrame.includes('127.0.0.1'))) {
+                        currentFirstFrame = undefined;
+                    }
+                }
+            }
+        }
+
+        // 3. Stitch all segment videos together
+        const { stitchVideoClips } = await import('../../utils/videoStitcher.js');
+        const finalOutputKey = `video-studio/stitched/${Date.now()}-advanced-gemini.mp4`;
+        console.log(`🎬 Stitching ${segmentVideoUrls.length} Gemini segments together...`);
+        const finalVideoUrl = await stitchVideoClips(segmentVideoUrls, finalOutputKey);
+
+        return {
+            ...state,
+            generation: {
+                falRequestId: `advanced-gemini-stitched-${Date.now()}`,
+                falEndpoint: 'atlascloud-gemini-flash',
+                provider: 'atlascloud',
+                videoUrl: finalVideoUrl,
+                progress: 100,
+                startedAt: new Date(),
+                completedAt: new Date(),
+            },
+            costPreview: estimateCost(model, Number(state.duration), state.resolution || '1080p', state.qualityMode || 'fast'),
+            status: 'critique', // status 'critique' makes the routes know it is finished
+        };
+    }
+
+    // Safety check for duration to prevent NaN for single segment path
     const minDur = cap?.duration?.min || 3;
     const maxDur = cap?.duration?.native || 15;
     const duration = Math.min(
@@ -959,10 +1087,6 @@ export async function advancedGenerateNode(state) {
     );
 
     console.log(`🎬 Advanced Generate: Model=${model}, Dur=${duration}s, refImages=${(state.referenceImages || []).length}, prompt="${prompt.substring(0, 60)}..."`);
-
-    if (!prompt) {
-        throw new Error('Video generation failed: Prompt is missing or empty after processing.');
-    }
 
     // For Atlas Cloud (seedance), base64 is supported in image_urls — other providers use ensureS3Url
     let imageUrl = state.firstImageUrl || undefined;
@@ -1153,7 +1277,7 @@ export async function ugcPromptBuilderNode(state) {
     const selectedModel = state.selectedModel || state.settings?.model || 'seedance-2.0';
 
     // Gemini Omni Flash: cinematic narrative prose, up to 7 @image refs, 20K chars
-    if (selectedModel === 'gemini-flash') {
+    if (selectedModel === 'gemini-flash' || selectedModel === 'gemini-omni-flash') {
         return await _buildGeminiFlashUGCPrompt(state);
     }
 
