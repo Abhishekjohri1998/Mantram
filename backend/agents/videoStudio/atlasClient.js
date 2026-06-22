@@ -69,20 +69,21 @@ function resolveModelName(qualityMode, imageCount) {
     return `atlascloud/workflow/${tier}/text-to-video`;
 }
 
-function resolveHappyHorseModelName(imageCount) {
-    // HappyHorse 1.0 model slugs on Atlas Cloud — per docs:
-    //   alibaba/happyhorse-1.0/text-to-video
-    //   alibaba/happyhorse-1.0/image-to-video
-    //   alibaba/happyhorse-1.0/reference-to-video
+function resolveHappyHorseModelName(imageCount, model = 'happyhorse-1.0') {
+    // HappyHorse model slugs on Atlas Cloud — per docs:
+    //   alibaba/happyhorse-1.x/text-to-video
+    //   alibaba/happyhorse-1.x/image-to-video
+    //   alibaba/happyhorse-1.x/reference-to-video
+    const version = model === 'happyhorse-1.1' ? '1.1' : '1.0';
     if (imageCount > 1) {
-        console.log(`📌 HappyHorse: ${imageCount} images → reference-to-video`);
-        return 'alibaba/happyhorse-1.0/reference-to-video';
+        console.log(`📌 HappyHorse ${version}: ${imageCount} images → reference-to-video`);
+        return `alibaba/happyhorse-${version}/reference-to-video`;
     }
     if (imageCount === 1) {
-        console.log(`📌 HappyHorse: 1 image → image-to-video`);
-        return 'alibaba/happyhorse-1.0/image-to-video';
+        console.log(`📌 HappyHorse ${version}: 1 image → image-to-video`);
+        return `alibaba/happyhorse-${version}/image-to-video`;
     }
-    return 'alibaba/happyhorse-1.0/text-to-video';
+    return `alibaba/happyhorse-${version}/text-to-video`;
 }
 
 async function resizeToAspectRatio(base64DataUri, targetRatio) {
@@ -673,6 +674,7 @@ export async function submitHappyHorseVideoGeneration({
     prompt, imageUrl, duration, aspectRatio, generateAudio = true,
     referenceImages = [], resolution = '720p',
     refAudio = null, // TTS audio URL for native lip-sync (audio-driven generation)
+    model = 'happyhorse-1.0',
 }) {
     console.log(`🐴 [HappyHorse] submitVideoGeneration: refs=${referenceImages.length} | imageUrl=${imageUrl ? 'yes' : 'no'} | refAudio=${refAudio ? 'yes' : 'no'}`);
 
@@ -712,7 +714,7 @@ export async function submitHappyHorseVideoGeneration({
 
     // Step 2 — Resolve model slug based on image count
     const imageCount = s3ImageUrls.length + s3RefImages.length;
-    const modelName = resolveHappyHorseModelName(imageCount);
+    const modelName = resolveHappyHorseModelName(imageCount, model);
     const dur = Math.min(Math.max(parseInt(duration, 10) || 5, 3), 15);
     const res = resolution === '1080p' ? '1080p' : '720p';
 
@@ -750,7 +752,7 @@ export async function submitHappyHorseVideoGeneration({
 
     const payload = { model: 'happyhorse', task_type: modelName, input: taskInput };
     const taskId  = await submitAtlasCloudPayload(payload);
-    return { taskId, provider: 'atlascloud', model: 'happyhorse-1.0', _payload: payload, type: 'generation' };
+    return { taskId, provider: 'atlascloud', model: model === 'happyhorse-1.1' ? 'happyhorse-1.1' : 'happyhorse-1.0', _payload: payload, type: 'generation' };
 }
 // ── Public: InfiniteTalk Audio-Driven Video Generation ────────────────────────
 

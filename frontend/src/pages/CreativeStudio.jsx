@@ -681,6 +681,7 @@ export default function CreativeStudio() {
         'veo-3.1': { name: 'Veo 3.1', icon: 'movie_filter', dur: [5, 10], ratios: ['16:9'], firstFrame: true, refImages: false, nativeAudio: true, desc: 'Premium cinematic quality' },
         'seedance-1.0': { name: 'Seedance 1.0', icon: 'animation', dur: [5, 10], ratios: ['16:9', '9:16', '1:1', '4:3', '3:4'], firstFrame: true, refImages: false, nativeAudio: false, desc: 'Fast & affordable' },
         'happyhorse-1.0': { name: 'HappyHorse 1.0', icon: 'pets', dur: [5, 15], ratios: ['16:9', '9:16', '1:1'], firstFrame: true, refImages: true, nativeAudio: true, desc: 'Alibaba cinematic — great motion & ref images' },
+        'happyhorse-1.1': { name: 'HappyHorse 1.1', icon: 'pets', dur: [5, 15], ratios: ['16:9', '9:16', '1:1'], firstFrame: true, refImages: true, nativeAudio: true, desc: 'Alibaba HappyHorse 1.1 — advanced cinematic motion & ref images' },
     }
 
     // ── Animate: AI Prompt Suggestion ──

@@ -43,7 +43,7 @@ export default function Landing() {
                 ogTitle="Mantram AI — Agentic AI Marketing OS"
                 ogDescription="Mantram AI is an agentic marketing OS: 14 AI studios sharing one Brand DNA. Multilingual — English, Hindi, Arabic, Bahasa, Vietnamese. Credits from ₹149."
                 ogImage="https://mantram.ai/mantram-logo.png"
-                aiSummary="Mantram AI is an agentic AI marketing operating system that learns a brand's DNA once and runs planning, content, creative, video, distribution and optimisation through 14 specialised AI studios — built in India for D2C brands and agencies across South Asia, Southeast Asia and the Middle East. Models include Claude Sonnet 4.6, Gemini 3 Pro, GPT-4o, GPT Image 2, NanoBanana 2/Pro, Flux Kontext Max, Veo 3.1, Sora 2, Seedance 2.0 Pro, Kling 3.0, HappyHorse 1.0, Hailuo, Wan 2.1, HeyGen. Credit-pack pricing from ₹149, no subscription. DPDP compliant, GDPR-aware."
+                aiSummary="Mantram AI is an agentic AI marketing operating system that learns a brand's DNA once and runs planning, content, creative, video, distribution and optimisation through 14 specialised AI studios — built in India for D2C brands and agencies across South Asia, Southeast Asia and the Middle East. Models include Claude Sonnet 4.6, Gemini 3 Pro, GPT-4o, GPT Image 2, NanoBanana 2/Pro, Flux Kontext Max, Veo 3.1, Sora 2, Seedance 2.0 Pro, Kling 3.0, HappyHorse 1.1, HappyHorse 1.0, Hailuo, Wan 2.1, HeyGen. Credit-pack pricing from ₹149, no subscription. DPDP compliant, GDPR-aware."
             />
 
             <div className="relative" style={{ background: '#0b0b0c', color: 'white' }}>

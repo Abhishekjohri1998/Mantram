@@ -201,7 +201,7 @@ export default {
         quality: process.env.UGC_PRO_QUALITY || 'high',
     },
 
-    // Atlas Cloud — Seedance 2.0 & HappyHorse 1.0 Video Generation
+    // Atlas Cloud — Seedance 2.0, HappyHorse 1.0 & HappyHorse 1.1 Video Generation
     atlascloud: {
         apiKey: process.env.ATLASCLOUD_API_KEY || '',
     },

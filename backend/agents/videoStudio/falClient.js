@@ -29,7 +29,7 @@ const MODEL_ENDPOINTS = {
 export const MODEL_AVAILABLE = {
     'kling-3.0-o': true, 'kling-3.0': true, 'veo-3.1': true, 'veo-3.1-fast': true,
     'seedance-1.0': true, 'seedance-2.0': true, 'seedance-2.0-fast': true, 'grok-imagine': true,
-    'hunyuan': true, 'sora-2': true, 'happyhorse-1.0': true, 'gemini-flash': true,
+    'hunyuan': true, 'sora-2': true, 'happyhorse-1.0': true, 'happyhorse-1.1': true, 'gemini-flash': true,
     'gemini-omni-flash': true,
 };
 
@@ -54,6 +54,7 @@ export const COST_PER_SECOND = {
     'sora-2': { fast: 0.10, quality: 0.15 },
     // HappyHorse and Gemini Flash (Atlas Cloud)
     'happyhorse-1.0': { fast: 0.15, quality: 0.20 },
+    'happyhorse-1.1': { fast: 0.15, quality: 0.20 },
     'gemini-flash': { fast: 0.15, quality: 0.15 },
     'gemini-omni-flash': { fast: 0.15, quality: 0.15 },
 };
@@ -70,6 +71,7 @@ const DURATION_LIMITS = {
     'hunyuan': { min: 3, max: 10 },
     'sora-2': { min: 5, max: 15 },
     'happyhorse-1.0': { min: 3, max: 15 },
+    'happyhorse-1.1': { min: 3, max: 15 },
     'gemini-flash': { min: 4, max: 10 },
     'gemini-omni-flash': { min: 4, max: 10 },
 };
@@ -164,12 +166,22 @@ export const MODEL_CAPABILITIES = {
     },
     'happyhorse-1.0': {
         id: 'happyhorse-1.0', name: 'HappyHorse 1.0', icon: '🐴', provider: 'atlascloud',
-        description: 'Alibaba HappyHorse — cinematic motion, native audio, ref images, 1080p',
+        description: 'Alibaba HappyHorse 1.0 — cinematic motion, native audio, ref images, 1080p',
         bestFor: 'Product demos, cinematic ads, brand films, animated content',
         duration: { min: 3, max: 15, native: 15, step: 1 },
         resolutions: ['720p', '1080p'], aspectRatios: ['16:9', '9:16', '1:1'],
         features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: false, multiShot: false, nativeAudio: true, voiceIds: false, cameraControl: false },
         maxReferenceImages: 9, costPerSecond: COST_PER_SECOND['happyhorse-1.0'], recommended: false,
+        maxPromptLength: 200000,
+    },
+    'happyhorse-1.1': {
+        id: 'happyhorse-1.1', name: 'HappyHorse 1.1', icon: '🐴', provider: 'atlascloud',
+        description: 'Alibaba HappyHorse 1.1 — advanced cinematic motion, native audio, ref images, 1080p',
+        bestFor: 'Product demos, cinematic ads, brand films, animated content',
+        duration: { min: 3, max: 15, native: 15, step: 1 },
+        resolutions: ['720p', '1080p'], aspectRatios: ['16:9', '9:16', '1:1'],
+        features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: false, multiShot: false, nativeAudio: true, voiceIds: false, cameraControl: false },
+        maxReferenceImages: 9, costPerSecond: COST_PER_SECOND['happyhorse-1.1'], recommended: false,
         maxPromptLength: 200000,
     },
     'gemini-flash': {
@@ -227,7 +239,7 @@ export function estimateCost(model = 'kling-3.0', durationSeconds = 5, resolutio
     let resMult = 1.0;
     
     // Atlas Cloud models have specific resolution multipliers based on observed billing
-    const ATLAS_MODELS = ['seedance-2.0', 'seedance-2.0-fast', 'happyhorse-1.0', 'gemini-flash', 'gemini-omni-flash'];
+    const ATLAS_MODELS = ['seedance-2.0', 'seedance-2.0-fast', 'happyhorse-1.0', 'happyhorse-1.1', 'gemini-flash', 'gemini-omni-flash'];
     if (ATLAS_MODELS.includes(model)) {
         // e.g. 10s seedance-2.0-fast 480p is $0.768. If base is $0.1536/s -> $1.536 for 10s.
         // So 480p multiplier is exactly 0.5.
@@ -587,9 +599,9 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         }
     }
 
-    // HappyHorse 1.0 — routes directly to Atlas Cloud
-    if (model === 'happyhorse-1.0') {
-        console.log(`🐴 [HappyHorse 1.0] Routing to Atlas Cloud...`);
+    // HappyHorse 1.x — routes directly to Atlas Cloud
+    if (model === 'happyhorse-1.0' || model === 'happyhorse-1.1') {
+        console.log(`🐴 [${model.toUpperCase()}] Routing to Atlas Cloud...`);
         try {
             const result = await submitHappyHorseVideoGeneration({
                 prompt: safePrompt,
@@ -600,18 +612,19 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                 referenceImages: s3ReferenceImages.filter(Boolean),
                 resolution: resolution || '720p',
                 refAudio: s3RefAudio || null, // Pass TTS audio for lip-sync
+                model: model,
             });
             return {
                 requestId: result.taskId,
-                endpoint: 'atlascloud-happyhorse-1.0',
+                endpoint: `atlascloud-${model}`,
                 statusUrl: null,
                 resultUrl: null,
                 provider: 'atlascloud',
                 _atlasCloudPayload: result._payload,
             };
         } catch (err) {
-            console.error(`❌ [HappyHorse 1.0] Atlas Cloud submission failed: ${err.message}`);
-            throw new Error(`HappyHorse 1.0 generation failed: ${err.message}`);
+            console.error(`❌ [${model.toUpperCase()}] Atlas Cloud submission failed: ${err.message}`);
+            throw new Error(`${model.toUpperCase()} generation failed: ${err.message}`);
         }
     }
 

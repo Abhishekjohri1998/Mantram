@@ -449,7 +449,7 @@ router.post('/generate', protect, superadmin, async (req, res) => {
         const parsedProductImgs = Array.isArray(productImageUrls) ? productImageUrls.filter(u => u && u.startsWith('http')) : [];
         const parsedTags = Array.isArray(tags) ? tags : [];
         const selectedModel = model || 'seedance-2.0';
-        const isVideoModel = ['seedance-2.0', 'kling-v2', 'wan-2.1', 'luma-ray-2', 'minimax-video', 'happyhorse-1.0', 'gemini-flash'].some(m => selectedModel.includes(m));
+        const isVideoModel = ['seedance-2.0', 'kling-v2', 'wan-2.1', 'luma-ray-2', 'minimax-video', 'happyhorse-1.0', 'happyhorse-1.1', 'gemini-flash'].some(m => selectedModel.includes(m));
 
         // Build templateAssets from inputs
         const templateAssets = [];
