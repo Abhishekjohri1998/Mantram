@@ -14,6 +14,18 @@ export const getMetaAuthUrl = (stateId, platform = 'facebook') => {
     // The isolated Instagram OAuth is only for consumer accounts or specific Basic Display apps.
     const appId = config.facebook.appId;
 
+    // Facebook Login for Business requires config_id instead of scope
+    const socialConfigId = config.facebook.socialConfigId;
+
+    // Always use Facebook Dialog for Business Accounts
+    const baseUrl = 'https://www.facebook.com/v22.0/dialog/oauth';
+
+    if (socialConfigId) {
+        // Business App flow — use config_id (scopes are defined in the Meta Dashboard configuration)
+        return `${baseUrl}?client_id=${appId}&redirect_uri=${config.facebook.redirectUri}&state=${stateId}&config_id=${socialConfigId}&response_type=code&override_default_response_type=true`;
+    }
+
+    // Standard Consumer App flow — use scope
     // Base scopes needed for Facebook Pages (Publishing only)
     const fbScopes = [
         'pages_show_list',
@@ -32,9 +44,6 @@ export const getMetaAuthUrl = (stateId, platform = 'facebook') => {
     const requestedScopes = [...fbScopes, ...igScopes];
 
     const scopes = requestedScopes.join(',');
-
-    // Always use Facebook Dialog for Business Accounts
-    const baseUrl = 'https://www.facebook.com/v22.0/dialog/oauth';
 
     // auth_type=rerequest forces Meta to re-prompt the user for any missing permissions
     // if the scopes have changed since they last connected.

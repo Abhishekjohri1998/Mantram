@@ -106,6 +106,10 @@ export default {
         appId: process.env.FACEBOOK_APP_ID,
         appSecret: process.env.FACEBOOK_APP_SECRET,
         redirectUri: process.env.FACEBOOK_REDIRECT_URI,
+        authCallbackUrl: process.env.FACEBOOK_AUTH_CALLBACK_URL,
+        // Facebook Login for Business — config_id (required for Business-type apps)
+        loginConfigId: process.env.FACEBOOK_LOGIN_CONFIG_ID,       // For user login/signup
+        socialConfigId: process.env.FACEBOOK_SOCIAL_CONFIG_ID,     // For connecting Pages/Instagram
     },
 
     // Instagram Specific App

@@ -144,6 +144,10 @@ const userSchema = new mongoose.Schema({
         failedLoginAttempts: { type: Number, default: 0 },
         lastFailedLogin: { type: Date },
     },
+
+    // OAuth provider flags
+    isGoogleUser: { type: Boolean, default: false },
+    isFacebookUser: { type: Boolean, default: false },
 }, { timestamps: true });
 
 // Virtual: remaining credits (includes non-expired top-up)
@@ -174,6 +178,7 @@ userSchema.set('toJSON', {
         delete ret.activeSkills;
         delete ret.activeSubscription;
         delete ret.isGoogleUser;
+        delete ret.isFacebookUser;
         delete ret.lastActive;
         delete ret.__v;
         // Sanitize credits — only expose what the user needs to see
