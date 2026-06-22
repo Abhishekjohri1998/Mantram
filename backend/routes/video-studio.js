@@ -7634,7 +7634,7 @@ router.get('/:id/status', protect, async (req, res) => {
                     const currentModel = project.routing?.selectedModel || project.model;
                     
                     if (isSafetyError && currentModel !== 'kling-3.0') {
-                        console.log(`🛡️ Safe Mode Pivot: Bytedance rejected real-person image. Falling back to Kling 3.0 (fal.ai) which accepts real faces.`);
+                        console.log(`🛡️ Safe Mode Pivot: Bytedance rejected real-person image. Attempting fallbacks...`);
                         try {
                             let prompt = '';
                             let imageUrl = null;
@@ -7642,76 +7642,170 @@ router.get('/:id/status', protect, async (req, res) => {
                             let resolution = project.routing?.resolution || '1080p';
                             let aspectRatio = project.routing?.aspectRatio || '16:9';
                             let mode = project.routing?.mode || 'fast';
+                            let referenceImages = [];
                             
                             if (project.mode === 'advanced') {
                                 prompt = project.advancedConfig?.prompt || project.title;
                                 imageUrl = project.advancedConfig?.firstImageUrl || null;
                                 duration = project.advancedConfig?.duration || 5;
+                                referenceImages = (project.advancedConfig?.referenceImages || []).filter(Boolean);
                             } else {
                                 prompt = project.backendPrompt || project.title;
                                 imageUrl = project.input?.images?.[0]?.url || null;
                                 duration = project.script?.totalDuration || 5;
                             }
                             
-                            // Strip @image tags since Kling accepts the image natively for I2V
+                            // Strip @image tags for fallback models
                             prompt = prompt.replace(/@Image\d+/gi, '').replace(/\s{2,}/g, ' ').trim();
+                            
+                            let fallbackSucceeded = false;
 
-                            const klingResult = await submitVideoGeneration({
-                                model: 'kling-3.0',
-                                prompt,
-                                imageUrl,
-                                duration: Math.min(duration, 10),
-                                resolution,
-                                mode,
-                                generateAudio: true,
-                                aspectRatio,
-                                referenceImages: [],
-                            });
-                            
-                            console.log(`✅ Safe Mode: Kling 3.0 task submitted: ${klingResult.requestId}`);
-                            
-                            // Update project with Kling generation details and switch status back to generating
-                            // Update project with Kling generation details
-                            const isLaozhangSync = !!klingResult._laozhangVideoUrl;
-                            updated.status = isLaozhangSync ? 'completed' : (project.mode === 'advanced' ? 'advanced-generating' : 'generating');
-                            
-                            updated.generation = {
-                                falRequestId: klingResult.requestId,
-                                falEndpoint: klingResult.endpoint,
-                                falStatusUrl: klingResult.statusUrl,
-                                falResultUrl: klingResult.resultUrl,
-                                provider: klingResult.provider || 'fal',
-                                _laozhangVideoUrl: klingResult._laozhangVideoUrl || null,
-                                videoUrl: klingResult._laozhangVideoUrl || '',
-                                progress: isLaozhangSync ? 100 : 5,
-                                startedAt: new Date(),
-                                ...(isLaozhangSync ? { completedAt: new Date() } : {}),
-                                error: '',
-                            };
-                            
-                            if (isLaozhangSync) {
-                                updated.finalVideoUrl = klingResult._laozhangVideoUrl;
+                            // ── Fallback 1: Atlas Cloud Wan-2.7 (accepts real faces) ──
+                            // Reuse the original Seedance _atlasCloudPayload (already has processed
+                            // images, CDN uploads, and prompt). Just switch task_type to Wan-2.7.
+                            const originalPayload = project.generation?._atlasCloudPayload || updated.generation?._atlasCloudPayload;
+                            if (originalPayload) {
+                                try {
+                                    console.log(`🛡️ Safe Mode Fallback 1: Trying Atlas Cloud Wan-2.7 (accepts real faces)...`);
+                                    const wan27Payload = JSON.parse(JSON.stringify(originalPayload));
+                                    // Switch Seedance model to Wan-2.7 equivalent
+                                    if (wan27Payload.task_type) {
+                                        if (wan27Payload.task_type.includes('reference-to-video')) {
+                                            wan27Payload.task_type = 'alibaba/wan-2.7/reference-to-video';
+                                        } else if (wan27Payload.task_type.includes('image-to-video')) {
+                                            wan27Payload.task_type = 'alibaba/wan-2.7/image-to-video';
+                                        } else {
+                                            wan27Payload.task_type = 'alibaba/wan-2.7/text-to-video';
+                                        }
+                                    }
+                                    const { resubmitAtlasCloudTask } = await import('../agents/videoStudio/atlasClient.js');
+                                    const wan27Result = await resubmitAtlasCloudTask(wan27Payload);
+                                    
+                                    console.log(`✅ Safe Mode: Wan-2.7 task submitted: ${wan27Result.taskId}`);
+                                    updated.status = project.mode === 'advanced' ? 'advanced-generating' : 'generating';
+                                    updated.generation = {
+                                        falRequestId: wan27Result.taskId,
+                                        falEndpoint: 'atlascloud-wan-2.7-safemode',
+                                        falStatusUrl: null,
+                                        falResultUrl: null,
+                                        provider: 'atlascloud',
+                                        _atlasCloudPayload: wan27Payload,
+                                        videoUrl: '',
+                                        progress: 5,
+                                        startedAt: new Date(),
+                                        error: '',
+                                    };
+                                    await VideoProject.findByIdAndUpdate(project._id, {
+                                        status: updated.status,
+                                        generation: updated.generation,
+                                        'routing.selectedModel': 'wan-2.7'
+                                    });
+                                    fallbackSucceeded = true;
+                                } catch (wan27Err) {
+                                    console.error(`❌ Safe Mode Wan-2.7 fallback failed: ${wan27Err.message}`);
+                                }
+                            } else {
+                                console.warn(`⚠️ Safe Mode: No stored _atlasCloudPayload — skipping Wan-2.7 fallback`);
                             }
-                            
-                            // Save the pivot back to the DB immediately
-                            await VideoProject.findByIdAndUpdate(project._id, {
-                                status: updated.status,
-                                generation: updated.generation,
-                                ...(isLaozhangSync ? { finalVideoUrl: updated.finalVideoUrl } : {}),
-                                'routing.selectedModel': 'kling-3.0'
-                            });
-                            
-                            if (isLaozhangSync) {
-                                // Fire and forget async download to S3
-                                downloadAndUploadVideoToS3(project._id.toString(), klingResult._laozhangVideoUrl)
-                                    .catch(err => console.error(`[SafeMode] LaoZhang async S3 upload failed for ${project._id}:`, err.message));
+
+                            // ── Fallback 2: Kling 3.0 via LaoZhang (if Wan-2.7 failed) ──
+                            if (!fallbackSucceeded) {
+                                try {
+                                    console.log(`🛡️ Safe Mode Fallback 2: Trying Kling 3.0 via LaoZhang...`);
+                                    const klingResult = await submitVideoGeneration({
+                                        model: 'kling-3.0',
+                                        prompt,
+                                        imageUrl,
+                                        duration: Math.min(duration, 10),
+                                        resolution,
+                                        mode,
+                                        generateAudio: true,
+                                        aspectRatio,
+                                        referenceImages: [],
+                                    });
+                                    
+                                    console.log(`✅ Safe Mode: Kling 3.0 task submitted: ${klingResult.requestId}`);
+                                    const isLaozhangSync = !!klingResult._laozhangVideoUrl;
+                                    updated.status = isLaozhangSync ? 'completed' : (project.mode === 'advanced' ? 'advanced-generating' : 'generating');
+                                    updated.generation = {
+                                        falRequestId: klingResult.requestId,
+                                        falEndpoint: klingResult.endpoint,
+                                        falStatusUrl: klingResult.statusUrl,
+                                        falResultUrl: klingResult.resultUrl,
+                                        provider: klingResult.provider || 'fal',
+                                        _laozhangVideoUrl: klingResult._laozhangVideoUrl || null,
+                                        videoUrl: klingResult._laozhangVideoUrl || '',
+                                        progress: isLaozhangSync ? 100 : 5,
+                                        startedAt: new Date(),
+                                        ...(isLaozhangSync ? { completedAt: new Date() } : {}),
+                                        error: '',
+                                    };
+                                    if (isLaozhangSync) updated.finalVideoUrl = klingResult._laozhangVideoUrl;
+                                    await VideoProject.findByIdAndUpdate(project._id, {
+                                        status: updated.status,
+                                        generation: updated.generation,
+                                        ...(isLaozhangSync ? { finalVideoUrl: updated.finalVideoUrl } : {}),
+                                        'routing.selectedModel': 'kling-3.0'
+                                    });
+                                    if (isLaozhangSync) {
+                                        downloadAndUploadVideoToS3(project._id.toString(), klingResult._laozhangVideoUrl)
+                                            .catch(err => console.error(`[SafeMode] LaoZhang async S3 upload failed for ${project._id}:`, err.message));
+                                    }
+                                    fallbackSucceeded = true;
+                                } catch (klingErr) {
+                                    console.error(`❌ Safe Mode Kling 3.0 fallback failed: ${klingErr.message}`);
+                                }
+                            }
+
+                            // ── Fallback 3: Grok Imagine (if both Wan-2.7 and Kling failed) ──
+                            if (!fallbackSucceeded) {
+                                try {
+                                    console.log(`🛡️ Safe Mode Fallback 3: Trying Grok Imagine...`);
+                                    const grokResult = await submitVideoGeneration({
+                                        model: 'grok-imagine',
+                                        prompt,
+                                        imageUrl,
+                                        duration: Math.min(duration, 15),
+                                        resolution,
+                                        mode,
+                                        generateAudio: true,
+                                        aspectRatio,
+                                        referenceImages: [],
+                                    });
+                                    
+                                    console.log(`✅ Safe Mode: Grok Imagine task submitted: ${grokResult.requestId}`);
+                                    updated.status = project.mode === 'advanced' ? 'advanced-generating' : 'generating';
+                                    updated.generation = {
+                                        falRequestId: grokResult.requestId,
+                                        falEndpoint: grokResult.endpoint,
+                                        falStatusUrl: grokResult.statusUrl,
+                                        falResultUrl: grokResult.resultUrl,
+                                        provider: grokResult.provider || 'grok',
+                                        videoUrl: '',
+                                        progress: 5,
+                                        startedAt: new Date(),
+                                        error: '',
+                                    };
+                                    await VideoProject.findByIdAndUpdate(project._id, {
+                                        status: updated.status,
+                                        generation: updated.generation,
+                                        'routing.selectedModel': 'grok-imagine'
+                                    });
+                                    fallbackSucceeded = true;
+                                } catch (grokErr) {
+                                    console.error(`❌ Safe Mode Grok fallback failed: ${grokErr.message}`);
+                                }
+                            }
+
+                            if (!fallbackSucceeded) {
+                                throw new Error('All safe mode fallbacks exhausted (Wan-2.7, Kling 3.0, Grok)');
                             }
                             
                         } catch (fallbackErr) {
-                            console.error(`❌ Safe Mode Kling fallback failed: ${fallbackErr.message}`);
+                            console.error(`❌ Safe Mode all fallbacks failed: ${fallbackErr.message}`);
                             // Fall through to standard refund if fallback fails
                             if (project.creditsUsed > 0) {
-                                await refundCredits(project.user, project.creditsUsed, 'videoGenerateRefund', `Refund: Video Generation Async Failure (${updated.generation?.error || 'Unknown'} - Fallback failed)`, 'video', { projectId: project._id });
+                                await refundCredits(project.user, project.creditsUsed, 'videoGenerateRefund', `Refund: Video Generation Async Failure (${updated.generation?.error || 'Unknown'} - All fallbacks failed)`, 'video', { projectId: project._id });
                                 await VideoProject.findByIdAndUpdate(project._id, { creditsUsed: 0 });
                             }
                         }
