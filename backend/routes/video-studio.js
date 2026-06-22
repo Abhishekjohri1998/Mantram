@@ -9438,6 +9438,24 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
     { name: 'avatarImage',  maxCount: 1 },    // legacy single-avatar compat
     { name: 'refImages',    maxCount: 3 },    // location/element/mood reference images
 ]), async (req, res) => {
+    // Set headers to application/json and set CORS headers immediately to prevent gateway timeout
+    res.setHeader('Content-Type', 'application/json');
+    const origin = req.headers.origin;
+    if (origin) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+        res.setHeader('Vary', 'Origin');
+    }
+
+    const keepAliveInterval = setInterval(() => {
+        console.log('[Storyboard Create] Sending keep-alive chunk to prevent gateway timeout...');
+        res.write('\n');
+    }, 15000);
+
+    req.on('close', () => {
+        clearInterval(keepAliveInterval);
+    });
+
     try {
         const {
             brandId, brief, productName, productFeatures,
@@ -9910,20 +9928,43 @@ Format: ${format} | Style: ${style === '3d' ? 'Pixar/Unreal Engine 3D animated' 
             plan.productImageUrls = await Promise.all(plan.productImageUrls.map(url => getSignedUrlIfNeeded(url)));
         }
 
-        res.json({
+        clearInterval(keepAliveInterval);
+        res.end(JSON.stringify({
             success: true,
             projectId: project._id,
             plan,
-        });
+        }));
     } catch (err) {
+        clearInterval(keepAliveInterval);
         console.error('[Storyboard Create] Error:', err.message);
-        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+        if (!res.headersSent) {
+            res.status(500);
+        }
+        res.end(JSON.stringify({ success: false, error: safeErrorMessage(err) }));
     }
 });
 
 // ── POST /api/video-studio/storyboard/regen-poster ───────────────────────────
 // Regenerate the main storyboard poster (after user edits prompt)
 router.post('/storyboard/regen-poster', protect, async (req, res) => {
+    // Set headers to application/json and set CORS headers immediately to prevent gateway timeout
+    res.setHeader('Content-Type', 'application/json');
+    const origin = req.headers.origin;
+    if (origin) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+        res.setHeader('Vary', 'Origin');
+    }
+
+    const keepAliveInterval = setInterval(() => {
+        console.log('[Storyboard Regen Poster] Sending keep-alive chunk to prevent gateway timeout...');
+        res.write('\n');
+    }, 15000);
+
+    req.on('close', () => {
+        clearInterval(keepAliveInterval);
+    });
+
     try {
         const { projectId, imagePrompt, style = 'hyperrealistic', format = '9:16', imageModel = 'gpt-image-2', dialogueLanguage } = req.body;
 
@@ -10069,14 +10110,19 @@ router.post('/storyboard/regen-poster', protect, async (req, res) => {
         }
 
         const signedImageUrl = await getSignedUrlIfNeeded(posterUrl);
-        res.json({ 
+        clearInterval(keepAliveInterval);
+        res.end(JSON.stringify({ 
             success: true, 
             imageUrl: signedImageUrl,
             // videoPrompt not returned — it is generated fresh at animate-time
-        });
+        }));
     } catch (err) {
+        clearInterval(keepAliveInterval);
         console.error('[Storyboard Regen Poster] Error:', err.message);
-        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+        if (!res.headersSent) {
+            res.status(500);
+        }
+        res.end(JSON.stringify({ success: false, error: safeErrorMessage(err) }));
     }
 });
 
