@@ -674,7 +674,7 @@ export default function CreativeStudio() {
 
     // Synced with backend MODEL_CAPABILITIES (falClient.js) + xAI/fal.ai/PiAPI API docs
     const ANIMATE_MODELS = {
-        'gemini-flash': { name: 'Gemini Flash Video', icon: 'flash_on', dur: [4, 10], ratios: ['16:9', '9:16'], firstFrame: true, refImages: false, nativeAudio: false, desc: 'Google Gemini Flash Video' },
+        'gemini-flash': { name: 'Gemini Flash Video', icon: 'flash_on', dur: [4, 10], ratios: ['16:9', '9:16'], firstFrame: true, refImages: true, nativeAudio: false, desc: 'Google Gemini Flash Video' },
         'grok-imagine': { name: 'Grok Imagine', icon: 'memory', dur: [5, 5], ratios: ['16:9', '1:1', '9:16'], firstFrame: true, refImages: false, nativeAudio: false, desc: 'Fast, affordable, image-to-video' },
         'seedance-2.0': { name: 'Seedance 2.0', icon: 'switch_video', dur: [5, 15], ratios: ['16:9', '9:16'], firstFrame: true, refImages: true, nativeAudio: false, desc: 'Cinematic, camera control' },
         'kling-3.0': { name: 'Kling 3.0', icon: 'slow_motion_video', dur: [5, 10], ratios: ['16:9', '9:16', '1:1'], firstFrame: true, refImages: false, nativeAudio: false, desc: 'Best motion & physics' },
