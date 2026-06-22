@@ -8343,7 +8343,19 @@ router.post('/upload-image', protect, async (req, res) => {
         }
 
         if (hostedUrl) {
-            res.json({ success: true, url: hostedUrl });
+            // ✅ FIX: S3 bucket uses "Bucket owner enforced" (ACLs disabled), so raw
+            // S3 path-style URLs are NOT publicly accessible (403). Presign the URL
+            // before returning it to the frontend for display. Also return the raw
+            // permanent URL so the backend can use it for generation/storage.
+            let displayUrl = hostedUrl;
+            if (hostedUrl.includes('amazonaws.com')) {
+                try {
+                    displayUrl = await getSignedUrlIfNeeded(hostedUrl);
+                } catch (signErr) {
+                    console.warn('⚠️ Failed to presign uploaded image URL:', signErr.message);
+                }
+            }
+            res.json({ success: true, url: displayUrl, permanentUrl: hostedUrl });
         } else {
             res.status(500).json({ success: false, error: 'Failed to upload image to any storage provider' });
         }
