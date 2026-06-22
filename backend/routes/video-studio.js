@@ -9446,6 +9446,9 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
         res.setHeader('Access-Control-Allow-Credentials', 'true');
         res.setHeader('Vary', 'Origin');
     }
+    
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
 
     const keepAliveInterval = setInterval(() => {
         console.log('[Storyboard Create] Sending keep-alive chunk to prevent gateway timeout...');
@@ -9955,6 +9958,9 @@ router.post('/storyboard/regen-poster', protect, async (req, res) => {
         res.setHeader('Access-Control-Allow-Credentials', 'true');
         res.setHeader('Vary', 'Origin');
     }
+
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
 
     const keepAliveInterval = setInterval(() => {
         console.log('[Storyboard Regen Poster] Sending keep-alive chunk to prevent gateway timeout...');
