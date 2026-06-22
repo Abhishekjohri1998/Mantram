@@ -15,6 +15,7 @@ import { protect } from '../middleware/auth.js';
 import { requireCredits } from '../middleware/credits.js';
 import { getOrchestrator } from '../agents/orchestrator.js';
 import { safeErrorMessage } from '../utils/safeError.js';
+import { getSignedUrlIfNeeded } from '../utils/s3.js';
 import {
     artDirectorNode,
     promptEngineerNode,
@@ -96,10 +97,13 @@ router.post('/start', protect, requireCredits('creative'), async (req, res) => {
 
         await req.user.updateOne({ $inc: { 'usage.creativesGenerated': 1 } });
 
+        const creativeObj = creative.toObject();
+        creativeObj.imageUrl = await getSignedUrlIfNeeded(creativeObj.imageUrl);
+
         res.json({
             success: true,
             creative: {
-                ...creative.toObject(),
+                ...creativeObj,
                 agenticData: {
                     artDirection: state.artDirection,
                     engineeredPrompt: state.engineeredPrompt,
@@ -141,7 +145,8 @@ router.post('/:id/variations', protect, requireCredits('creative'), async (req, 
             (state.variations || []).map(async (v) => {
                 try {
                     const result = await generateImage(v.prompt, brand, creative.type, req.user);
-                    return { ...v, imageUrl: result.imageUrl, success: true };
+                    const signedUrl = await getSignedUrlIfNeeded(result.imageUrl);
+                    return { ...v, imageUrl: signedUrl, success: true };
                 } catch (err) {
                     return { ...v, imageUrl: null, success: false, error: err.message };
                 }
@@ -192,7 +197,10 @@ router.post('/:id/regenerate', protect, requireCredits('creative'), async (req, 
             },
         });
 
-        res.json({ success: true, creative: newCreative });
+        const creativeObj = newCreative.toObject();
+        creativeObj.imageUrl = await getSignedUrlIfNeeded(creativeObj.imageUrl);
+
+        res.json({ success: true, creative: creativeObj });
     } catch (error) {
         console.error('Creative regenerate error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });

@@ -18,6 +18,7 @@ import Brand from '../models/Brand.js';
 import redis from '../utils/redisClient.js';
 import { clearBrandMemCache } from '../agents/shared/agentUtils.js';
 import config from '../config/env.js';
+import { getSignedUrlIfNeeded } from '../utils/s3.js';
 
 import { generateBrandIdentity } from '../agents/brandKit/identityAgent.js';
 import { generateStationeryKit } from '../agents/brandKit/stationeryAgent.js';
@@ -62,6 +63,20 @@ async function saveAsset(userId, brandId, assetType, result, brief, scopeLabel, 
         creditsUsed,
         status: 'completed',
     });
+}
+
+async function signBrandKitAsset(asset) {
+    if (!asset) return asset;
+    const assetObj = typeof asset.toObject === 'function' ? asset.toObject() : asset;
+    if (assetObj.assets && Array.isArray(assetObj.assets)) {
+        assetObj.assets = await Promise.all(assetObj.assets.map(async (sub) => {
+            if (sub.imageUrl) {
+                sub.imageUrl = await getSignedUrlIfNeeded(sub.imageUrl);
+            }
+            return sub;
+        }));
+    }
+    return assetObj;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -109,7 +124,15 @@ router.post('/identity/generate', protect, async (req, res) => {
             }
         }
 
-        res.json({ success: true, asset: saved, artStrategy: result.artStrategy, brand: updatedBrand });
+        let signedBrand = null;
+        if (updatedBrand) {
+            signedBrand = { ...updatedBrand };
+            if (signedBrand.dna?.logo?.url) {
+                signedBrand.dna.logo.url = await getSignedUrlIfNeeded(signedBrand.dna.logo.url);
+            }
+        }
+
+        res.json({ success: true, asset: await signBrandKitAsset(saved), artStrategy: result.artStrategy, brand: signedBrand });
     } catch (err) {
         console.error('[BrandKit] Identity error:', err.message);
         res.status(500).json({ error: err.message || 'Identity generation failed' });
@@ -133,7 +156,7 @@ router.post('/stationery/generate', protect, async (req, res) => {
         await deductCredits(req.user._id, cost, 'brand-kit-stationery');
         const saved = await saveAsset(req.user._id, brandId, 'stationery', result, brief, '', cost);
 
-        res.json({ success: true, asset: saved, artStrategy: result.artStrategy });
+        res.json({ success: true, asset: await signBrandKitAsset(saved), artStrategy: result.artStrategy });
     } catch (err) {
         console.error('[BrandKit] Stationery error:', err.message);
         res.status(500).json({ error: err.message || 'Stationery generation failed' });
@@ -168,7 +191,7 @@ router.post('/guide/generate', protect, async (req, res) => {
             guideAsset.hostedUrl = backendViewUrl;
         }
 
-        res.json({ success: true, asset: saved, hostedUrl: guideAsset?.hostedUrl || result.hostedUrl, artStrategy: result.artStrategy });
+        res.json({ success: true, asset: await signBrandKitAsset(saved), hostedUrl: guideAsset?.hostedUrl || result.hostedUrl, artStrategy: result.artStrategy });
     } catch (err) {
         console.error('[BrandKit] Guide error:', err.message);
         res.status(500).json({ error: err.message || 'Guide generation failed' });
@@ -192,7 +215,7 @@ router.post('/collection/generate', protect, async (req, res) => {
         await deductCredits(req.user._id, cost, 'brand-kit-collection');
         const saved = await saveAsset(req.user._id, brandId, 'collection', result, brief, scopeLabel, cost);
 
-        res.json({ success: true, asset: saved, copy: result.copy, artStrategy: result.artStrategy });
+        res.json({ success: true, asset: await signBrandKitAsset(saved), copy: result.copy, artStrategy: result.artStrategy });
     } catch (err) {
         console.error('[BrandKit] Collection error:', err.message);
         res.status(500).json({ error: err.message || 'Collection generation failed' });
@@ -310,12 +333,21 @@ router.post('/wizard/generate', protect, async (req, res) => {
         const savedGuide = savedAssets.find(a => a.assetType === 'guide');
         const guideUrl = savedGuide?.assets?.[0]?.hostedUrl || (guideResult.status === 'fulfilled' ? guideResult.value?.hostedUrl : null);
 
+        const signedSavedAssets = await Promise.all(savedAssets.map(a => signBrandKitAsset(a)));
+        let signedBrand = null;
+        if (brandObj) {
+            signedBrand = brandObj.toObject ? brandObj.toObject() : brandObj;
+            if (signedBrand.dna?.logo?.url) {
+                signedBrand.dna.logo.url = await getSignedUrlIfNeeded(signedBrand.dna.logo.url);
+            }
+        }
+
         res.json({
             success: true,
-            assets: savedAssets,
+            assets: signedSavedAssets,
             guideUrl,
             artStrategy: identityResult.status === 'fulfilled' ? identityResult.value?.artStrategy : null,
-            brand: brandObj, // return the newly created brand document
+            brand: signedBrand,
         });
     } catch (err) {
         console.error('[BrandKit] Wizard error:', err.message);
@@ -343,7 +375,8 @@ router.get('/assets', protect, async (req, res) => {
             BrandKitAsset.countDocuments(filter),
         ]);
 
-        res.json({ success: true, assets, total, offset: parseInt(offset), limit: parseInt(limit) });
+        const signedAssets = await Promise.all(assets.map(a => signBrandKitAsset(a)));
+        res.json({ success: true, assets: signedAssets, total, offset: parseInt(offset), limit: parseInt(limit) });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

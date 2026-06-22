@@ -699,7 +699,8 @@ router.get('/:id/templates', protect, async (req, res) => {
     try {
         const brand = await findBrandWithAccess(req.params.id, req.user._id);
         if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
-        res.json({ success: true, templates: brand.customTemplates || [] });
+        const signedBrand = await signBrandAssets(brand);
+        res.json({ success: true, templates: signedBrand.customTemplates || [] });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
@@ -752,7 +753,8 @@ router.get('/:id/categories', protect, async (req, res) => {
     try {
         const brand = await findBrandWithAccess(req.params.id, req.user._id);
         if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
-        res.json({ success: true, categories: brand.customCategories || [] });
+        const signedBrand = await signBrandAssets(brand);
+        res.json({ success: true, categories: signedBrand.customCategories || [] });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }

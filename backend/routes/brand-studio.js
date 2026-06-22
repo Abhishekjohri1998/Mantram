@@ -14,7 +14,7 @@ import PulseHistory from '../models/PulseHistory.js';
 import ProductContext from '../models/ProductContext.js';
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
-import { mirrorUrlToS3 } from '../utils/s3.js';
+import { mirrorUrlToS3, getSignedUrlIfNeeded } from '../utils/s3.js';
 
 const router = express.Router();
 
@@ -1328,7 +1328,8 @@ router.post('/deck/regenerate-image', protect, async (req, res) => {
             imageUrl = r?.imageUrl;
         }
         if (!imageUrl) throw new Error('Image generation returned empty');
-        res.json({ success: true, imageUrl });
+        const signedUrl = await getSignedUrlIfNeeded(imageUrl);
+        res.json({ success: true, imageUrl: signedUrl });
     } catch (err) {
         console.error('❌ Pulse Deck image regen:', err.message);
         res.status(500).json({ success: false, error: err.message });
@@ -2394,7 +2395,8 @@ router.post('/aplus/regenerate-image', protect, async (req, res) => {
         }
 
         if (!result?.imageUrl) throw new Error('Image generation returned empty');
-        res.json({ success: true, imageUrl: result.imageUrl });
+        const signedUrl = await getSignedUrlIfNeeded(result.imageUrl);
+        res.json({ success: true, imageUrl: signedUrl });
     } catch (err) {
         console.error('❌ A+ regenerate-image:', err.message);
         res.status(500).json({ success: false, error: err.message });

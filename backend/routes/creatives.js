@@ -2717,7 +2717,11 @@ router.post('/save-to-bank', protect, async (req, res) => {
             status: 'draft',
         });
 
-        res.json({ success: true, creative });
+        const creativeObj = creative.toObject();
+        creativeObj.imageUrl = await getSignedUrlIfNeeded(creativeObj.imageUrl);
+        creativeObj.thumbnailUrl = await getSignedUrlIfNeeded(creativeObj.thumbnailUrl);
+
+        res.json({ success: true, creative: creativeObj });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
@@ -2829,8 +2833,9 @@ router.get('/:id/image', async (req, res) => {
             }
         }
 
-        // HTTP URL — redirect
-        res.redirect(creative.imageUrl);
+        // HTTP URL — redirect (pre-sign if it's our S3 URL to avoid private bucket 403 blocks)
+        const signedUrl = await getSignedUrlIfNeeded(creative.imageUrl);
+        res.redirect(signedUrl);
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
@@ -2868,7 +2873,11 @@ router.post('/upload-to-bank', protect, async (req, res) => {
             status: 'draft',
         });
 
-        res.json({ success: true, creative });
+        const creativeObj = creative.toObject();
+        creativeObj.imageUrl = await getSignedUrlIfNeeded(creativeObj.imageUrl);
+        creativeObj.thumbnailUrl = await getSignedUrlIfNeeded(creativeObj.thumbnailUrl);
+
+        res.json({ success: true, creative: creativeObj });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
@@ -3070,7 +3079,8 @@ router.get('/vto-status/:requestId', protect, async (req, res) => {
                 });
             }
 
-            return res.json({ success: true, status: 'completed', imageUrl });
+            const signedUrl = await getSignedUrlIfNeeded(imageUrl);
+            return res.json({ success: true, status: 'completed', imageUrl: signedUrl });
         } else if (statusData.status === 'FAILED') {
             return res.json({ success: true, status: 'failed', error: statusData.error || 'Generation failed' });
         }
