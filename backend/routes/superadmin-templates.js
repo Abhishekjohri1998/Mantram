@@ -429,14 +429,22 @@ router.post('/upload', protect, superadmin, upload.single('file'), async (req, r
 router.post('/generate', protect, superadmin, async (req, res) => {
     try {
         const {
+            templateId,
             name, categoryId, description, tags, studioOrigin, studioSection,
             prompt, model, productImageUrls, avatarUrl,
             duration, format, quality,
         } = req.body;
 
         if (!prompt || !prompt.trim()) return res.status(400).json({ success: false, error: 'Prompt is required' });
-        if (!name || !name.trim()) return res.status(400).json({ success: false, error: 'Template name is required' });
-        if (!categoryId) return res.status(400).json({ success: false, error: 'Category is required' });
+        
+        let existingTemplate = null;
+        if (templateId) {
+            existingTemplate = await Template.findById(templateId);
+            if (!existingTemplate) return res.status(404).json({ success: false, error: 'Template to regenerate not found' });
+        } else {
+            if (!name || !name.trim()) return res.status(400).json({ success: false, error: 'Template name is required' });
+            if (!categoryId) return res.status(400).json({ success: false, error: 'Category is required' });
+        }
 
         const parsedProductImgs = Array.isArray(productImageUrls) ? productImageUrls.filter(u => u && u.startsWith('http')) : [];
         const parsedTags = Array.isArray(tags) ? tags : [];
@@ -475,11 +483,12 @@ router.post('/generate', protect, superadmin, async (req, res) => {
                 referenceImages: [...avatarFaceRefs, ...imageUrls.slice(1)].filter(Boolean),
             });
 
-            // Create draft template with generation taskId — poll for completion
-            const template = await Template.create({
-                name: name.trim(),
-                categoryId,
-                description: description || '',
+            // Create draft template or update existing template with generation taskId — poll for completion
+            let template;
+            const templateData = {
+                name: name ? name.trim() : (existingTemplate ? existingTemplate.name : ''),
+                categoryId: categoryId || (existingTemplate ? existingTemplate.categoryId : null),
+                description: description || (existingTemplate ? existingTemplate.description : ''),
                 tags: parsedTags,
                 studioOrigin: studioOrigin || 'video',
                 studioSection: studioSection || 'video_qads',
@@ -493,12 +502,20 @@ router.post('/generate', protect, superadmin, async (req, res) => {
                 savedProductImageUrls: parsedProductImgs,
                 savedAvatarUrl: avatarUrl || '',
                 savedVideoSettings: { duration: parseInt(duration || 8), format: format || '9:16', model: selectedModel },
-                isActive: false,
-                isPublished: false,
-                createdBy: req.user._id,
                 sourceJobId: genResult.requestId || genResult.taskId,
                 sourceJobType: 'VideoProject',
-            });
+            };
+
+            if (templateId) {
+                template = await Template.findByIdAndUpdate(templateId, templateData, { new: true });
+            } else {
+                template = await Template.create({
+                    ...templateData,
+                    isActive: false,
+                    isPublished: false,
+                    createdBy: req.user._id,
+                });
+            }
 
             const signed = await signTemplate(template);
             res.json({
@@ -589,10 +606,11 @@ router.post('/generate', protect, superadmin, async (req, res) => {
             // Ensure the generated image is on S3
             const s3Url = await ensureS3Url(result.imageUrl, `templates/gen-${Date.now()}.webp`);
 
-            const template = await Template.create({
-                name: name.trim(),
-                categoryId,
-                description: description || '',
+            let template;
+            const templateData = {
+                name: name ? name.trim() : (existingTemplate ? existingTemplate.name : ''),
+                categoryId: categoryId || (existingTemplate ? existingTemplate.categoryId : null),
+                description: description || (existingTemplate ? existingTemplate.description : ''),
                 tags: parsedTags,
                 studioOrigin: studioOrigin || 'creative',
                 studioSection: studioSection || 'ai_create',
@@ -606,10 +624,18 @@ router.post('/generate', protect, superadmin, async (req, res) => {
                 savedProductImageUrls: parsedProductImgs,
                 savedAvatarUrl: avatarUrl || '',
                 savedVideoSettings: { format: format || '1:1', model: selectedModel },
-                isActive: false,
-                isPublished: false,
-                createdBy: req.user._id,
-            });
+            };
+
+            if (templateId) {
+                template = await Template.findByIdAndUpdate(templateId, templateData, { new: true });
+            } else {
+                template = await Template.create({
+                    ...templateData,
+                    isActive: false,
+                    isPublished: false,
+                    createdBy: req.user._id,
+                });
+            }
 
             const signed = await signTemplate(template);
             res.json({
@@ -702,17 +728,12 @@ router.put('/reorder', protect, superadmin, async (req, res) => {
 
 router.put('/:id', protect, superadmin, async (req, res) => {
     try {
-        // savedPrompt is immutable — block any attempt to change it here
-        if (req.body.savedPrompt !== undefined) {
-            return res.status(400).json({ success: false, error: 'savedPrompt is immutable after creation. Create a new template to change the prompt.' });
-        }
-
-        // Step 6: allow studioSection, isPublished, promptTemplate, generationModel updates
+        // Allow updating studioSection, isPublished, promptTemplate, generationModel, savedPrompt
         const ALLOWED_UPDATES = [
             'name', 'description', 'tags', 'categoryId', 'studioOrigin', 'studioSection',
             'isActive', 'isPublished', 'isFeatured', 'showOnHomeScreen',
             'previewUrl', 'previewImageUrl', 'previewType', 'previewVideoUrl',
-            'promptTemplate', 'generationModel', 'generationParams',
+            'promptTemplate', 'savedPrompt', 'generationModel', 'generationParams',
             'sortOrder',
             'savedProductUrl', 'savedProductImageUrls', 'savedAvatarUrl', 'savedVideoSettings',
             'templateAssets',

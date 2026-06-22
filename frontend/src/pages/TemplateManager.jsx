@@ -157,7 +157,20 @@ const TemplateManager = () => {
     const [genAssetInputs, setGenAssetInputs] = useState({ productUrl: '', avatarUrl: '' });
     const [mentionMenu, setMentionMenu] = useState({ visible: false, query: '', cursor: 0 });
 
-    const handleFileUpload = async (e, type) => {
+    // Edit modal regeneration states
+    const [editPrompt, setEditPrompt] = useState('');
+    const [editModel, setEditModel] = useState('seedance-2.0');
+    const [editDuration, setEditDuration] = useState(8);
+    const [editFormat, setEditFormat] = useState('9:16');
+    const [editAvatarUrl, setEditAvatarUrl] = useState('');
+    const [editProductImageUrls, setEditProductImageUrls] = useState([]);
+    const [editGenStatus, setEditGenStatus] = useState('idle'); // idle | generating | polling | done | error
+    const [editGenProgress, setEditGenProgress] = useState(0);
+    const [editGenTaskId, setEditGenTaskId] = useState(null);
+    const [editGenError, setEditGenError] = useState('');
+    const [editAssetInputs, setEditAssetInputs] = useState({ productUrl: '' });
+
+    const handleFileUpload = async (e, type, isEdit = false) => {
         const file = e.target.files?.[0];
         if (!file) return;
         
@@ -171,10 +184,18 @@ const TemplateManager = () => {
                     body: JSON.stringify({ imageData: base64, folder: 'templates' })
                 });
                 if (res && res.url) {
-                    if (type === 'avatar') {
-                        setGenForm(f => ({ ...f, avatarUrl: res.url }));
-                    } else if (type === 'product') {
-                        setGenForm(f => ({ ...f, productImageUrls: [...f.productImageUrls, res.url] }));
+                    if (isEdit) {
+                        if (type === 'avatar') {
+                            setEditAvatarUrl(res.url);
+                        } else if (type === 'product') {
+                            setEditProductImageUrls(urls => [...urls, res.url]);
+                        }
+                    } else {
+                        if (type === 'avatar') {
+                            setGenForm(f => ({ ...f, avatarUrl: res.url }));
+                        } else if (type === 'product') {
+                            setGenForm(f => ({ ...f, productImageUrls: [...f.productImageUrls, res.url] }));
+                        }
                     }
                     addToast('Image uploaded', 'success');
                 } else {
@@ -255,6 +276,48 @@ const TemplateManager = () => {
         }, 5000);
         return () => clearInterval(interval);
     }, [genStatus, genTaskId]);
+
+    // Poll for regeneration status inside Edit Modal
+    useEffect(() => {
+        if (editGenStatus !== 'polling' || !editGenTaskId) return;
+
+        const interval = setInterval(async () => {
+            try {
+                const res = await api(`/superadmin/templates/generate/status/${editGenTaskId}`);
+                setEditGenProgress(res.progress || 0);
+                if (res.status === 'COMPLETED') {
+                    setEditGenStatus('done');
+                    setEditGenProgress(100);
+                    setEditGenTaskId(null);
+                    fetchData();
+                    // Update current modal data with the completed video preview
+                    setModal(m => {
+                        if (!m.open || !m.data) return m;
+                        return {
+                            ...m,
+                            data: {
+                                ...m.data,
+                                previewUrl: res.videoUrl,
+                                previewVideoUrl: res.videoUrl,
+                                previewType: 'video'
+                            }
+                        };
+                    });
+                    addToast('Video regenerated successfully!', 'success');
+                    clearInterval(interval);
+                } else if (res.status === 'FAILED') {
+                    setEditGenStatus('error');
+                    setEditGenError(res.error || 'Video generation failed');
+                    setEditGenTaskId(null);
+                    addToast('Video generation failed', 'error');
+                    clearInterval(interval);
+                }
+            } catch (err) {
+                console.warn('Poll error:', err.message);
+            }
+        }, 5000);
+        return () => clearInterval(interval);
+    }, [editGenStatus, editGenTaskId]);
 
     // Global poll for any stuck "pending" templates
     useEffect(() => {
@@ -349,6 +412,75 @@ const TemplateManager = () => {
 
     const removeProductImageUrl = (i) => {
         setGenForm(f => ({ ...f, productImageUrls: f.productImageUrls.filter((_, idx) => idx !== i) }));
+    };
+
+    const handleRegenerate = async () => {
+        if (!editPrompt.trim()) return addToast('Prompt formula is required to regenerate', 'error');
+
+        setEditGenStatus('generating');
+        setEditGenError('');
+        setEditGenProgress(0);
+        try {
+            const res = await api('/superadmin/templates/generate', {
+                method: 'POST',
+                body: JSON.stringify({
+                    templateId: modal.data._id, // Pass existing template ID to update it
+                    name: modal.data.name,      // Keep name
+                    categoryId: selectedCategory,
+                    description: modal.data.description,
+                    tags: tags,
+                    studioOrigin: selectedStudio || modal.data.studioOrigin,
+                    studioSection: selectedSection || modal.data.studioSection,
+                    prompt: editPrompt,
+                    model: editModel,
+                    productImageUrls: editProductImageUrls,
+                    avatarUrl: editAvatarUrl,
+                    duration: editDuration,
+                    format: editFormat,
+                }),
+            });
+
+            if (res.status === 'done') {
+                // Image generation - done immediately
+                setEditGenStatus('done');
+                // Update modal.data preview url
+                setModal(m => {
+                    if (!m.open || !m.data) return m;
+                    return {
+                        ...m,
+                        data: {
+                            ...m.data,
+                            previewUrl: res.previewUrl,
+                            previewImageUrl: res.previewUrl,
+                            previewType: 'image'
+                        }
+                    };
+                });
+                addToast('Template image regenerated successfully!', 'success');
+                fetchData();
+            } else if (res.taskId) {
+                // Video generation - poll
+                setEditGenTaskId(res.taskId);
+                setEditGenStatus('polling');
+                addToast('Video regeneration started — polling for results...', 'success');
+            }
+        } catch (err) {
+            setEditGenStatus('error');
+            setEditGenError(err.message || 'Regeneration failed');
+            addToast(err.message, 'error');
+        }
+    };
+
+    const addEditProductImageUrl = () => {
+        const url = editAssetInputs.productUrl.trim();
+        if (url && url.startsWith('http')) {
+            setEditProductImageUrls(urls => [...urls, url]);
+            setEditAssetInputs({ productUrl: '' });
+        }
+    };
+
+    const removeEditProductImageUrl = (i) => {
+        setEditProductImageUrls(urls => urls.filter((_, idx) => idx !== i));
     };
 
     // ── Bulk publish helpers (FIX 8) ──
@@ -454,6 +586,20 @@ const TemplateManager = () => {
         setSelectedCategory(template.categoryId || '');
         setSelectedSection(template.studioSection || 'general');
         setFormErrors({});
+
+        // Initialize regeneration states
+        setEditPrompt(template.savedPrompt || template.promptTemplate || '');
+        setEditModel(template.generationModel || 'seedance-2.0');
+        setEditDuration(template.savedVideoSettings?.duration || 8);
+        setEditFormat(template.savedVideoSettings?.format || '9:16');
+        setEditAvatarUrl(template.savedAvatarUrl || '');
+        setEditProductImageUrls(template.savedProductImageUrls || []);
+        setEditGenStatus('idle');
+        setEditGenProgress(0);
+        setEditGenTaskId(null);
+        setEditGenError('');
+        setEditAssetInputs({ productUrl: '' });
+
         setModal({ open: true, data: template });
     };
 
@@ -524,7 +670,21 @@ const TemplateManager = () => {
                     isFeatured: fd.get('isFeatured') === 'on',
                     showOnHomeScreen: fd.get('showOnHomeScreen') === 'on',
                     isActive: fd.get('isActive') === 'on',
-                    isPublished: fd.get('isPublished') === 'on'
+                    isPublished: fd.get('isPublished') === 'on',
+                    savedPrompt: editPrompt,
+                    promptTemplate: editPrompt,
+                    generationModel: editModel,
+                    savedAvatarUrl: editAvatarUrl,
+                    savedProductImageUrls: editProductImageUrls,
+                    savedVideoSettings: {
+                        duration: editDuration,
+                        format: editFormat,
+                        model: editModel
+                    },
+                    templateAssets: [
+                        ...(editAvatarUrl ? [{ role: 'avatar', label: 'Avatar / Model', url: editAvatarUrl, swappable: true }] : []),
+                        ...editProductImageUrls.map(url => ({ role: 'product', label: 'Product Image', url, swappable: true }))
+                    ]
                 };
 
                 const res = await api(`/superadmin/templates/${modal.data._id}`, {
@@ -793,6 +953,48 @@ const TemplateManager = () => {
                                 </div>
                             )}
 
+                            {!modal.isNew && (
+                                <div style={{ display: 'flex', gap: 14, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 14, alignItems: 'center' }}>
+                                    <div style={{ flex: 1 }}>
+                                        <span style={labelStyle}>Current Preview</span>
+                                        <div style={{ width: '100%', height: 120, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 6, position: 'relative' }}>
+                                            {editGenStatus === 'polling' ? (
+                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, color: '#7C3AED' }}>
+                                                    <span className="material-symbols-outlined" style={{ animation: 'spin 1s linear infinite' }}>progress_activity</span>
+                                                    <span style={{ fontSize: 11, fontWeight: 'bold' }}>Generating {editGenProgress}%</span>
+                                                </div>
+                                            ) : editGenStatus === 'generating' ? (
+                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, color: '#7C3AED' }}>
+                                                    <span className="material-symbols-outlined" style={{ animation: 'spin 1s linear infinite' }}>progress_activity</span>
+                                                    <span style={{ fontSize: 11, fontWeight: 'bold' }}>Submitting...</span>
+                                                </div>
+                                            ) : modal.data?.previewUrl === 'pending' ? (
+                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, color: 'rgba(255,255,255,0.4)' }}>
+                                                    <span className="material-symbols-outlined" style={{ animation: 'spin 1s linear infinite' }}>progress_activity</span>
+                                                    <span style={{ fontSize: 11 }}>Generating video...</span>
+                                                </div>
+                                            ) : modal.data?.previewType === 'video' || modal.data?.previewUrl?.endsWith('.mp4') ? (
+                                                <video src={modal.data.previewUrl} style={{ width: '100%', height: '100%', objectFit: 'contain' }} controls />
+                                            ) : modal.data?.previewUrl ? (
+                                                <img src={modal.data.previewUrl} style={{ width: '100%', height: '100%', objectFit: 'contain' }} alt="Preview" />
+                                            ) : (
+                                                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>No preview available</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                        <span style={labelStyle}>Design Studio Origin</span>
+                                        <div style={{ fontSize: 13, color: '#fff', fontWeight: 600, background: 'rgba(255,255,255,0.05)', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)' }}>
+                                            {selectedStudio?.toUpperCase() || modal.data?.studioOrigin?.toUpperCase() || 'CREATIVE'} - {selectedSection || modal.data?.studioSection || 'General'}
+                                        </div>
+                                        <span style={{ ...labelStyle, marginTop: 4 }}>Model used</span>
+                                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', fontFamily: 'monospace' }}>
+                                            {editModel || modal.data?.generationModel || 'gpt-image-2'}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {modal.isNew && (
                                 <div style={{ display: 'flex', gap: 14 }}>
                                     <label style={{ ...labelStyle, flex: 2 }}>Preview Media
@@ -948,15 +1150,117 @@ const TemplateManager = () => {
                                         />
                                     </label>
                                 ) : (
-                                    <>
-                                        <span style={{ ...labelStyle, marginBottom: 8, display: 'block' }}>Saved Prompt (Read-Only)</span>
-                                        <PromptBlock text={modal.data?.savedPrompt} />
-                                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 6 }}>To change the prompt, create a new template from a studio generation.</div>
-                                    </>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 16 }}>
+                                        <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', color: '#7C3AED', letterSpacing: 0.5, marginBottom: 4 }}>AI Generation Parameters</div>
+
+                                        {/* AI Model & Sections */}
+                                        <div style={{ display: 'flex', gap: 14 }}>
+                                            <label style={{ ...labelStyle, flex: 1 }}>AI Model
+                                                <select value={editModel} onChange={e => setEditModel(e.target.value)} style={{ ...inputStyle, marginTop: 6 }}>
+                                                    <optgroup label="Video Models">
+                                                        {VIDEO_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                                                    </optgroup>
+                                                    <optgroup label="Image Models">
+                                                        {IMAGE_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                                                    </optgroup>
+                                                </select>
+                                            </label>
+
+                                            {/* Video specific controls */}
+                                            {isVideoModel(editModel) && (
+                                                <>
+                                                    <label style={{ ...labelStyle, flex: 1 }}>Duration (sec)
+                                                        <input type="number" min={3} max={15} value={editDuration} onChange={e => setEditDuration(parseInt(e.target.value) || 8)} style={{ ...inputStyle, marginTop: 6 }} />
+                                                    </label>
+                                                    <label style={{ ...labelStyle, flex: 1 }}>Format
+                                                        <select value={editFormat} onChange={e => setEditFormat(e.target.value)} style={{ ...inputStyle, marginTop: 6 }}>
+                                                            <option value="9:16">9:16 (Vertical)</option>
+                                                            <option value="16:9">16:9 (Landscape)</option>
+                                                            <option value="1:1">1:1 (Square)</option>
+                                                        </select>
+                                                    </label>
+                                                </>
+                                            )}
+                                        </div>
+
+                                        {/* Prompt Formula */}
+                                        <label style={labelStyle}>Prompt Formula *
+                                            <textarea
+                                                value={editPrompt}
+                                                onChange={e => setEditPrompt(e.target.value)}
+                                                rows={4}
+                                                style={{ ...inputStyle, resize: 'vertical', fontFamily: 'monospace', fontSize: 12, lineHeight: 1.5, marginTop: 6 }}
+                                                placeholder="Describe design style. Use @Image1 for avatar, @Image2 for product..."
+                                            />
+                                        </label>
+
+                                        {/* Assets section */}
+                                        <div style={{ border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: 12, background: 'rgba(0,0,0,0.1)' }}>
+                                            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>Reference Assets</div>
+                                            
+                                            {/* Avatar upload */}
+                                            <label style={{ ...labelStyle, marginBottom: 10 }}>Avatar / Model Image (@Image1)
+                                                <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                                                    <input value={editAvatarUrl} onChange={e => setEditAvatarUrl(e.target.value)} style={{ ...inputStyle, flex: 1 }} placeholder="https://... avatar image URL" />
+                                                    <label style={{ ...actionBtnStyle, color: '#7C3AED', borderColor: 'rgba(124,58,237,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                                                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>upload</span> Upload
+                                                        <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => handleFileUpload(e, 'avatar', true)} />
+                                                    </label>
+                                                </div>
+                                                {editAvatarUrl && (
+                                                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: 6, fontSize: 11 }}>
+                                                            <img src={editAvatarUrl} style={{ width: 24, height: 24, borderRadius: 4, objectFit: 'cover' }} alt="" />
+                                                            <span style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(255,255,255,0.6)' }}>{editAvatarUrl.split('/').pop()}</span>
+                                                            <button type="button" onClick={() => setEditAvatarUrl('')} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><span className="material-symbols-outlined" style={{ fontSize: 14 }}>close</span></button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </label>
+
+                                            {/* Product images list */}
+                                            <label style={labelStyle}>Product Images (@Image2, @Image3...)
+                                                <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                                                    <input value={editAssetInputs.productUrl} onChange={e => setEditAssetInputs({ productUrl: e.target.value })} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addEditProductImageUrl(); } }} style={{ ...inputStyle, flex: 1 }} placeholder="https://... product image URL" />
+                                                    <button type="button" onClick={addEditProductImageUrl} style={{ ...actionBtnStyle, color: '#7C3AED', borderColor: 'rgba(124,58,237,0.3)' }}>Add URL</button>
+                                                    <label style={{ ...actionBtnStyle, color: '#10b981', borderColor: 'rgba(16,185,129,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                                                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>upload</span> Upload
+                                                        <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => handleFileUpload(e, 'product', true)} />
+                                                    </label>
+                                                </div>
+                                            </label>
+                                            {editProductImageUrls.length > 0 && (
+                                                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                                                    {editProductImageUrls.map((url, i) => (
+                                                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: 6, fontSize: 11 }}>
+                                                            <img src={url} style={{ width: 24, height: 24, borderRadius: 4, objectFit: 'cover' }} alt="" />
+                                                            <span style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(255,255,255,0.6)' }}>{url.split('/').pop()}</span>
+                                                            <button type="button" onClick={() => removeEditProductImageUrl(i)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0 }}><span className="material-symbols-outlined" style={{ fontSize: 14 }}>close</span></button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Regenerate Trigger Button inside Parameters */}
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+                                            <button
+                                                type="button"
+                                                onClick={handleRegenerate}
+                                                disabled={editGenStatus === 'generating' || editGenStatus === 'polling'}
+                                                style={{ background: '#7C3AED', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 8, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}
+                                            >
+                                                {editGenStatus === 'generating' ? <><span className="material-symbols-outlined" style={{ fontSize: 14, animation: 'spin 1s linear infinite' }}>progress_activity</span>Submitting...</> :
+                                                 editGenStatus === 'polling' ? <><span className="material-symbols-outlined" style={{ fontSize: 14, animation: 'spin 1s linear infinite' }}>progress_activity</span>Regenerating {editGenProgress}%...</> :
+                                                 editGenStatus === 'done' ? <><span className="material-symbols-outlined" style={{ fontSize: 14 }}>refresh</span>Regenerate Again</> :
+                                                 <><span className="material-symbols-outlined" style={{ fontSize: 14 }}>auto_awesome</span>Regenerate Media</>}
+                                            </button>
+                                        </div>
+                                    </div>
                                 )}
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                                <button type="submit" disabled={isSubmitting} style={{ background: isSubmitting ? 'rgba(249,115,22,0.5)' : '#f97316', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <button type="submit" disabled={isSubmitting || editGenStatus === 'generating' || editGenStatus === 'polling'} style={{ background: isSubmitting || editGenStatus === 'generating' || editGenStatus === 'polling' ? 'rgba(249,115,22,0.5)' : '#f97316', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
                                     {isSubmitting ? <><span className="material-symbols-outlined" style={{ fontSize: 16, animation: 'spin 1s linear infinite' }}>progress_activity</span>{submitStatus}</> : (modal.isNew ? 'Upload & Create' : 'Save Template')}
                                 </button>
                                 <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
