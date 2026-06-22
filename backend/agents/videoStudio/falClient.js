@@ -30,6 +30,7 @@ export const MODEL_AVAILABLE = {
     'kling-3.0-o': true, 'kling-3.0': true, 'veo-3.1': true, 'veo-3.1-fast': true,
     'seedance-1.0': true, 'seedance-2.0': true, 'seedance-2.0-fast': true, 'grok-imagine': true,
     'hunyuan': true, 'sora-2': true, 'happyhorse-1.0': true, 'gemini-flash': true,
+    'gemini-omni-flash': true,
 };
 
 export function getModelsInfo() {
@@ -54,6 +55,7 @@ export const COST_PER_SECOND = {
     // HappyHorse and Gemini Flash (Atlas Cloud)
     'happyhorse-1.0': { fast: 0.15, quality: 0.20 },
     'gemini-flash': { fast: 0.15, quality: 0.15 },
+    'gemini-omni-flash': { fast: 0.15, quality: 0.15 },
 };
 
 const DURATION_LIMITS = {
@@ -69,6 +71,7 @@ const DURATION_LIMITS = {
     'sora-2': { min: 5, max: 15 },
     'happyhorse-1.0': { min: 3, max: 15 },
     'gemini-flash': { min: 4, max: 10 },
+    'gemini-omni-flash': { min: 4, max: 10 },
 };
 
 export const MODEL_CAPABILITIES = {
@@ -181,6 +184,18 @@ export const MODEL_CAPABILITIES = {
         maxReferenceImages: 7, costPerSecond: COST_PER_SECOND['gemini-flash'], recommended: false,
         maxPromptLength: 20000, // Atlas Cloud docs: up to 20,000 characters
     },
+    'gemini-omni-flash': {
+        id: 'gemini-omni-flash', name: 'Gemini Omni Flash', icon: '⚡', provider: 'atlascloud',
+        description: 'Google Gemini Omni Flash — up to 7 reference images, 20K prompt, cinematic subject-consistent video',
+        bestFor: 'UGC, product showcases, character-consistent storytelling, subject-anchored video',
+        // Durations: 4, 6, 8, 10s per generation (enum — not continuous). For long-form, chain segments.
+        duration: { min: 4, max: 10, native: 10, step: 2 },
+        resolutions: ['720p', '1080p', '4k'], aspectRatios: ['16:9', '9:16'],
+        // referenceImages: true — supports 1–7 reference images via `images[]` field
+        features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: false, multiShot: false, nativeAudio: false, voiceIds: false, cameraControl: false },
+        maxReferenceImages: 7, costPerSecond: COST_PER_SECOND['gemini-flash'], recommended: false,
+        maxPromptLength: 20000, // Atlas Cloud docs: up to 20,000 characters
+    },
 };
 
 let LIVE_COST_PER_SECOND = {};
@@ -212,7 +227,7 @@ export function estimateCost(model = 'kling-3.0', durationSeconds = 5, resolutio
     let resMult = 1.0;
     
     // Atlas Cloud models have specific resolution multipliers based on observed billing
-    const ATLAS_MODELS = ['seedance-2.0', 'seedance-2.0-fast', 'happyhorse-1.0', 'gemini-flash'];
+    const ATLAS_MODELS = ['seedance-2.0', 'seedance-2.0-fast', 'happyhorse-1.0', 'gemini-flash', 'gemini-omni-flash'];
     if (ATLAS_MODELS.includes(model)) {
         // e.g. 10s seedance-2.0-fast 480p is $0.768. If base is $0.1536/s -> $1.536 for 10s.
         // So 480p multiplier is exactly 0.5.
@@ -601,7 +616,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     }
 
     // Gemini Flash Video — routes directly to Atlas Cloud
-    if (model === 'gemini-flash') {
+    if (model === 'gemini-flash' || model === 'gemini-omni-flash') {
         console.log(`⚡ [Gemini Flash Video] Routing to Atlas Cloud...`);
         try {
             const result = await submitGeminiFlashVideoGeneration({
