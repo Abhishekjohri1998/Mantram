@@ -1,7 +1,46 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { protect, superadmin } from '../middleware/auth.js';
-import { uploadToS3, ensureS3Url } from '../utils/s3.js';
+import { uploadToS3, ensureS3Url, getSignedUrlIfNeeded } from '../utils/s3.js';
+
+/**
+ * Sign all S3 URLs in a template object (previews, video, assets, source images)
+ * to ensure they render correctly in the frontend.
+ */
+async function signTemplate(template) {
+    if (!template) return null;
+    const t = template.toObject ? template.toObject() : template;
+
+    // Collect all URL references that need signing
+    const urlRefs = [];
+
+    if (t.previewUrl) urlRefs.push({ obj: t, key: 'previewUrl' });
+    if (t.previewImageUrl) urlRefs.push({ obj: t, key: 'previewImageUrl' });
+    if (t.previewVideoUrl) urlRefs.push({ obj: t, key: 'previewVideoUrl' });
+    if (t.systemReferenceImage) urlRefs.push({ obj: t, key: 'systemReferenceImage' });
+    if (t.savedAvatarUrl) urlRefs.push({ obj: t, key: 'savedAvatarUrl' });
+    if (t.savedProductUrl) urlRefs.push({ obj: t, key: 'savedProductUrl' });
+
+    if (Array.isArray(t.templateAssets)) {
+        for (const asset of t.templateAssets) {
+            if (asset.url) urlRefs.push({ obj: asset, key: 'url' });
+        }
+    }
+
+    if (Array.isArray(t.savedProductImageUrls)) {
+        for (let i = 0; i < t.savedProductImageUrls.length; i++) {
+            urlRefs.push({ obj: t.savedProductImageUrls, key: i });
+        }
+    }
+
+    // Parallel sign all URLs at once
+    if (urlRefs.length > 0) {
+        const signed = await Promise.all(urlRefs.map(r => getSignedUrlIfNeeded(r.obj[r.key])));
+        urlRefs.forEach((r, i) => { r.obj[r.key] = signed[i]; });
+    }
+
+    return t;
+}
 import TemplateCategory from '../models/TemplateCategory.js';
 import Template from '../models/Template.js';
 import VideoProject from '../models/VideoProject.js';
@@ -110,7 +149,8 @@ router.get('/', protect, superadmin, async (req, res) => {
             isBrandAware: !!(t.promptTemplate && (t.promptTemplate.includes('{brand}') || t.promptTemplate.includes('{product}'))),
         }));
 
-        res.json({ success: true, templates: enriched, count: enriched.length });
+        const signedTemplates = await Promise.all(enriched.map(t => signTemplate(t)));
+        res.json({ success: true, templates: signedTemplates, count: signedTemplates.length });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
@@ -119,7 +159,8 @@ router.get('/', protect, superadmin, async (req, res) => {
 router.post('/', protect, superadmin, async (req, res) => {
     try {
         const template = await Template.create({ ...req.body, createdBy: req.user._id });
-        res.status(201).json({ success: true, template });
+        const signed = await signTemplate(template);
+        res.status(201).json({ success: true, template: signed });
     } catch (err) {
         res.status(400).json({ success: false, error: err.message });
     }
@@ -373,7 +414,8 @@ router.post('/upload', protect, superadmin, upload.single('file'), async (req, r
             ...(parsedDna ? { dna: parsedDna, systemReferenceImage: previewUrl } : {}),
         });
 
-        res.status(201).json({ success: true, template });
+        const signed = await signTemplate(template);
+        res.status(201).json({ success: true, template: signed });
     } catch (err) {
         res.status(400).json({ success: false, error: err.message });
     }
@@ -458,9 +500,10 @@ router.post('/generate', protect, superadmin, async (req, res) => {
                 sourceJobType: 'VideoProject',
             });
 
+            const signed = await signTemplate(template);
             res.json({
                 success: true,
-                template,
+                template: signed,
                 taskId: genResult.requestId || genResult.taskId,
                 status: 'generating',
                 type: 'video',
@@ -568,12 +611,13 @@ router.post('/generate', protect, superadmin, async (req, res) => {
                 createdBy: req.user._id,
             });
 
+            const signed = await signTemplate(template);
             res.json({
                 success: true,
-                template,
+                template: signed,
                 status: 'done',
                 type: 'image',
-                previewUrl: s3Url,
+                previewUrl: signed.previewUrl,
             });
         }
     } catch (err) {
@@ -687,7 +731,8 @@ router.put('/:id', protect, superadmin, async (req, res) => {
 
         const template = await Template.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true });
         if (!template) return res.status(404).json({ success: false, error: 'Not found' });
-        res.json({ success: true, template });
+        const signed = await signTemplate(template);
+        res.json({ success: true, template: signed });
     } catch (err) {
         res.status(400).json({ success: false, error: err.message });
     }
@@ -777,7 +822,8 @@ router.post('/promote-from-job', protect, superadmin, async (req, res) => {
             isActive: false, // requires admin to activate after review
         });
 
-        res.json({ success: true, template });
+        const signed = await signTemplate(template);
+        res.json({ success: true, template: signed });
     } catch (err) {
         res.status(400).json({ success: false, error: err.message });
     }
@@ -823,7 +869,8 @@ router.post('/promote-from-generated', protect, superadmin, async (req, res) => 
             createdBy: req.user._id,
         });
 
-        res.json({ success: true, template });
+        const signed = await signTemplate(template);
+        res.json({ success: true, template: signed });
     } catch (err) {
         res.status(400).json({ success: false, error: err.message });
     }

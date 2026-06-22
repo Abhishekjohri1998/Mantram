@@ -9,6 +9,46 @@ import { analyzeProduct } from '../agents/templates/productAnalyzer.js';
 import { deductCredits } from '../middleware/credits.js';
 import { internalGenerateCreative } from './creatives.js';
 import Brand from '../models/Brand.js';
+import { getSignedUrlIfNeeded } from '../utils/s3.js';
+
+/**
+ * Sign all S3 URLs in a template object (previews, video, assets, source images)
+ * to ensure they render correctly in the frontend.
+ */
+async function signTemplate(template) {
+    if (!template) return null;
+    const t = template.toObject ? template.toObject() : template;
+
+    // Collect all URL references that need signing
+    const urlRefs = [];
+
+    if (t.previewUrl) urlRefs.push({ obj: t, key: 'previewUrl' });
+    if (t.previewImageUrl) urlRefs.push({ obj: t, key: 'previewImageUrl' });
+    if (t.previewVideoUrl) urlRefs.push({ obj: t, key: 'previewVideoUrl' });
+    if (t.systemReferenceImage) urlRefs.push({ obj: t, key: 'systemReferenceImage' });
+    if (t.savedAvatarUrl) urlRefs.push({ obj: t, key: 'savedAvatarUrl' });
+    if (t.savedProductUrl) urlRefs.push({ obj: t, key: 'savedProductUrl' });
+
+    if (Array.isArray(t.templateAssets)) {
+        for (const asset of t.templateAssets) {
+            if (asset.url) urlRefs.push({ obj: asset, key: 'url' });
+        }
+    }
+
+    if (Array.isArray(t.savedProductImageUrls)) {
+        for (let i = 0; i < t.savedProductImageUrls.length; i++) {
+            urlRefs.push({ obj: t.savedProductImageUrls, key: i });
+        }
+    }
+
+    // Parallel sign all URLs at once
+    if (urlRefs.length > 0) {
+        const signed = await Promise.all(urlRefs.map(r => getSignedUrlIfNeeded(r.obj[r.key])));
+        urlRefs.forEach((r, i) => { r.obj[r.key] = signed[i]; });
+    }
+
+    return t;
+}
 
 const router = express.Router();
 
@@ -33,7 +73,8 @@ router.get('/public/homepage', async (req, res) => {
             .limit(10)
             .lean();
             
-        res.json({ success: true, templates });
+        const signedTemplates = await Promise.all(templates.map(t => signTemplate(t)));
+        res.json({ success: true, templates: signedTemplates });
     } catch (error) {
         console.error('GET /api/templates/public/homepage error:', error);
         res.status(500).json({ success: false, error: error.message });
@@ -110,7 +151,8 @@ router.get('/', protect, async (req, res) => {
                 .lean()).map(t => ({ ...t, isBrandAware: false }));
         }
 
-        res.json({ success: true, templates });
+        const signedTemplates = await Promise.all(templates.map(t => signTemplate(t)));
+        res.json({ success: true, templates: signedTemplates });
     } catch (error) {
         console.error('GET /api/templates error:', error);
         res.status(500).json({ success: false, error: error.message });
@@ -161,7 +203,8 @@ router.get('/by-section/:section', protect, async (req, res) => {
                 .lean()).map(t => ({ ...t, isBrandAware: false }));
         }
 
-        res.json({ success: true, section, templates });
+        const signedTemplates = await Promise.all(templates.map(t => signTemplate(t)));
+        res.json({ success: true, section, templates: signedTemplates });
     } catch (error) {
         console.error('GET /api/templates/by-section error:', error);
         res.status(500).json({ success: false, error: error.message });
@@ -187,7 +230,8 @@ router.get('/my-brand', protect, async (req, res) => {
             .sort({ createdAt: -1 })
             .lean();
 
-        res.json({ success: true, templates });
+        const signedTemplates = await Promise.all(templates.map(t => signTemplate(t)));
+        res.json({ success: true, templates: signedTemplates });
     } catch (error) {
         console.error('GET /api/templates/my-brand error:', error);
         res.status(500).json({ success: false, error: error.message });
@@ -398,15 +442,16 @@ The promptFormula is the MOST IMPORTANT field. It will be used directly as an im
         await template.save();
         console.log(`[TemplateCreate] Created template "${template.name}" (${template._id}) in ${Date.now() - start}ms`);
 
+        const signedTemplate = await signTemplate(template);
         res.json({
             success: true,
             template: {
-                _id: template._id,
-                name: template.name,
-                previewImageUrl: template.previewImageUrl,
-                dna: template.dna,
-                aspectRatio: template.aspectRatio,
-                createdAt: template.createdAt,
+                _id: signedTemplate._id,
+                name: signedTemplate.name,
+                previewImageUrl: signedTemplate.previewImageUrl,
+                dna: signedTemplate.dna,
+                aspectRatio: signedTemplate.aspectRatio,
+                createdAt: signedTemplate.createdAt,
             },
         });
     } catch (error) {
@@ -437,7 +482,8 @@ router.get('/:id', protect, async (req, res) => {
         }
         // Include prompt fields so template hydration (pre-filling studio prompt) works
         const { generationParams, ...safeTemplate } = template;
-        res.json({ success: true, template: safeTemplate });
+        const signedTemplate = await signTemplate(safeTemplate);
+        res.json({ success: true, template: signedTemplate });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
