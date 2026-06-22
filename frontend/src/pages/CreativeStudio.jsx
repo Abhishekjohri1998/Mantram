@@ -951,6 +951,9 @@ Be specific and cinematic. Do NOT describe the image — describe the MOTION onl
     const [csCopyEnabled, setCsCopyEnabled] = useState(false)        // Copy toggle — generate cinematic ad copy alongside image
     const [csCustomW, setCsCustomW] = useState('1080')
     const [csCustomH, setCsCustomH] = useState('1080')
+    const [csProductPickerOpen, setCsProductPickerOpen] = useState(false)  // Product image picker modal
+    const [csProductLinkUrl, setCsProductLinkUrl] = useState('')           // Paste-link input
+    const [csProductPickerTab, setCsProductPickerTab] = useState('brand')  // 'brand' | 'bank' | 'upload' | 'link'
 
     // ── Logo/Brand Mockup State ──
     const [logoImage, setLogoImage] = useState(null)
@@ -11668,24 +11671,35 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                         <button onClick={() => { setCsProductImage(null); setCsProductFile(null) }} className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-[var(--sys-bg)]/80 hover:bg-[var(--sys-bg)] shadow-sm backdrop-blur-md flex items-center justify-center cursor-pointer transition-all">
                                             <span className="material-symbols-outlined text-[13px] text-[var(--sys-text)]">close</span>
                                         </button>
+                                        <button onClick={() => { setCsProductPickerOpen(true); setCsProductPickerTab('brand'); }} className="absolute bottom-1.5 left-1.5 flex items-center gap-1 px-2 py-1 rounded-lg bg-[var(--sys-bg)]/80 hover:bg-[var(--sys-bg)] shadow-sm backdrop-blur-md cursor-pointer transition-all text-[10px] font-bold text-[var(--sys-text)]">
+                                            <span className="material-symbols-outlined text-[11px]">swap_horiz</span> Change
+                                        </button>
                                     </div>
                                 ) : (
-                                    <label className="flex flex-col items-center justify-center h-28 rounded-xl border border-dashed border-[var(--sys-border)] hover:border-primary/50 transition-colors bg-[var(--sys-bg)]/50 cursor-pointer group">
-                                        <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-[22px] mb-1 group-hover:text-primary transition-colors">upload</span>
-                                        <span className="text-[11px] text-[var(--sys-text-muted)]">Upload product photo</span>
-                                        <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
-                                            const file = e.target.files?.[0]; if (!file) return;
-                                            setCsProductFile(file);
-                                            const reader = new FileReader();
-                                            reader.onload = async (ev) => {
-                                                try { const url = await creativesAPI.uploadToBank({ imageUrl: ev.target.result, brandId: activeBrand?._id, title: 'Product Upload' }); setCsProductImage(url?.imageUrl || ev.target.result); }
-                                                catch { setCsProductImage(ev.target.result); }
-                                            };
-                                            reader.readAsDataURL(file);
-                                        }} />
-                                    </label>
+                                    <div className="space-y-2">
+                                        <button onClick={() => { setCsProductPickerOpen(true); setCsProductPickerTab('brand'); }}
+                                            className="w-full flex items-center justify-center gap-2 h-20 rounded-xl border border-dashed border-[var(--sys-border)] hover:border-primary/50 transition-colors bg-[var(--sys-bg)]/50 cursor-pointer group">
+                                            <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-[20px] group-hover:text-primary transition-colors">photo_library</span>
+                                            <span className="text-[11px] text-[var(--sys-text-muted)] group-hover:text-[var(--sys-text)] font-medium transition-colors">Select from Brand / Image Bank</span>
+                                        </button>
+                                        <label className="w-full flex items-center justify-center gap-2 h-12 rounded-xl border border-[var(--sys-border)] hover:border-primary/30 transition-colors bg-[var(--sys-surface)] cursor-pointer group">
+                                            <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-[16px] group-hover:text-primary transition-colors">upload</span>
+                                            <span className="text-[11px] text-[var(--sys-text-muted)] group-hover:text-[var(--sys-text)] font-medium transition-colors">Upload from device</span>
+                                            <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
+                                                const file = e.target.files?.[0]; if (!file) return;
+                                                setCsProductFile(file);
+                                                const reader = new FileReader();
+                                                reader.onload = async (ev) => {
+                                                    try { const url = await creativesAPI.uploadToBank({ imageUrl: ev.target.result, brandId: activeBrand?._id, title: 'Product Upload' }); setCsProductImage(url?.imageUrl || ev.target.result); }
+                                                    catch { setCsProductImage(ev.target.result); }
+                                                };
+                                                reader.readAsDataURL(file);
+                                            }} />
+                                        </label>
+                                    </div>
                                 )}
                             </div>
+
 
                             {/* ── 3. Creative Direction — AI Art Director brief ── */}
                             <div className="px-5 pb-4 border-t border-[var(--sys-border)] pt-4">
@@ -11939,6 +11953,212 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                 </div>
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* ══════ Campaign Shot — Product Image Picker Modal ══════ */}
+            {csProductPickerOpen && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in" onClick={() => setCsProductPickerOpen(false)}>
+                    <div className="bg-[#0f1729] border border-[var(--sys-border)] rounded-2xl w-full max-w-[calc(100%-2rem)] sm:max-w-lg mx-auto shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-[var(--sys-border)]">
+                            <h3 className="text-[var(--sys-text)] font-bold text-sm flex items-center gap-2">
+                                <span className="material-symbols-outlined text-primary text-lg">add_a_photo</span>
+                                Select Product Image
+                            </h3>
+                            <button onClick={() => setCsProductPickerOpen(false)} className="p-1 rounded-lg hover:bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] transition cursor-pointer">
+                                <span className="material-symbols-outlined text-lg">close</span>
+                            </button>
+                        </div>
+                        {/* Tabs */}
+                        <div className="flex border-b border-[var(--sys-border)]">
+                            {[
+                                { id: 'brand', icon: 'domain', label: 'Brand Photos' },
+                                { id: 'bank', icon: 'photo_library', label: 'Image Bank' },
+                                { id: 'upload', icon: 'upload', label: 'Upload' },
+                                { id: 'link', icon: 'link', label: 'Paste Link' },
+                            ].map(tab => (
+                                <button key={tab.id} onClick={() => {
+                                    setCsProductPickerTab(tab.id);
+                                    if (tab.id === 'bank' && bankImages.length === 0) loadImageBank();
+                                }}
+                                    className={`flex-1 py-3 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer border-b-2 ${csProductPickerTab === tab.id ? 'text-primary border-primary bg-primary/5' : 'text-[var(--sys-text-muted)] border-transparent hover:text-[var(--sys-text)]'}`}>
+                                    <span className="material-symbols-outlined !text-base">{tab.icon}</span>
+                                    <span className="hidden sm:inline">{tab.label}</span>
+                                </button>
+                            ))}
+                        </div>
+                        {/* Tab Content */}
+                        <div className="p-4 sm:p-5 max-h-[400px] overflow-y-auto custom-scrollbar">
+                            {/* ── Brand Photos ── */}
+                            {csProductPickerTab === 'brand' && (() => {
+                                const imgSet = new Set();
+                                const allBrandPhotos = [];
+                                if (activeBrand?.dna?.logo?.url) {
+                                    imgSet.add(activeBrand.dna.logo.url);
+                                    allBrandPhotos.push({ url: activeBrand.dna.logo.url, alt: 'Brand Logo' });
+                                }
+                                brandImages.forEach(img => {
+                                    if (img?.url && !imgSet.has(img.url)) {
+                                        imgSet.add(img.url);
+                                        allBrandPhotos.push(img);
+                                    }
+                                });
+                                (activeBrand?.dna?.brandImages || []).forEach(img => {
+                                    if (img?.url && !imgSet.has(img.url)) {
+                                        imgSet.add(img.url);
+                                        allBrandPhotos.push(img);
+                                    }
+                                });
+                                // Also include product catalog images
+                                (productsList || []).forEach(p => {
+                                    if (p.images?.[0]?.url && !imgSet.has(p.images[0].url)) {
+                                        imgSet.add(p.images[0].url);
+                                        allBrandPhotos.push({ url: p.images[0].url, alt: p.title || 'Product' });
+                                    }
+                                });
+                                return allBrandPhotos.length > 0 ? (
+                                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                                        {allBrandPhotos.map((img, i) => (
+                                            <button key={`cs-bpm-${i}`}
+                                                onClick={() => {
+                                                    setCsProductImage(img.url);
+                                                    setCsProductFile(null);
+                                                    setCsProductPickerOpen(false);
+                                                }}
+                                                className="aspect-square rounded-xl overflow-hidden border border-transparent hover:border-primary/60 cursor-pointer transition-all hover:scale-[1.03] group relative">
+                                                <img loading="lazy" decoding="async" src={img.url} alt={img.alt || `Brand ${i + 1}`} className="w-full h-full object-cover" />
+                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
+                                                    <span className="material-symbols-outlined text-white text-lg">check_circle</span>
+                                                </div>
+                                                {img.alt && <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1.5 py-0.5 text-[9px] text-white truncate opacity-0 group-hover:opacity-100 transition-opacity">{img.alt}</div>}
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-10">
+                                        <span className="material-symbols-outlined text-3xl text-[var(--sys-text-muted)] mb-2 block">photo_library</span>
+                                        <p className="text-sm text-[var(--sys-text-muted)]">No brand photos available</p>
+                                        <p className="text-xs text-[var(--sys-text-muted)] mt-1">Add photos via Brand DNA or scan a website</p>
+                                    </div>
+                                );
+                            })()}
+
+                            {/* ── Image Bank ── */}
+                            {csProductPickerTab === 'bank' && (
+                                bankLoading ? (
+                                    <div className="text-center py-10">
+                                        <span className="material-symbols-outlined text-3xl text-[var(--sys-text-muted)] animate-spin block mb-2">progress_activity</span>
+                                        <p className="text-sm text-[var(--sys-text-muted)]">Loading your images...</p>
+                                    </div>
+                                ) : bankImages.length > 0 ? (
+                                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                                        {bankImages.map((img, i) => (
+                                            <button key={`cs-bank-${img._id || i}`}
+                                                onClick={() => {
+                                                    setCsProductImage(img.imageUrl || img.url);
+                                                    setCsProductFile(null);
+                                                    setCsProductPickerOpen(false);
+                                                }}
+                                                className="aspect-square rounded-xl overflow-hidden border border-transparent hover:border-primary/60 cursor-pointer transition-all hover:scale-[1.03] group relative">
+                                                <img loading="lazy" decoding="async" src={img.imageUrl || img.url || img.thumbnailUrl} alt={img.title || `Image ${i + 1}`} className="w-full h-full object-cover" />
+                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
+                                                    <span className="material-symbols-outlined text-white text-lg">check_circle</span>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-10">
+                                        <span className="material-symbols-outlined text-3xl text-[var(--sys-text-muted)] mb-2 block">photo_library</span>
+                                        <p className="text-sm text-[var(--sys-text-muted)]">No images in your bank yet</p>
+                                        <p className="text-xs text-[var(--sys-text-muted)] mt-1">Generate or upload images in AI Create to see them here</p>
+                                    </div>
+                                )
+                            )}
+
+                            {/* ── Upload ── */}
+                            {csProductPickerTab === 'upload' && (
+                                <div className="text-center py-6">
+                                    <div onDrop={(e) => {
+                                        e.preventDefault();
+                                        const file = e.dataTransfer?.files?.[0];
+                                        if (file && file.type.startsWith('image/')) {
+                                            setCsProductFile(file);
+                                            const reader = new FileReader();
+                                            reader.onload = async (ev) => {
+                                                try { const url = await creativesAPI.uploadToBank({ imageUrl: ev.target.result, brandId: activeBrand?._id, title: 'Product Upload' }); setCsProductImage(url?.imageUrl || ev.target.result); }
+                                                catch { setCsProductImage(ev.target.result); }
+                                                setCsProductPickerOpen(false);
+                                            };
+                                            reader.readAsDataURL(file);
+                                        }
+                                    }} onDragOver={e => e.preventDefault()}
+                                        className="border border-dashed border-[var(--sys-border)] rounded-2xl p-10 hover:border-primary/40 transition-colors mb-4">
+                                        <span className="material-symbols-outlined text-5xl text-[var(--sys-text-muted)] mb-3 block">cloud_upload</span>
+                                        <p className="text-[var(--sys-text-muted)] text-sm mb-1">Drag & drop your image</p>
+                                        <p className="text-xs text-[var(--sys-text-muted)]">PNG, JPG, WEBP up to 10MB</p>
+                                    </div>
+                                    <label className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[var(--sys-text)] text-[var(--sys-bg)] text-sm font-bold cursor-pointer hover:opacity-90 transition-opacity">
+                                        <span className="material-symbols-outlined text-base">upload</span>
+                                        Choose File
+                                        <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file && file.type.startsWith('image/')) {
+                                                setCsProductFile(file);
+                                                const reader = new FileReader();
+                                                reader.onload = async (ev) => {
+                                                    try { const url = await creativesAPI.uploadToBank({ imageUrl: ev.target.result, brandId: activeBrand?._id, title: 'Product Upload' }); setCsProductImage(url?.imageUrl || ev.target.result); }
+                                                    catch { setCsProductImage(ev.target.result); }
+                                                    setCsProductPickerOpen(false);
+                                                };
+                                                reader.readAsDataURL(file);
+                                            }
+                                        }} />
+                                    </label>
+                                </div>
+                            )}
+
+                            {/* ── Paste Link ── */}
+                            {csProductPickerTab === 'link' && (
+                                <div className="space-y-4">
+                                    <p className="text-xs text-[var(--sys-text-muted)]">Paste a direct image URL (PNG, JPG, WEBP)</p>
+                                    <div className="flex gap-2">
+                                        <input type="text" value={csProductLinkUrl} onChange={e => setCsProductLinkUrl(e.target.value)}
+                                            placeholder="https://example.com/product.jpg"
+                                            className="flex-1 bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-2.5 text-sm text-[var(--sys-text)] placeholder:text-[var(--sys-text-muted)] outline-none focus:border-primary/40"
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter' && csProductLinkUrl.trim()) {
+                                                    setCsProductImage(csProductLinkUrl.trim());
+                                                    setCsProductFile(null);
+                                                    setCsProductPickerOpen(false);
+                                                    setCsProductLinkUrl('');
+                                                }
+                                            }} />
+                                        <button onClick={() => {
+                                            if (csProductLinkUrl.trim()) {
+                                                setCsProductImage(csProductLinkUrl.trim());
+                                                setCsProductFile(null);
+                                                setCsProductPickerOpen(false);
+                                                setCsProductLinkUrl('');
+                                            }
+                                        }}
+                                            disabled={!csProductLinkUrl.trim()}
+                                            className="px-5 py-2.5 rounded-xl bg-[var(--sys-text)] text-[var(--sys-bg)] text-sm font-bold cursor-pointer hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed">
+                                            Use
+                                        </button>
+                                    </div>
+                                    {csProductLinkUrl.trim() && (
+                                        <div className="rounded-xl overflow-hidden border border-[var(--sys-border)] max-h-48">
+                                            <img loading="lazy" src={csProductLinkUrl.trim()} alt="Preview"
+                                                className="w-full h-full object-contain bg-[var(--sys-bg)]"
+                                                onError={e => e.target.style.display = 'none'} />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
