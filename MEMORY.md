@@ -18,6 +18,17 @@
   - Subsequent scenes chain using the last frame of the previous scene.
   - Always clean up duplicate schema fields (e.g. `totalDuration`) to avoid validation/consistency confusion.
 
+### Gemini Omni Flash Long-Form Video Support (Sprint 8)
+- **Feature**: Sequential multi-segment generation and model mapping harmonization.
+- **Goal**: Resolve the 10-second limit for Gemini Flash (`gemini-flash` and `gemini-omni-flash`) in both Advanced Mode and Storyboard Studio.
+- **Workflow**:
+  - **Dynamic Long-Form Threshold**: Threshold for Storyboard segmenting (`isLongForm`) is dynamically adjusted to `10s` for Gemini models (vs. `15s` for Seedance/others).
+  - **Advanced Mode Sequential Pipeline**: Refactored `advancedGenerateNode` to support a sequential generator loop when `duration > 10` for Gemini.
+  - **Segmenting & Chaining**: Divides total duration into optimal segments ($\le 10$ seconds, $\ge 4$ seconds). Generates segment $N$, extracts its last frame via FFmpeg, uploads it to S3, and passes it as the first frame (`imageUrl`) to segment $N+1$ to ensure visual continuity.
+  - **Stitching**: Concat-stitches all completed segments into a single final video using the `stitchVideoClips` utility.
+- **Gotchas / Learnings**:
+  - Model mappings must support both the database identifier (`gemini-omni-flash`) and the frontend identifier (`gemini-flash`) to prevent config mismatches and fallback errors.
+
 ### Visual Grounding & Competitor Style References (Sprint 6)
 - **Feature**: Competitor Style Referencing & Human Presence Mandate.
 - **Goal**: Elevate aesthetic quality of generated social media visuals by integrating competitor references and mandating human casting.
