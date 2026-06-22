@@ -121,3 +121,13 @@
   - Standardize batch list item shapes as `{ id, value }` objects, allowing downstream nodes to resolve `value` and track progress state by `id`.
   - Supply mock arguments or default params in test configurations to satisfy required input port checks on blocked nodes.
 
+### Super Admin Templates Manager Preview Regeneration (Sprint 8)
+- **Feature**: Live preview regeneration for existing templates in-place.
+- **Goal**: Allow Super Admins to adjust prompt formulas and assets for existing templates and trigger a regeneration job that updates the existing template rather than spawning a duplicate.
+- **Workflow**:
+  - **Backend Mutability**: Removed the strict immutability constraint on `savedPrompt` in the `PUT /:id` template route, adding it to `ALLOWED_UPDATES`.
+  - **In-Place Update Support**: Modified the POST `/generate` route to accept `templateId`. If provided, it finds the existing template and performs a `Template.findByIdAndUpdate` in-place, preserving `isActive`, `isPublished`, and `createdBy` flags. The video status polling logic matches the task ID to the template's `sourceJobId`, updating the S3 video URL on completion automatically.
+  - **Frontend Editor**: Extended the Edit Template Modal with a live preview media container (images/videos) and a collapsible "AI Generation Parameters" section (Prompt formula textarea, AI Model, Duration, Format, and Upload/URL inputs for Avatar and Product Images). Added a **Regenerate Media** action button that submits the generation task and polls progress inside the modal.
+- **Key Pattern / Learnings**:
+  - In-place updating is highly cohesive when leveraging existing asynchronous polling systems (matching by `sourceJobId`). Changing the `sourceJobId` on the target template automatically chains it to the global status poller without changing any background handler logic.
+  - Adding a preview of the active asset within the edit modal is critical to closing the loop for the user, allowing them to verify regeneration before saving.
