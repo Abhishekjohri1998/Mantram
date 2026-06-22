@@ -9042,35 +9042,41 @@ CRITICAL RULES:
                     // GeminiProvider.generateText accepts images[] as data: URIs or
                     // http URLs — it fetches/decodes them into inlineData automatically.
                     // ═══════════════════════════════════════════════════════════════
-                    const { getRouter: getVisionRouter } = await import('../ai/router.js');
-                    const visionRouter = getVisionRouter();
+                    console.log(`[analyze-brief-media] 🔍 Calling Gemini vision directly via fetch (base64 length=${base64.length})...`);
 
-                    // Prefer nativeGemini (direct Google API) — always has vision support.
-                    // Fall back to providers.gemini only if nativeGemini isn't initialised.
-                    const geminiVision = visionRouter.nativeGemini || visionRouter.providers.gemini;
-
-                    if (!geminiVision?.isAvailable()) {
+                    const geminiApiKey = process.env.GEMINI_API_KEY;
+                    if (!geminiApiKey) {
                         return res.status(503).json({
                             success: false,
                             error: 'Image analysis unavailable — GEMINI_API_KEY not configured. Please add it to .env or type your brief manually.',
                         });
                     }
 
-                    console.log(`[analyze-brief-media] 🔍 Calling Gemini vision (base64 length=${base64.length})...`);
+                    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
+                    const parts = [
+                        { text: systemPrompt },
+                        { text: 'Read every word from this image. Extract ALL text verbatim and generate the advertising brief.' },
+                        { inlineData: { mimeType: mime || 'image/jpeg', data: base64 } }
+                    ];
 
-                    // Pass the image as a data: URI — GeminiProvider.generateText() handles
-                    // the base64 extraction and inlineData formatting automatically.
-                    const geminiResult = await geminiVision.generateText({
-                        systemPrompt,
-                        userPrompt: 'Read every word from this image. Extract ALL text verbatim and generate the advertising brief.',
-                        images: [`data:image/jpeg;base64,${base64}`],
-                        temperature: 0.1,
-                        maxTokens: 1500,
-                        model: 'gemini-2.5-flash',
+                    const geminiResp = await fetch(geminiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ role: 'user', parts }],
+                            generationConfig: { temperature: 0.1, maxOutputTokens: 2500, responseMimeType: 'application/json' },
+                        }),
+                        signal: AbortSignal.timeout(40_000),
                     });
 
-                    const raw = geminiResult?.text || '';
-                    const visionProviderUsed = 'gemini-flash';
+                    if (!geminiResp.ok) {
+                        const errText = await geminiResp.text();
+                        throw new Error(`Gemini API Error [${geminiResp.status}]: ${errText}`);
+                    }
+
+                    const geminiData = await geminiResp.json();
+                    const raw = geminiData.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
+                    const visionProviderUsed = 'gemini-2.5-flash-direct';
 
                     // ── Total failure: surface the error, don't hallucinate ────────────
                     if (!raw) {
@@ -9167,20 +9173,15 @@ CRITICAL RULES:
                     }
                     console.log(`[analyze-brief-media] Measured audio duration: ${audioDuration} seconds`);
 
-                    const { getRouter } = await import('../ai/router.js');
-                    const router = getRouter();
-
-                    // Prefer nativeGemini (direct Google API) — always has direct audio/multimodal support.
-                    const geminiAudio = router.nativeGemini || router.providers.gemini;
-
-                    if (!geminiAudio?.isAvailable()) {
+                    const geminiApiKey = process.env.GEMINI_API_KEY;
+                    if (!geminiApiKey) {
                         return res.status(503).json({
                             success: false,
                             error: 'Audio analysis unavailable — GEMINI_API_KEY not configured. Please add it to .env or type your brief manually.',
                         });
                     }
 
-                    console.log(`[analyze-brief-media] 🔍 Calling Gemini audio transcription (base64 length=${base64.length}, mime=${mime})...`);
+                    console.log(`[analyze-brief-media] 🔍 Calling Gemini audio transcription directly via fetch (base64 length=${base64.length}, mime=${mime})...`);
 
                     const systemPrompt = `You are a highly accurate audio transcription engine AND a creative advertising strategist.
 Your PRIMARY JOB: Listen to the audio and extract/transcribe every single word verbatim. Do not summarize, skip, or paraphrase the spoken words.
@@ -9227,17 +9228,31 @@ CRITICAL RULES:
 - suggestedFormat MUST be one of: "9:16" portrait, "16:9" landscape, "1:1" square.
 - Return ONLY JSON. Do not include any explanations or markdown wrappers outside the JSON object.`;
 
-                    const geminiResult = await geminiAudio.generateText({
-                        systemPrompt,
-                        userPrompt: 'Transcribe the audio verbatim and extract key details into the specified JSON format.',
-                        images: [dataUri], // GeminiProvider accepts any inlineData data URI in the images list
-                        temperature: 0.1,
-                        maxTokens: 1500,
-                        model: 'gemini-2.5-flash',
+                    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
+                    const parts = [
+                        { text: systemPrompt },
+                        { text: 'Transcribe the audio verbatim and extract key details into the specified JSON format.' },
+                        { inlineData: { mimeType: mime, data: base64 } }
+                    ];
+
+                    const geminiResp = await fetch(geminiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ role: 'user', parts }],
+                            generationConfig: { temperature: 0.1, maxOutputTokens: 6000, responseMimeType: 'application/json' },
+                        }),
+                        signal: AbortSignal.timeout(60_000),
                     });
 
-                    const raw = geminiResult?.text || '';
-                    const audioProviderUsed = 'gemini-flash';
+                    if (!geminiResp.ok) {
+                        const errText = await geminiResp.text();
+                        throw new Error(`Gemini API Error [${geminiResp.status}]: ${errText}`);
+                    }
+
+                    const geminiData = await geminiResp.json();
+                    const raw = geminiData.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
+                    const audioProviderUsed = 'gemini-2.5-flash-direct';
 
                     if (!raw) {
                         throw new Error('Gemini returned an empty response for audio analysis');
