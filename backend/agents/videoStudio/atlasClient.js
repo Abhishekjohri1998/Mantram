@@ -590,7 +590,7 @@ export async function submitAtlasCloudVideoGeneration({
         prompt:         finalPrompt,
         aspect_ratio:   aspectRatio || '16:9',
         duration:       dur,
-        resolution:     resolution === '1080p' ? '1080p' : (resolution === '480p' ? '480p' : '720p'),
+        resolution:     resolution === '4k' ? '4k' : (resolution === '1080p' ? '1080p' : (resolution === '480p' ? '480p' : '720p')),
         generate_audio: refAudio ? false : (generateAudio !== false),
     };
 
@@ -716,7 +716,7 @@ export async function submitHappyHorseVideoGeneration({
     const imageCount = s3ImageUrls.length + s3RefImages.length;
     const modelName = resolveHappyHorseModelName(imageCount, model);
     const dur = Math.min(Math.max(parseInt(duration, 10) || 5, 3), 15);
-    const res = resolution === '1080p' ? '1080p' : '720p';
+    const res = resolution === '4k' ? '4k' : (resolution === '1080p' ? '1080p' : '720p');
 
     console.log(`🎯 [HappyHorse] model=${modelName} | dur=${dur}s | images=${s3ImageUrls.length} | refs=${s3RefImages.length} | res=${res}`);
     console.log(`📝 [HappyHorse] Prompt (first 200): ${finalPrompt.substring(0, 200)}`);

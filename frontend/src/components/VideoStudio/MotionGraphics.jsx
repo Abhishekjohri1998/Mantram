@@ -30,7 +30,7 @@ const PRESETS = [
 
 const RATIOS = ['9:16', '16:9', '1:1', '4:3']
 const DURATIONS = [5, 8, 10, 15]
-const RESOLUTIONS = ['480p', '720p', '1080p']
+const RESOLUTIONS = ['480p', '720p', '1080p', '4k']
 const MODELS = [
     { value: 'seedance-2.0', label: 'Seedance 2.0' },
     { value: 'seedance-2.0-fast', label: 'Seedance 2 Fast' },

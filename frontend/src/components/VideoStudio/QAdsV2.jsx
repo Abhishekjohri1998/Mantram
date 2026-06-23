@@ -20,7 +20,12 @@ import ViralityMiniPanel from '../ViralityMiniPanel'
 
 const DURS = [{value:5,label:'5s',msIcon:'timer'},{value:8,label:'8s',msIcon:'timer'},{value:10,label:'10s',msIcon:'timer'},{value:15,label:'15s',msIcon:'timer'},{value:20,label:'20s',msIcon:'timer'},{value:30,label:'30s',msIcon:'movie'},{value:45,label:'45s',msIcon:'movie'},{value:60,label:'60s',msIcon:'movie'},{value:90,label:'90s',msIcon:'movie'},{value:120,label:'120s',msIcon:'movie'}]
 const FMTS = [{value:'9:16',label:'9:16',msIcon:'crop_portrait'},{value:'16:9',label:'16:9',msIcon:'crop_landscape'},{value:'1:1',label:'1:1',msIcon:'crop_square'}]
-const RES = [{value:'480p',label:'480p',msIcon:'sd'},{value:'720p',label:'720p',msIcon:'sd'},{value:'1080p',label:'1080p',msIcon:'hd'}]
+const RES = [
+    {value:'480p',label:'480p',msIcon:'sd'},
+    {value:'720p',label:'720p',msIcon:'sd'},
+    {value:'1080p',label:'1080p',msIcon:'hd'},
+    {value:'4k',label:'4K',msIcon:'4k'}
+]
 const VIDEO_MODELS = [
     {value:'seedance-2.0',label:'Seedance 2.0',msIcon:'local_movies'},
     {value:'seedance-2.0-fast',label:'Seedance 2.0 Fast',msIcon:'bolt'},
@@ -712,6 +717,37 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
         return 'English'
     })
 
+    const getCredits = (modelId, dur, res) => {
+        const d = parseInt(dur) || 8;
+        const r = res || '720p';
+        const m = modelId || 'seedance-2.0';
+        
+        let costPerSec = 0.23;
+        if (m === 'seedance-2.0-fast') costPerSec = 0.1536;
+        else if (m === 'seedance-1.0') costPerSec = 0.08;
+        else if (m === 'happyhorse-1.0' || m === 'happyhorse-1.1') costPerSec = 0.15;
+        else if (m === 'gemini-flash' || m === 'gemini-omni-flash') costPerSec = 0.15;
+        else if (m === 'kling-3.0') costPerSec = 0.07;
+        else if (m === 'veo-3.1') costPerSec = 0.10;
+        else if (m === 'grok-imagine') costPerSec = 0.08;
+        
+        let resMult = 1.0;
+        const ATLAS_MODELS = ['seedance-2.0', 'seedance-2.0-fast', 'happyhorse-1.0', 'happyhorse-1.1', 'gemini-flash', 'gemini-omni-flash'];
+        if (ATLAS_MODELS.includes(m)) {
+            if (r === '480p') resMult = 0.5;
+            else if (r === '720p') resMult = 0.6;
+            else if (r === '1080p') resMult = 1.0;
+            else if (r === '4k') resMult = 2.0;
+        } else {
+            if (r === '480p') resMult = 0.5;
+            else if (r === '720p') resMult = 0.7;
+            else if (r === '4k') resMult = 2.0;
+        }
+        
+        const usd = costPerSec * d * resMult;
+        return Math.max(Math.ceil(usd * 20), 5);
+    };
+
     // Modals
     const [showAvatar, setShowAvatar] = useState(false)
     const [showCats, setShowCats] = useState(false)
@@ -1248,7 +1284,7 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
                                         style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 0', fontWeight: 800, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, letterSpacing: 0.5 }}
                                     >
                                         <span className="material-symbols-outlined" style={{ fontSize: 18 }}>videocam</span>
-                                        Generate Video · 8 credits
+                                        Generate Video · {getCredits(selectedModel, duration, resolution)} credits
                                     </button>
                                 )}
                             </div>

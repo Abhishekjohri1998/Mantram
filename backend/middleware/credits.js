@@ -265,15 +265,25 @@ export const requireCredits = (actionOrCost = 1) => {
                         const defaultDuration = (actionOrCost === 'qAdsGenerate') ? 8 : 5;
                         const { model = defaultModel, duration = defaultDuration,
                             resolution = '720p', qualityMode = 'fast' } = req.body;
-                        // Parse duration from settings for UGC Pro / Q-Ads
+                        // Parse parameters from settings for UGC Pro / Q-Ads if encapsulated
                         let parsedDuration = parseInt(duration) || defaultDuration;
+                        let parsedResolution = resolution;
+                        let parsedModel = model;
+                        let parsedQuality = qualityMode;
                         if (req.body.settings) {
-                            const s = typeof req.body.settings === 'string' ? JSON.parse(req.body.settings) : req.body.settings;
-                            if (s.duration) parsedDuration = parseInt(s.duration) || parsedDuration;
+                            try {
+                                const s = typeof req.body.settings === 'string' ? JSON.parse(req.body.settings) : req.body.settings;
+                                if (s.duration) parsedDuration = parseInt(s.duration) || parsedDuration;
+                                if (s.resolution) parsedResolution = s.resolution;
+                                if (s.model) parsedModel = s.model;
+                                if (s.qualityMode || s.quality) parsedQuality = s.qualityMode || s.quality;
+                            } catch (e) {
+                                console.warn('⚠️ [credits.js] Failed to parse settings in credit check:', e.message);
+                            }
                         }
-                        const estimate = estimateCost(model || defaultModel, parsedDuration, resolution, qualityMode);
+                        const estimate = estimateCost(parsedModel || defaultModel, parsedDuration, parsedResolution, parsedQuality);
                         cost = estimate.credits;
-                        console.log(`🎬 Dynamic video credits [${actionOrCost}]: ${model || defaultModel} ${parsedDuration}s ${resolution} ${qualityMode} → $${estimate.usd} → ${cost} credits`);
+                        console.log(`🎬 Dynamic video credits [${actionOrCost}]: ${parsedModel || defaultModel} ${parsedDuration}s ${parsedResolution} ${parsedQuality} → $${estimate.usd} → ${cost} credits`);
                     }
                 } else {
                     cost = (typeof rawCost === 'number' ? rawCost : null) || 1;

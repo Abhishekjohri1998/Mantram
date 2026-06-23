@@ -24,14 +24,14 @@ async function api(path, opts = {}) {
 const MODELS = {
     'gemini-flash': { id: 'gemini-flash', name: 'Gemini Flash Video', msIcon: 'flash_on', durs: [4, 6, 8, 10, 15, 20, 30, 45, 60, 90], ratios: ['16:9', '9:16'], res: ['4k', '1080p', '720p'], has: { firstFrame: true, refImages: true, multiRefImages: 6, audio: false, quality: false }, cost: 0.12, desc: "Google Gemini Flash Video model via Atlas Cloud — high fidelity, multi-duration, 4K." },
     'kling-3.0-o': { id: 'kling-3.0-o', name: 'Kling 3.O Omni', msIcon: 'all_inclusive', durs: [5, 10, 15, 20, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16', '1:1'], res: ['4k', '1080p', '720p', '480p'], has: { firstFrame: false, lastFrame: false, audio: true, quality: true, multishot: true, refImages: true, refVideo: false, refAudio: false }, cost: 0.12, desc: "Ultimate cinematic omni-model. Supports multi-shot & dynamic ref images." },
-    'seedance-2.0': { id: 'seedance-2.0', name: 'Seedance 2.0', msIcon: 'movie_filter', durs: [5, 10, 15, 20, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16', '1:1', '4:3', '21:9'], res: ['1080p', '720p', '480p'], has: { firstFrame: true, refImages: true, refVideo: true, refAudio: true, audio: true, quality: true, multiRefImages: 9, negativePrompt: true, seed: true, cfgScale: true }, cost: 0.08, desc: "Best for Lip-Sync and precise motion tracking. Supports up to 9 reference images." },
-    'seedance-2.0-fast': { id: 'seedance-2.0-fast', name: 'Seedance 2.0 Fast', msIcon: 'movie_filter', durs: [5, 10, 15, 20, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16', '1:1', '4:3', '21:9'], res: ['1080p', '720p', '480p'], has: { firstFrame: true, refImages: true, refVideo: true, refAudio: true, audio: true, quality: true, multiRefImages: 9, negativePrompt: true, seed: true, cfgScale: true }, cost: 0.05, desc: "Ultra-fast generation for testing and rapid prototyping." },
+    'seedance-2.0': { id: 'seedance-2.0', name: 'Seedance 2.0', msIcon: 'movie_filter', durs: [5, 10, 15, 20, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16', '1:1', '4:3', '21:9'], res: ['4k', '1080p', '720p', '480p'], has: { firstFrame: true, refImages: true, refVideo: true, refAudio: true, audio: true, quality: true, multiRefImages: 9, negativePrompt: true, seed: true, cfgScale: true }, cost: 0.08, desc: "Best for Lip-Sync and precise motion tracking. Supports up to 9 reference images." },
+    'seedance-2.0-fast': { id: 'seedance-2.0-fast', name: 'Seedance 2.0 Fast', msIcon: 'movie_filter', durs: [5, 10, 15, 20, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16', '1:1', '4:3', '21:9'], res: ['4k', '1080p', '720p', '480p'], has: { firstFrame: true, refImages: true, refVideo: true, refAudio: true, audio: true, quality: true, multiRefImages: 9, negativePrompt: true, seed: true, cfgScale: true }, cost: 0.05, desc: "Ultra-fast generation for testing and rapid prototyping." },
     'kling-3.0': { id: 'kling-3.0', name: 'Kling 3.0', msIcon: 'videocam', durs: [5, 10, 15, 20, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16', '1:1'], res: ['4k', '1080p', '720p', '480p'], has: { firstFrame: true, lastFrame: true, audio: true, quality: true }, cost: 0.07, desc: "High realistic generation with Fast and Pro options." },
-    'veo-3.1': { id: 'veo-3.1', name: 'Veo 3.1', msIcon: 'smart_display', durs: [5, 8, 20, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16'], res: ['1080p', '720p', '480p'], has: { firstFrame: true, lastFrame: true, refImages: true, audio: true, quality: true }, cost: 0.10, desc: "Incredible Cinematic physics. Fast and Pro options." },
-    'seedance-1.0': { id: 'seedance-1.0', name: 'Seedance 1.0', msIcon: 'slow_motion_video', durs: [5, 10, 20, 30, 45, 60], ratios: ['16:9', '9:16', '1:1', '4:3'], res: ['720p', '480p'], has: { firstFrame: true, lastFrame: true }, cost: 0.05, desc: "Cost-effective, reliable motion." },
-    'grok-imagine': { id: 'grok-imagine', name: 'Grok Imagine', msIcon: 'neurology', durs: [5, 15, 20, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16', '1:1'], res: ['1080p', '720p', '480p'], has: { firstFrame: true }, cost: 0.08, desc: "Ultra-fast text-to-video capabilities without reference locks." },
-    'happyhorse-1.0': { id: 'happyhorse-1.0', name: 'HappyHorse 1.0', msIcon: 'pets', durs: [5, 10, 15, 20, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16', '1:1'], res: ['1080p', '720p'], has: { firstFrame: true, refImages: true, audio: true, quality: true }, cost: 0.06, desc: "Alibaba's cinematic model. Great motion, native audio, ref images, 1080p." },
-    'happyhorse-1.1': { id: 'happyhorse-1.1', name: 'HappyHorse 1.1', msIcon: 'pets', durs: [5, 10, 15, 20, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16', '1:1'], res: ['1080p', '720p'], has: { firstFrame: true, refImages: true, audio: true, quality: true }, cost: 0.06, desc: "Alibaba's HappyHorse 1.1 model. Advanced cinematic motion, native audio, ref images, 1080p." },
+    'veo-3.1': { id: 'veo-3.1', name: 'Veo 3.1', msIcon: 'smart_display', durs: [5, 8, 20, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16'], res: ['4k', '1080p', '720p', '480p'], has: { firstFrame: true, lastFrame: true, refImages: true, audio: true, quality: true }, cost: 0.10, desc: "Incredible Cinematic physics. Fast and Pro options." },
+    'seedance-1.0': { id: 'seedance-1.0', name: 'Seedance 1.0', msIcon: 'slow_motion_video', durs: [5, 10, 20, 30, 45, 60], ratios: ['16:9', '9:16', '1:1', '4:3'], res: ['4k', '720p', '480p'], has: { firstFrame: true, lastFrame: true }, cost: 0.05, desc: "Cost-effective, reliable motion." },
+    'grok-imagine': { id: 'grok-imagine', name: 'Grok Imagine', msIcon: 'neurology', durs: [5, 15, 20, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16', '1:1'], res: ['4k', '1080p', '720p', '480p'], has: { firstFrame: true }, cost: 0.08, desc: "Ultra-fast text-to-video capabilities without reference locks." },
+    'happyhorse-1.0': { id: 'happyhorse-1.0', name: 'HappyHorse 1.0', msIcon: 'pets', durs: [5, 10, 15, 20, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16', '1:1'], res: ['4k', '1080p', '720p'], has: { firstFrame: true, refImages: true, audio: true, quality: true }, cost: 0.06, desc: "Alibaba's cinematic model. Great motion, native audio, ref images, 1080p." },
+    'happyhorse-1.1': { id: 'happyhorse-1.1', name: 'HappyHorse 1.1', msIcon: 'pets', durs: [5, 10, 15, 20, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16', '1:1'], res: ['4k', '1080p', '720p'], has: { firstFrame: true, refImages: true, audio: true, quality: true }, cost: 0.06, desc: "Alibaba's HappyHorse 1.1 model. Advanced cinematic motion, native audio, ref images, 1080p." },
 }
 
 const LANGUAGES = [
@@ -636,7 +636,22 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
     const observerRef = useRef(null)
 
     const m = MODELS[model] || MODELS['seedance-2.0']
-    const credits = Math.max(Math.ceil(m.cost * (quality === 'quality' ? 2 : 1) * duration * 70), 5)
+    
+    // Resolve resolution multiplier to align with backend estimateCost
+    let resMult = 1.0
+    const ATLAS_MODELS = ['seedance-2.0', 'seedance-2.0-fast', 'happyhorse-1.0', 'happyhorse-1.1', 'gemini-flash', 'gemini-omni-flash']
+    if (ATLAS_MODELS.includes(model)) {
+        if (resolution === '480p') resMult = 0.5
+        else if (resolution === '720p') resMult = 0.6
+        else if (resolution === '1080p') resMult = 1.0
+        else if (resolution === '4k') resMult = 2.0
+    } else {
+        if (resolution === '480p') resMult = 0.5
+        else if (resolution === '720p') resMult = 0.7
+        else if (resolution === '4k') resMult = 2.0
+    }
+    
+    const credits = Math.max(Math.ceil(m.cost * (quality === 'quality' ? 2 : 1) * duration * 70 * resMult), 5)
     const activeJobCount = jobs.filter(j => j.status === 'generating').length
     const canGenerate = activeJobCount < MAX_CONCURRENT
 
