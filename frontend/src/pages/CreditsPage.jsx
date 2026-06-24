@@ -1018,7 +1018,8 @@ export default function CreditsPage() {
                                     <div className="size-8 border border-primary border-t-transparent rounded-full animate-spin" />
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                <>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                                     {packages.map((pkg) => {
                                         const isCurrent = pkg.slug === balance?.plan;
                                         const currentTier = packages.find(p => p.slug === balance?.plan)?.tier || 0;
@@ -1181,6 +1182,7 @@ export default function CreditsPage() {
                                         <p>On-demand credit top-ups available.</p>
                                     </div>
                                 </div>
+                                </>
                             )}
                         </div>
                     ) : (
