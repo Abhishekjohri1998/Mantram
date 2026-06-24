@@ -1230,7 +1230,12 @@ export default function SuperAdminDashboard() {
                                                 </span>
                                                 <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
                                                     u.plan === 'enterprise' ? 'bg-[var(--sys-primary-dim)] text-primary' : 
+                                                    u.plan === 'elite' ? 'bg-[#7c3aed]/15 text-[#7c3aed]' : 
+                                                    u.plan === 'generative' ? 'bg-[#10b981]/15 text-[#10b981]' : 
+                                                    u.plan === 'max' ? 'bg-[#FF4D00]/15 text-[#FF4D00]' : 
+                                                    u.plan === 'plus' ? 'bg-[#6366f1]/15 text-[#6366f1]' : 
                                                     u.plan === 'professional' ? 'bg-[#FF4D00]/15 text-[#FF4D00]' : 
+                                                    u.plan === 'creator' ? 'bg-[#6366f1]/15 text-[#6366f1]' : 
                                                     u.plan === 'test' ? 'bg-[var(--sys-primary-dim)] text-primary' :
                                                     'bg-[var(--sys-border)]/15 text-[var(--sys-text-muted)]'
                                                 }`}>Plan: {u.plan}</span>
@@ -1338,7 +1343,12 @@ export default function SuperAdminDashboard() {
                                                         {u.email} • {u.company || 'Individual'} 
                                                         <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${
                                                             u.plan === 'enterprise' ? 'bg-[var(--sys-primary-dim)] text-primary' : 
+                                                            u.plan === 'elite' ? 'bg-[#7c3aed]/15 text-[#7c3aed]' : 
+                                                            u.plan === 'generative' ? 'bg-[#10b981]/15 text-[#10b981]' : 
+                                                            u.plan === 'max' ? 'bg-[#FF4D00]/15 text-[#FF4D00]' : 
+                                                            u.plan === 'plus' ? 'bg-[#6366f1]/15 text-[#6366f1]' : 
                                                             u.plan === 'professional' ? 'bg-[#FF4D00]/15 text-[#FF4D00]' : 
+                                                            u.plan === 'creator' ? 'bg-[#6366f1]/15 text-[#6366f1]' : 
                                                             u.plan === 'test' ? 'bg-[var(--sys-primary-dim)] text-primary' :
                                                             'bg-[var(--sys-border)]/15 text-[var(--sys-text-muted)]'
                                                         }`}>Plan: {u.plan}</span>
@@ -1777,7 +1787,12 @@ export default function SuperAdminDashboard() {
                                                     <td className="px-6 py-4">
                                                         <span className={`text-[9px] px-2 py-1 rounded-lg font-black uppercase tracking-wider border ${
                                                             u.plan === 'enterprise' ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' : 
+                                                            u.plan === 'elite' ? 'bg-[#7c3aed]/10 border-[#7c3aed]/20 text-[#7c3aed]' : 
+                                                            u.plan === 'generative' ? 'bg-[#10b981]/10 border-[#10b981]/20 text-[#10b981]' : 
+                                                            u.plan === 'max' ? 'bg-[#FF4D00]/10 border-[#FF4D00]/20 text-[#FF4D00]' : 
+                                                            u.plan === 'plus' ? 'bg-[#6366f1]/10 border-[#6366f1]/20 text-[#6366f1]' : 
                                                             u.plan === 'professional' ? 'bg-[#FF4D00]/10 border-[#FF4D00]/20 text-[#FF4D00]' : 
+                                                            u.plan === 'creator' ? 'bg-[#6366f1]/10 border-[#6366f1]/20 text-[#6366f1]' : 
                                                             u.plan === 'test' ? 'bg-[var(--sys-primary-dim)] border-[var(--sys-border)] text-primary' :
                                                             'bg-[var(--sys-border)]/10 border-[var(--sys-border)] text-[var(--sys-text-muted)]'
                                                         }`}>

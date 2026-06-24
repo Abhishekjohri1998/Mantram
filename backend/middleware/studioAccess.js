@@ -23,7 +23,7 @@ async function getAllPackages() {
         return cachedPackages;
     }
     try {
-        const pkgs = await SubscriptionPackage.find({ isActive: true });
+        const pkgs = await SubscriptionPackage.find();
         cachedPackages = {};
         pkgs.forEach(p => {
             cachedPackages[p.slug] = p;

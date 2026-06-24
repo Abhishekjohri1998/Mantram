@@ -21,15 +21,25 @@ const router = Router();
 
 // USD Pricing mapping for Shopify Billing
 const SUBSCRIPTION_USD_PRICING = {
-    creator: {
-        monthly: 19.99,
-        quarterly: 49.99,
-        yearly: 199.99,
+    plus: {
+        monthly: 20.00,
+        quarterly: 55.00,
+        yearly: 200.00,
     },
-    professional: {
-        monthly: 49.99,
-        quarterly: 129.99,
-        yearly: 499.99,
+    max: {
+        monthly: 100.00,
+        quarterly: 270.00,
+        yearly: 1000.00,
+    },
+    generative: {
+        monthly: 200.00,
+        quarterly: 540.00,
+        yearly: 2000.00,
+    },
+    elite: {
+        monthly: 1000.00,
+        quarterly: 2850.00,
+        yearly: 10800.00,
     }
 };
 
@@ -94,7 +104,7 @@ router.get('/store-visibility', protect, async (req, res) => {
 // @access  Public
 router.get('/packages', async (req, res) => {
     try {
-        const packages = await SubscriptionPackage.find().sort({ displayOrder: 1 });
+        const packages = await SubscriptionPackage.find({ isActive: true }).sort({ displayOrder: 1 });
         res.json({ success: true, packages });
     } catch (error) {
         console.error('❌ Get Packages Error:', error);

@@ -146,8 +146,10 @@ export default function CreditsPage() {
         if (activeBillingProvider === 'shopify') {
             if (type === 'subscription') {
                 const usdPrices = {
-                    creator: { monthly: 19.99, quarterly: 49.99, yearly: 199.99 },
-                    professional: { monthly: 49.99, quarterly: 129.99, yearly: 499.99 }
+                    plus: { monthly: 20.00, quarterly: 55.00, yearly: 200.00 },
+                    max: { monthly: 100.00, quarterly: 270.00, yearly: 1000.00 },
+                    generative: { monthly: 200.00, quarterly: 540.00, yearly: 2000.00 },
+                    elite: { monthly: 1000.00, quarterly: 2850.00, yearly: 10800.00 }
                 };
                 const slug = item.slug;
                 if (usdPrices[slug] && usdPrices[slug][cycle]) {
@@ -1016,7 +1018,7 @@ export default function CreditsPage() {
                                     <div className="size-8 border border-primary border-t-transparent rounded-full animate-spin" />
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                                     {packages.map((pkg) => {
                                         const isCurrent = pkg.slug === balance?.plan;
                                         const currentTier = packages.find(p => p.slug === balance?.plan)?.tier || 0;
