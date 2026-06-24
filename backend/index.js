@@ -724,14 +724,25 @@ const gracefulShutdown = (signal) => {
 
     // Mark DB as shutting down EARLY — prevents auto-reconnect in db.js from firing
     if (mongoose.connection) mongoose.connection.isShuttingDown = true;
+
+    // Hard safety net — force exit after 12s no matter what.
+    // During OOM events, the drain loop below can't even run because V8
+    // can't allocate memory. This ensures PM2 doesn't spam "failed to kill".
+    const forceExitTimer = setTimeout(() => {
+        console.error('⚠️ Could not close connections in time, forcefully shutting down');
+        process.exit(1);
+    }, 12000);
+    forceExitTimer.unref(); // Don't keep the event loop alive just for this timer
     
     server.close(async () => {
         console.log('HTTP server closed. No longer accepting new connections.');
         
         try {
             // REL-009 & REL-015: Wait for in-flight jobs to finish before closing DB
+            // Reduced from 15 checks (30s) to 5 checks (10s) — during OOM restarts,
+            // long drain loops just delay recovery and cause PM2 "failed to kill" spam.
             let drainChecks = 0;
-            while (hasInFlightJobs() && drainChecks < 15) { // wait up to 30 seconds (15 * 2s)
+            while (hasInFlightJobs() && drainChecks < 5) { // wait up to 10 seconds (5 * 2s)
                 console.log(`⏳ Waiting for ${getInFlightJobs().length} in-flight jobs to complete...`);
                 await new Promise(resolve => setTimeout(resolve, 2000));
                 drainChecks++;
@@ -749,10 +760,6 @@ const gracefulShutdown = (signal) => {
             process.exit(1);
         }
     });
-    setTimeout(() => {
-        console.error('Could not close connections in time, forcefully shutting down');
-        process.exit(1);
-    }, 30000);
 };
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

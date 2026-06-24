@@ -13,6 +13,10 @@ module.exports = {
         instances: 1,
         exec_mode: 'fork',
 
+        // Give Node.js a 3GB heap ceiling so V8 GC has room to breathe
+        // before hitting OOM during heavy workloads (SEO crawls, image buffers, Playwright)
+        node_args: '--max-old-space-size=3072',
+
         // Environment
         env: {
             NODE_ENV: 'production',
@@ -21,7 +25,7 @@ module.exports = {
 
         // Auto-restart on crash
         autorestart: true,
-        max_memory_restart: '1G',   // 500M was too aggressive for AI/video workloads
+        max_memory_restart: '2G',   // 1G was too aggressive — SEO crawls + image buffers routinely hit 1.2-1.5GB
         exp_backoff_restart_delay: 100,
         max_restarts: 10,
         restart_delay: 1000,
@@ -31,7 +35,7 @@ module.exports = {
         // This ensures MongoDB is connected before the worker receives requests
         wait_ready: true,
         listen_timeout: 30000,   // 30s max to wait for ready signal (DB connect can take 5-10s on cold start)
-        kill_timeout: 35000,     // 35s for graceful shutdown — matches the 30s drain loop in index.js
+        kill_timeout: 15000,     // 15s for graceful shutdown — reduced from 35s to prevent PM2 "failed to kill" spam
 
         // Disable PM2 APM (PMX) — suppresses pidusage TypeError noise in logs
         // pidusage crashes when monitoring PIDs that exit during cluster restarts
