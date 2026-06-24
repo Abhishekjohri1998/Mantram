@@ -17,6 +17,7 @@ import { requireCredits, refundCredits } from '../middleware/credits.js';
 import { fetchOptions } from '../utils/network.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import { laozhangImageGenerate, isLaozhangAvailable } from '../agents/videoStudio/laozhangClient.js';
+import { getSignedUrlIfNeeded } from '../utils/s3.js';
 import {
     researchNode,
     contentStrategistNode,
@@ -1068,10 +1069,21 @@ router.post('/blog/generate', protect, requireCredits('content'), async (req, re
 
         await req.user.updateOne({ $inc: { 'usage.contentGenerated': 1 } });
 
+        // Sign S3 URLs in blog images so the frontend can display them
+        const contentObj = content.toObject();
+        if (contentObj.blogMeta?.heroImageUrl) {
+            contentObj.blogMeta.heroImageUrl = await getSignedUrlIfNeeded(contentObj.blogMeta.heroImageUrl);
+        }
+        if (contentObj.blogMeta?.sections) {
+            for (const section of contentObj.blogMeta.sections) {
+                if (section.imageUrl) section.imageUrl = await getSignedUrlIfNeeded(section.imageUrl);
+            }
+        }
+
         res.json({
             success: true,
             content: {
-                ...content.toObject(),
+                ...contentObj,
                 agenticData: {
                     research: state.research,
                     intelligence: {
@@ -1138,7 +1150,8 @@ router.post('/blog/:id/generate-image', protect, async (req, res) => {
             }
             content.markModified('blogMeta');
             await content.save();
-            return res.json({ success: true, imageUrl: brandImageUrl, altText: seoAltText, sectionIndex: isHero ? -1 : sectionIndex, model: 'Brand DNA' });
+            const signedBrandUrl = await getSignedUrlIfNeeded(brandImageUrl);
+            return res.json({ success: true, imageUrl: signedBrandUrl, altText: seoAltText, sectionIndex: isHero ? -1 : sectionIndex, model: 'Brand DNA' });
         }
 
 
@@ -1223,7 +1236,8 @@ router.post('/blog/:id/generate-image', protect, async (req, res) => {
                     }
                     content.markModified('blogMeta');
                     await content.save();
-                    return res.json({ success: true, imageUrl, altText: seoAltText, sectionIndex: isHero ? -1 : sectionIndex, aspectRatio, model: 'NanoBanana 2 (LaoZhang)' });
+                    const signedLzUrl = await getSignedUrlIfNeeded(imageUrl);
+                    return res.json({ success: true, imageUrl: signedLzUrl, altText: seoAltText, sectionIndex: isHero ? -1 : sectionIndex, aspectRatio, model: 'NanoBanana 2 (LaoZhang)' });
                 }
             } catch (lzErr) {
                 console.warn(`⚠️ [LaoZhang] Blog image failed (${lzErr.message?.substring(0, 80)}), falling through to Gemini direct...`);
@@ -1312,7 +1326,8 @@ router.post('/blog/:id/generate-image', protect, async (req, res) => {
         content.markModified('blogMeta');
         await content.save();
 
-        res.json({ success: true, imageUrl, altText: seoAltText, sectionIndex: isHero ? -1 : sectionIndex, aspectRatio, model: 'NanoBanana 2' });
+        const signedVertexUrl = await getSignedUrlIfNeeded(imageUrl);
+        res.json({ success: true, imageUrl: signedVertexUrl, altText: seoAltText, sectionIndex: isHero ? -1 : sectionIndex, aspectRatio, model: 'NanoBanana 2' });
     } catch (error) {
         console.error('Blog image generation error:', error);
         res.status(500).json({ success: false, error: safeErrorMessage(error) });

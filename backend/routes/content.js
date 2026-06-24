@@ -9,6 +9,8 @@ import { requireCredits, refundCredits } from '../middleware/credits.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import { mineAutocomplete } from '../utils/autocomplete.js';
 
+import { getSignedUrlIfNeeded } from '../utils/s3.js';
+
 const router = Router();
 
 // ── In-memory cache for trending data (30 min TTL per brand) ──
@@ -227,7 +229,21 @@ router.get('/:id', protect, async (req, res) => {
     try {
         const content = await Content.findOne({ _id: req.params.id, user: req.user._id }).populate('brand', 'name dna.voice');
         if (!content) return res.status(404).json({ success: false, error: 'Content not found' });
-        res.json({ success: true, content });
+
+        // Sign S3 URLs in blog images so the frontend can display them
+        const contentObj = content.toObject();
+        if (contentObj.blogMeta) {
+            if (contentObj.blogMeta.heroImageUrl) {
+                contentObj.blogMeta.heroImageUrl = await getSignedUrlIfNeeded(contentObj.blogMeta.heroImageUrl);
+            }
+            if (contentObj.blogMeta.sections) {
+                for (const section of contentObj.blogMeta.sections) {
+                    if (section.imageUrl) section.imageUrl = await getSignedUrlIfNeeded(section.imageUrl);
+                }
+            }
+        }
+
+        res.json({ success: true, content: contentObj });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
