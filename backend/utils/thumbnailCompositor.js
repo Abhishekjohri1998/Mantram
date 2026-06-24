@@ -94,7 +94,7 @@ export async function compositeThumbnail(frameUrl, hookText, lowerThirdText, sty
     console.log(`🎨 [thumbnailCompositor] Starting direct render...`);
     
     // 1. Fetch the base frame
-    const resp = await fetch(frameUrl, { signal: AbortSignal.timeout(30000) });
+    const resp = await fetch(frameUrl);
     if (!resp.ok) throw new Error(`Failed to fetch frame for compositing: ${resp.status}`);
     const imageBuffer = Buffer.from(await resp.arrayBuffer());
 

@@ -8,6 +8,7 @@
  */
 
 import mongoose from 'mongoose';
+import { getFriendlyErrorMessage } from '../utils/safeError.js';
 
 const GenerationJobSchema = new mongoose.Schema(
     {
@@ -98,6 +99,32 @@ const GenerationJobSchema = new mongoose.Schema(
 // Compound index for efficient user job listing
 GenerationJobSchema.index({ user: 1, createdAt: -1 });
 GenerationJobSchema.index({ user: 1, status: 1 });
+
+// ── Sanitize errorMessage before saving to DB ──
+GenerationJobSchema.pre('save', function (next) {
+    if (this.isModified('errorMessage') && this.errorMessage) {
+        this.errorMessage = getFriendlyErrorMessage(this.errorMessage);
+    }
+    next();
+});
+
+const sanitizeUpdate = function (next) {
+    const update = this.getUpdate();
+    if (update) {
+        if (update.errorMessage) {
+            update.errorMessage = getFriendlyErrorMessage(update.errorMessage);
+        }
+        if (update.$set && update.$set.errorMessage) {
+            update.$set.errorMessage = getFriendlyErrorMessage(update.$set.errorMessage);
+        }
+    }
+    next();
+};
+
+GenerationJobSchema.pre('findOneAndUpdate', sanitizeUpdate);
+GenerationJobSchema.pre('updateOne', sanitizeUpdate);
+GenerationJobSchema.pre('updateMany', sanitizeUpdate);
+GenerationJobSchema.pre('update', sanitizeUpdate);
 
 // ── SEC-001: Strip internal AI prompts and config from API responses ──
 GenerationJobSchema.set('toJSON', {

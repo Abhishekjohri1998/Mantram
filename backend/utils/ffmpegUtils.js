@@ -24,8 +24,7 @@ export async function extractLastFrameToS3(videoUrl) {
     const outPath = path.join(tmpDir, 'last_frame.jpg');
 
     try {
-        // Download the video first to avoid FFmpeg HTTP streaming seek issues
-        const resp = await fetch(videoUrl, { signal: AbortSignal.timeout(120000) });
+        const resp = await fetch(videoUrl);
         if (!resp.ok) throw new Error(`Failed to download video: ${resp.status}`);
         const buffer = Buffer.from(await resp.arrayBuffer());
         fs.writeFileSync(videoPath, buffer);
@@ -39,7 +38,7 @@ export async function extractLastFrameToS3(videoUrl) {
             '-q:v', '2',
             '-y',
             outPath
-        ], { timeout: 60000 });
+        ]);
         
         // Fallback: If for some reason output wasn't created (e.g. video < 1s)
         if (!fs.existsSync(outPath)) {
@@ -49,7 +48,7 @@ export async function extractLastFrameToS3(videoUrl) {
                 '-q:v', '2',
                 '-y',
                 outPath
-            ], { timeout: 30000 });
+            ]);
         }
 
         if (fs.existsSync(outPath)) {
@@ -85,12 +84,12 @@ export async function muxAudioOntoVideo(videoUrl, audioUrl) {
 
     try {
         // Download video
-        const videoResp = await fetch(videoUrl, { signal: AbortSignal.timeout(120000) });
+        const videoResp = await fetch(videoUrl);
         if (!videoResp.ok) throw new Error(`Failed to download video: ${videoResp.status}`);
         fs.writeFileSync(videoPath, Buffer.from(await videoResp.arrayBuffer()));
 
         // Download audio
-        const audioResp = await fetch(audioUrl, { signal: AbortSignal.timeout(60000) });
+        const audioResp = await fetch(audioUrl);
         if (!audioResp.ok) throw new Error(`Failed to download audio: ${audioResp.status}`);
         fs.writeFileSync(audioPath, Buffer.from(await audioResp.arrayBuffer()));
 
@@ -106,7 +105,7 @@ export async function muxAudioOntoVideo(videoUrl, audioUrl) {
             '-shortest',              // Truncate to whichever is shorter
             '-movflags', '+faststart',
             outputPath,
-        ], { timeout: 120000 });
+        ], { timeout: 3600000 }); // 1 hour generous timeout
 
         const muxedBuffer = fs.readFileSync(outputPath);
         const s3Key = `video-studio/longform/muxed-scene-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.mp4`;
@@ -145,7 +144,7 @@ export async function concatSceneAudios(sceneAudios, tmpDir) {
         if (audioUrl) {
             // Download the TTS audio
             const audioFilePath = path.join(tmpDir, `tts-raw-${i}.mp3`);
-            const resp = await fetch(audioUrl, { signal: AbortSignal.timeout(60000) });
+            const resp = await fetch(audioUrl);
             if (!resp.ok) {
                 console.warn(`⚠️ [ConcatAudio] Failed to download audio ${i}: ${resp.status}`);
                 // Generate silence for this scene
@@ -154,7 +153,7 @@ export async function concatSceneAudios(sceneAudios, tmpDir) {
                     '-t', String(sceneDuration),
                     '-c:a', 'aac', '-b:a', '128k',
                     segPath,
-                ], { timeout: 30000 });
+                ]);
                 segmentPaths.push(segPath);
                 continue;
             }
@@ -170,7 +169,7 @@ export async function concatSceneAudios(sceneAudios, tmpDir) {
                 '-c:a', 'aac', '-b:a', '128k',
                 '-ar', '44100', '-ac', '2',
                 segPath,
-            ], { timeout: 30000 });
+            ]);
         } else {
             // No TTS for this scene → generate silence matching scene duration
             await execFileAsync(ffmpegPath, [
@@ -178,7 +177,7 @@ export async function concatSceneAudios(sceneAudios, tmpDir) {
                 '-t', String(sceneDuration),
                 '-c:a', 'aac', '-b:a', '128k',
                 segPath,
-            ], { timeout: 30000 });
+            ]);
         }
 
         segmentPaths.push(segPath);
@@ -196,7 +195,7 @@ export async function concatSceneAudios(sceneAudios, tmpDir) {
         '-c:a', 'aac', '-b:a', '192k',
         '-ar', '44100', '-ac', '2',
         outputPath,
-    ], { timeout: 120000 });
+    ], { timeout: 3600000 }); // 1 hour generous timeout
 
     console.log(`✅ [ConcatAudio] Concatenated ${segmentPaths.length} audio segments → ${outputPath}`);
     return outputPath;
@@ -238,7 +237,7 @@ export async function mixAudioAndMux(videoPath, voiceoverPath, bgmUrl, tmpDir) {
     if (bgmUrl) {
         bgmPath = path.join(tmpDir, 'bgm.mp3');
         try {
-            const resp = await fetch(bgmUrl, { signal: AbortSignal.timeout(60000) });
+            const resp = await fetch(bgmUrl);
             if (resp.ok) {
                 fs.writeFileSync(bgmPath, Buffer.from(await resp.arrayBuffer()));
             } else {
@@ -293,7 +292,7 @@ export async function mixAudioAndMux(videoPath, voiceoverPath, bgmUrl, tmpDir) {
         outputPath,
     );
 
-    await execFileAsync(ffmpegPath, ffmpegArgs, { timeout: 180000 });
+    await execFileAsync(ffmpegPath, ffmpegArgs, { timeout: 3600000 }); // 1 hour generous timeout
     console.log(`✅ [MixAudio] Final video with audio: ${outputPath}`);
     return outputPath;
 }

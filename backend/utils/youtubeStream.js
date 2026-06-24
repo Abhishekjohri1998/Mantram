@@ -161,7 +161,7 @@ export async function getYouTubeStreamUrl(videoIdOrUrl) {
     if (!resolvedUrl) {
         try {
             console.log(`   ➡️ Strategy 2: youtube-dl-exec (android) ${cookiePath ? '[with cookies]' : ''}`);
-            const output = await youtubedl(url, { ...commonOptions, extractorArgs: 'youtube:player_client=android' }, { timeout: 60000 });
+            const output = await youtubedl(url, { ...commonOptions, extractorArgs: 'youtube:player_client=android' });
             const streamUrl = typeof output === 'string' ? output.trim() : String(output).trim();
             if (streamUrl.startsWith('http')) {
                 console.log(`   ✅ Strategy 2 success`);
@@ -176,7 +176,7 @@ export async function getYouTubeStreamUrl(videoIdOrUrl) {
     if (!resolvedUrl) {
         try {
             console.log(`   ➡️ Strategy 3: youtube-dl-exec (web_safari) ${cookiePath ? '[with cookies]' : ''}`);
-            const output = await youtubedl(url, { ...commonOptions, extractorArgs: 'youtube:player_client=web_safari' }, { timeout: 60000 });
+            const output = await youtubedl(url, { ...commonOptions, extractorArgs: 'youtube:player_client=web_safari' });
             const streamUrl = typeof output === 'string' ? output.trim() : String(output).trim();
             if (streamUrl.startsWith('http')) {
                 console.log(`   ✅ Strategy 3 success`);
@@ -191,7 +191,7 @@ export async function getYouTubeStreamUrl(videoIdOrUrl) {
     if (!resolvedUrl) {
         try {
             console.log(`   ➡️ Strategy 4: youtube-dl-exec (default) ${cookiePath ? '[with cookies]' : ''}`);
-            const output = await youtubedl(url, commonOptions, { timeout: 60000 });
+            const output = await youtubedl(url, commonOptions);
             const streamUrl = typeof output === 'string' ? output.trim() : String(output).trim();
             if (streamUrl.startsWith('http')) {
                 console.log(`   ✅ Strategy 4 success`);
@@ -221,7 +221,7 @@ export async function getYouTubeStreamUrl(videoIdOrUrl) {
 
         console.log(`   📥 Downloading video stream to local cache for fast seeking...`);
         await pruneYoutubeCache(); // Clean up old cached files to prevent disk space issues
-        const res = await fetch(resolvedUrl, { signal: AbortSignal.timeout(180000) });
+        const res = await fetch(resolvedUrl);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         
         const dest = fs.createWriteStream(localVideoPath);

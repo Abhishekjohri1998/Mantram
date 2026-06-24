@@ -6,47 +6,56 @@
  */
 const nodeEnv = process.env.NODE_ENV || 'development';
 
-// Patterns that indicate an API/provider error the user should see
-const USER_FACING_PATTERNS = [
-    'busy', 'overloaded', 'high demand', 'rate limit', 'rate_limit',
-    'quota', 'exceeded', 'too long', 'too large', 'content policy',
-    'safety', 'blocked', 'violation', 'harmful', 'inappropriate',
-    'not configured', 'api key', 'api_key', 'invalid key',
-    'model not found', 'model not available', 'no longer available',
-    'failed to generate', 'generation failed', 'all models failed',
-    'all models unavailable', 'timeout', 'timed out', 'connection refused',
-    'image generation failed', 'fal.ai', 'piapi', 'laozhang',
-    'prompt', 'token limit', 'context length', 'max_tokens',
-    'billing', 'payment', 'credits', 'insufficient',
-    'aspect ratio', 'invalid format', 'unsupported',
-    'try a different', 'switch to', 'currently busy',
-    'no image', 'returned no image',
-];
-
-export function safeErrorMessage(error, fallback = 'Internal server error') {
-    // ALWAYS allow provider-categorized errors to pass through (disclaimers)
-    if (error?.isProviderError || error?.provider) {
-        return error.message;
-    }
-
-    // Cast to string safely to avoid .toLowerCase() crashes on objects
-    const msg = String(error?.message || error || '');
-
-    // Always show real error in development
-    if (nodeEnv === 'development') {
-        return msg || fallback;
-    }
-
-
-    // In production: check if the error is user-facing (API/provider issue)
+/**
+ * Maps complex technical errors, fetch issues, and timeouts into clean,
+ * localized user-friendly messages. Keeps billing/credits and content-safety
+ * feedback clear so the user understands why the generation didn't proceed.
+ */
+export function getFriendlyErrorMessage(error) {
+    if (!error) return 'AI models are currently busy — please try again';
+    
+    // Cast to string safely to avoid crashes
+    const msg = String(error.message || error || '');
     const lowerMsg = msg.toLowerCase();
-    const isUserFacing = USER_FACING_PATTERNS.some(pattern => lowerMsg.includes(pattern));
 
-    if (isUserFacing) {
-        // Strip any file paths or stack-trace-like content but keep the message
-        return msg.replace(/file:\/\/[^\s]+/g, '').replace(/at\s+[\w.]+\s+\([^)]+\)/g, '').trim();
+    // 1. Billing / Credits
+    if (
+        lowerMsg.includes('credit') || 
+        lowerMsg.includes('billing') || 
+        lowerMsg.includes('payment') || 
+        lowerMsg.includes('insufficient')
+    ) {
+        return 'Insufficient credits — please top up your account.';
     }
 
-    // Truly internal error — hide details
-    return fallback;
+    // 2. Safety / Content Policy
+    if (
+        lowerMsg.includes('safety') || 
+        lowerMsg.includes('content policy') || 
+        lowerMsg.includes('violation') || 
+        lowerMsg.includes('blocked') || 
+        lowerMsg.includes('inappropriate') ||
+        lowerMsg.includes('harmful')
+    ) {
+        return 'Content safety violation — please refine your prompt.';
+    }
+
+    // 3. User cancel
+    if (lowerMsg.includes('cancelled by user') || lowerMsg.includes('cancel')) {
+        return 'Job cancelled.';
+    }
+
+    // 4. Default: fetch failures, timeouts, connection issues, API provider failures,
+    // and raw internal server errors are formatted as "AI models are currently busy"
+    return 'AI models are currently busy — please try again';
 }
+
+export function safeErrorMessage(error, fallback = 'AI models are currently busy — please try again') {
+    // Log real error for server developers to debug
+    if (error) {
+        console.error('⚠️ [safeErrorMessage] Raw technical error:', error.message || error);
+    }
+    
+    return getFriendlyErrorMessage(error || fallback);
+}
+

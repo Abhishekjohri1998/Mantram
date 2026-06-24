@@ -610,7 +610,7 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
         const segmentPaths = [];
         for (let i = 0; i < validVideos.length; i++) {
             const segPath = path.join(tmpDir, `seg-${i+1}.mp4`);
-            const resp = await fetch(validVideos[i], { signal: AbortSignal.timeout(120000) });
+            const resp = await fetch(validVideos[i]);
             if (!resp.ok) throw new Error(`Failed to download segment ${i+1}: ${resp.status}`);
             fs.writeFileSync(segPath, Buffer.from(await resp.arrayBuffer()));
             segmentPaths.push(segPath);
@@ -639,7 +639,7 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
                 console.log(`[SB LongForm ${jobId}] 🎧 Mixing brief audio ref: ${params.refAudio}`);
                 const refAudioLocalPath = path.join(tmpDir, 'brief-audio-ref.mp3');
                 const signedRefAudio = await getSignedUrlIfNeeded(params.refAudio);
-                const audioResp = await fetch(signedRefAudio, { signal: AbortSignal.timeout(60000) });
+                const audioResp = await fetch(signedRefAudio);
                 if (!audioResp.ok) throw new Error(`HTTP ${audioResp.status} downloading brief audio`);
                 fs.writeFileSync(refAudioLocalPath, Buffer.from(await audioResp.arrayBuffer()));
 
@@ -863,7 +863,7 @@ export async function stitchSegments(segmentUrls, format = '9:16', label = 'manu
     const segPaths = [];
     for (let i = 0; i < segmentUrls.length; i++) {
         const segPath = path.join(tmpDir, `seg-${i + 1}.mp4`);
-        const resp = await fetch(segmentUrls[i], { signal: AbortSignal.timeout(120000) });
+        const resp = await fetch(segmentUrls[i]);
         if (!resp.ok) throw new Error(`Failed to download segment ${i + 1}: ${resp.status}`);
         fs.writeFileSync(segPath, Buffer.from(await resp.arrayBuffer()));
         segPaths.push(segPath);
