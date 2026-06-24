@@ -151,6 +151,8 @@ export default function SuperAdminDashboard() {
     const [growthCopied, setGrowthCopied] = useState(null)
     const [growthRegenerating, setGrowthRegenerating] = useState(null)
     const [growthGeneratingImage, setGrowthGeneratingImage] = useState(null)
+    const [growthBatchGenerating, setGrowthBatchGenerating] = useState(false)
+    const [growthBatchProgress, setGrowthBatchProgress] = useState({ current: 0, total: 0 })
     const [growthImageModel, setGrowthImageModel] = useState('gpt-image-2')
     const [growthHistoryPage, setGrowthHistoryPage] = useState(1)
     const [showGrowthHistory, setShowGrowthHistory] = useState(false)
@@ -494,6 +496,95 @@ export default function SuperAdminDashboard() {
             }
         } catch (e) { showToast(e.message || 'Image generation failed', 'error') }
         finally { setGrowthGeneratingImage(null) }
+    }
+
+    const handleGenerateAllImages = async (scope = 'platform') => {
+        if (!growthContent?._id || growthBatchGenerating) return
+        const jobs = []
+
+        if (scope === 'instagram_slides') {
+            // Generate only carousel slide images
+            const slides = growthContent.instagram?.post?.slides || []
+            slides.forEach((s, j) => {
+                if (!s.imageUrl) jobs.push({ platform: 'instagram_post', index: 0, slideIndex: j })
+            })
+        } else if (scope === 'platform') {
+            // Generate all images for current platform tab
+            if (growthPlatformTab === 'linkedin') {
+                (growthContent.linkedin || []).forEach((_, i) => jobs.push({ platform: 'linkedin', index: i }))
+            } else if (growthPlatformTab === 'instagram') {
+                // Cover image (slide 0)
+                const slides = growthContent.instagram?.post?.slides || []
+                slides.forEach((s, j) => {
+                    if (!s.imageUrl) jobs.push({ platform: 'instagram_post', index: 0, slideIndex: j })
+                })
+                // Story slides
+                const storySlides = growthContent.instagram?.story?.slides || []
+                storySlides.forEach((s, j) => {
+                    if (!s.imageUrl) jobs.push({ platform: 'instagram_story', index: 0, slideIndex: j })
+                })
+            } else if (growthPlatformTab === 'twitter') {
+                (growthContent.twitter || []).forEach((_, i) => jobs.push({ platform: 'twitter', index: i }))
+            } else if (growthPlatformTab === 'reddit') {
+                (growthContent.reddit || []).forEach((_, i) => jobs.push({ platform: 'reddit', index: i }))
+            }
+        } else if (scope === 'all') {
+            // Generate ALL images across all platforms
+            (growthContent.linkedin || []).forEach((_, i) => jobs.push({ platform: 'linkedin', index: i }))
+            const slides = growthContent.instagram?.post?.slides || []
+            slides.forEach((s, j) => {
+                if (!s.imageUrl) jobs.push({ platform: 'instagram_post', index: 0, slideIndex: j })
+            })
+            const storySlides = growthContent.instagram?.story?.slides || []
+            storySlides.forEach((s, j) => {
+                if (!s.imageUrl) jobs.push({ platform: 'instagram_story', index: 0, slideIndex: j })
+            })
+            ;(growthContent.twitter || []).forEach((_, i) => jobs.push({ platform: 'twitter', index: i }))
+            ;(growthContent.reddit || []).forEach((_, i) => jobs.push({ platform: 'reddit', index: i }))
+        }
+
+        if (jobs.length === 0) {
+            showToast('No images to generate (all already have images)', 'info')
+            return
+        }
+
+        setGrowthBatchGenerating(true)
+        setGrowthBatchProgress({ current: 0, total: jobs.length })
+        let successCount = 0
+        let failCount = 0
+
+        for (let idx = 0; idx < jobs.length; idx++) {
+            const job = jobs[idx]
+            const key = job.slideIndex !== null && job.slideIndex !== undefined
+                ? `${job.platform}-${job.index}-${job.slideIndex}`
+                : `${job.platform}-${job.index}`
+            setGrowthGeneratingImage(key)
+            setGrowthBatchProgress({ current: idx + 1, total: jobs.length })
+            try {
+                const res = await API.generateGrowthImage(growthContent._id, {
+                    platform: job.platform,
+                    index: job.index,
+                    slideIndex: job.slideIndex ?? null,
+                    imageModel: growthImageModel
+                })
+                if (res.success) {
+                    setGrowthContent(res.content)
+                    successCount++
+                }
+            } catch (e) {
+                failCount++
+                console.error(`Failed to generate image for ${key}:`, e)
+            }
+            setGrowthGeneratingImage(null)
+        }
+
+        setGrowthBatchGenerating(false)
+        setGrowthBatchProgress({ current: 0, total: 0 })
+        if (failCount === 0) {
+            showToast(`✨ All ${successCount} images generated successfully!`)
+        } else {
+            showToast(`Generated ${successCount}/${jobs.length} images (${failCount} failed)`, 'warning')
+        }
     }
 
     const handleCopyContent = (text, key) => {
@@ -4951,18 +5042,55 @@ export default function SuperAdminDashboard() {
                                         ))}
                                     </div>
 
-                                    {/* Image Model Selector */}
-                                    <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] w-fit max-w-full shrink-0">
-                                        <span className="text-xs font-bold text-[var(--sys-text-muted)] pl-2">🖼️ Image Model:</span>
-                                        <select
-                                            value={growthImageModel}
-                                            onChange={(e) => setGrowthImageModel(e.target.value)}
-                                            className="text-xs p-1.5 rounded-xl bg-[var(--sys-bg)] border border-[var(--sys-border)] text-[var(--sys-text)] outline-none font-bold cursor-pointer max-w-[150px] truncate"
+                                    {/* Image Model Selector + Generate All */}
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-[var(--sys-surface)] border border-[var(--sys-border)] w-fit max-w-full shrink-0">
+                                            <span className="text-xs font-bold text-[var(--sys-text-muted)] pl-2">🖼️ Image Model:</span>
+                                            <select
+                                                value={growthImageModel}
+                                                onChange={(e) => setGrowthImageModel(e.target.value)}
+                                                className="text-xs p-1.5 rounded-xl bg-[var(--sys-bg)] border border-[var(--sys-border)] text-[var(--sys-text)] outline-none font-bold cursor-pointer max-w-[150px] truncate"
+                                            >
+                                                <option value="gpt-image-2">GPT Image 2</option>
+                                                <option value="nanobanana-2">NanoBanana 2</option>
+                                                <option value="nanobanana-pro">NanoBanana Pro</option>
+                                            </select>
+                                        </div>
+                                        <button
+                                            onClick={() => handleGenerateAllImages('platform')}
+                                            disabled={growthBatchGenerating || !!growthGeneratingImage}
+                                            className="px-3 py-2 rounded-xl text-[10px] font-bold bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white cursor-pointer transition-all disabled:opacity-50 flex items-center gap-1.5 shadow-lg shadow-purple-500/20 border border-purple-400/20"
                                         >
-                                            <option value="gpt-image-2">GPT Image 2</option>
-                                            <option value="nanobanana-2">NanoBanana 2</option>
-                                            <option value="nanobanana-pro">NanoBanana Pro</option>
-                                        </select>
+                                            {growthBatchGenerating ? (
+                                                <>
+                                                    <span className="material-symbols-outlined text-[13px] animate-spin">progress_activity</span>
+                                                    {growthBatchProgress.current}/{growthBatchProgress.total} Generating...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span className="material-symbols-outlined text-[13px]">photo_library</span>
+                                                    Gen All Images
+                                                </>
+                                            )}
+                                        </button>
+                                        <button
+                                            onClick={() => handleGenerateAllImages('all')}
+                                            disabled={growthBatchGenerating || !!growthGeneratingImage}
+                                            className="px-3 py-2 rounded-xl text-[10px] font-bold bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white cursor-pointer transition-all disabled:opacity-50 flex items-center gap-1.5 shadow-lg shadow-orange-500/20 border border-orange-400/20"
+                                            title="Generate images for ALL platforms at once"
+                                        >
+                                            {growthBatchGenerating ? (
+                                                <>
+                                                    <span className="material-symbols-outlined text-[13px] animate-spin">progress_activity</span>
+                                                    Working...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span className="material-symbols-outlined text-[13px]">all_inclusive</span>
+                                                    Gen All Platforms
+                                                </>
+                                            )}
+                                        </button>
                                     </div>
                                 </div>
 
@@ -5254,7 +5382,26 @@ export default function SuperAdminDashboard() {
 
                                                 {growthContent.instagram?.post?.slides?.length > 0 && showIgSliders && (
                                                     <div className="mt-4 animate-in fade-in slide-in-from-top-4 duration-300">
-                                                        <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider mb-2">📑 Carousel Slides</p>
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider">📑 Carousel Slides</p>
+                                                            <button
+                                                                onClick={() => handleGenerateAllImages('instagram_slides')}
+                                                                disabled={growthBatchGenerating || !!growthGeneratingImage}
+                                                                className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white cursor-pointer transition-all disabled:opacity-50 flex items-center gap-1 shadow-lg shadow-pink-500/20 border border-pink-400/20"
+                                                            >
+                                                                {growthBatchGenerating ? (
+                                                                    <>
+                                                                        <span className="material-symbols-outlined text-[11px] animate-spin">progress_activity</span>
+                                                                        {growthBatchProgress.current}/{growthBatchProgress.total}
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <span className="material-symbols-outlined text-[11px]">auto_awesome</span>
+                                                                        Gen All Slide Images
+                                                                    </>
+                                                                )}
+                                                            </button>
+                                                        </div>
                                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                             {growthContent.instagram.post.slides.map((s, j) => (
                                                                 <div key={j} className="p-3 rounded-xl bg-[var(--sys-bg)] border border-[var(--sys-border)] flex flex-col justify-between">
