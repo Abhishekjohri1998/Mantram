@@ -1166,6 +1166,21 @@ export default function CreditsPage() {
                                     })}
                                 </div>
 
+                                {/* All paid plans include info box */}
+                                <div className="mt-8 p-6 rounded-2xl border border-[var(--sys-border)] bg-[var(--sys-surface)]/10 backdrop-blur-md relative overflow-hidden">
+                                    <div className="absolute inset-0 opacity-[0.02] pointer-events-none bg-gradient-to-r from-primary to-transparent" />
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <span className="material-symbols-outlined text-primary text-lg">auto_awesome</span>
+                                        <h4 className="text-sm font-bold text-[var(--sys-text)]">All paid plans include:</h4>
+                                    </div>
+                                    <div className="space-y-2.5 pl-6 text-xs text-[var(--sys-text-muted)] leading-relaxed">
+                                        <p>Access to 200+ image, video, audio, music models including <strong className="text-[var(--sys-text)] font-semibold">Seedance 2.0, Veo 3.1, Kling 3.0, Nano banana pro & Elevenlabs music</strong>.</p>
+                                        <p>Access to invideo v4 agent that can create up to 30 mins of video from a single prompt.</p>
+                                        <p>Access to top stock providers like iStock, Storyblocks & more.</p>
+                                        <p>Model & agent prices are subject to change.</p>
+                                        <p>On-demand credit top-ups available.</p>
+                                    </div>
+                                </div>
                             )}
                         </div>
                     ) : (
