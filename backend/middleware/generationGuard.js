@@ -41,6 +41,7 @@ export const generationRateLimiter = rateLimit({
     legacyHeaders: false,
     // Skip rate limiting for superadmins
     skip: (req) => req.user?.role === 'superadmin',
+    validate: { keyGenerator: false },
 });
 
 // ── FIX-19: Per-User Concurrent Job Limit ───────────────────────────────────

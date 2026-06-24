@@ -424,7 +424,7 @@ const mcpRateLimiter = rateLimit({
     legacyHeaders: false,
     message: { error: 'Rate limit exceeded. Max 60 requests per minute per API key.' },
     skip: (req) => req.method === 'OPTIONS',
-    validate: { trustProxy: false },
+    validate: { trustProxy: false, keyGenerator: false },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
