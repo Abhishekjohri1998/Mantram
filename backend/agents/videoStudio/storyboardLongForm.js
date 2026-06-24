@@ -639,7 +639,7 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
                 console.log(`[SB LongForm ${jobId}] 🎧 Mixing brief audio ref: ${params.refAudio}`);
                 const refAudioLocalPath = path.join(tmpDir, 'brief-audio-ref.mp3');
                 const signedRefAudio = await getSignedUrlIfNeeded(params.refAudio);
-                const audioResp = await fetch(signedRefAudio);
+                const audioResp = await fetch(signedRefAudio, { signal: AbortSignal.timeout(60000) });
                 if (!audioResp.ok) throw new Error(`HTTP ${audioResp.status} downloading brief audio`);
                 fs.writeFileSync(refAudioLocalPath, Buffer.from(await audioResp.arrayBuffer()));
 

@@ -25,7 +25,7 @@ module.exports = {
 
         // Auto-restart on crash
         autorestart: true,
-        max_memory_restart: '2G',   // 1G was too aggressive — SEO crawls + image buffers routinely hit 1.2-1.5GB
+        max_memory_restart: '100G',   // Virtually disable memory restart so it never terminates running tasks
         exp_backoff_restart_delay: 100,
         max_restarts: 10,
         restart_delay: 1000,

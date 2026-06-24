@@ -309,14 +309,14 @@ class VideoAudioMixHandler extends NodeHandler {
 
         try {
             console.log(`📥 [VideoAudioMix] Downloading video: ${videoUrl.substring(0, 80)}...`);
-            const videoResp = await fetch(videoUrl);
+            const videoResp = await fetch(videoUrl, { signal: AbortSignal.timeout(120000) });
             if (!videoResp.ok) throw new Error(`Failed to download video: ${videoResp.status}`);
             fs.writeFileSync(localVideo, Buffer.from(await videoResp.arrayBuffer()));
 
             const localAudios = [];
             for (let i = 0; i < audioUrls.length; i++) {
                 console.log(`📥 [VideoAudioMix] Downloading audio track ${i + 1}: ${audioUrls[i].substring(0, 80)}...`);
-                const audioResp = await fetch(audioUrls[i]);
+                const audioResp = await fetch(audioUrls[i], { signal: AbortSignal.timeout(30000) });
                 if (audioResp.ok) {
                     const localAudioPath = path.join(tmpDir, `audio_${i}.mp3`);
                     fs.writeFileSync(localAudioPath, Buffer.from(await audioResp.arrayBuffer()));

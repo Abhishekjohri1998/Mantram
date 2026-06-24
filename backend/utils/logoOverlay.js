@@ -103,7 +103,7 @@ export async function fetchImageBuffer(urlOrBase64, opts = {}) {
             const hit = LOGO_CACHE.get(urlOrBase64);
             if (hit && hit.expiresAt > Date.now()) return hit.buffer;
         }
-        const resp = await fetch(urlOrBase64);
+        const resp = await fetch(urlOrBase64, { signal: AbortSignal.timeout(30000) });
         if (!resp.ok) throw new Error(`Failed to fetch image: ${resp.status}`);
         const buf = Buffer.from(await resp.arrayBuffer());
         if (cache) {

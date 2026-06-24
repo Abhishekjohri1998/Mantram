@@ -349,6 +349,12 @@ const server = app.listen(config.port, '0.0.0.0', () => {
     }
 });
 
+// Configure server timeouts to match 10-hour Nginx proxy settings (prevent connection drops on long generation tasks)
+server.timeout = 10 * 60 * 60 * 1000;         // 10 hours
+server.headersTimeout = 10 * 60 * 60 * 1000;  // 10 hours
+server.requestTimeout = 10 * 60 * 60 * 1000;  // 10 hours
+server.keepAliveTimeout = 65000;              // 65 seconds
+
 // ── DEFERRED INITIALIZATION (WAIT FOR DB) ─────────────────────
 connectDB().then(() => {
     // Pre-warm the credit costs cache

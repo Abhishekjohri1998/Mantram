@@ -298,7 +298,7 @@ async function runPipeline(jobId, params) {
         const segmentPaths = [];
         for (let i = 0; i < sceneVideos.length; i++) {
             const segPath = path.join(tmpDir, `scene-${i + 1}.mp4`);
-            const resp = await fetch(sceneVideos[i]);
+            const resp = await fetch(sceneVideos[i], { signal: AbortSignal.timeout(120000) });
             if (!resp.ok) throw new Error(`Failed to download scene ${i + 1}`);
             const buffer = Buffer.from(await resp.arrayBuffer());
             fs.writeFileSync(segPath, buffer);

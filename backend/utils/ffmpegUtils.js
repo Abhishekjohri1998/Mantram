@@ -25,7 +25,7 @@ export async function extractLastFrameToS3(videoUrl) {
 
     try {
         // Download the video first to avoid FFmpeg HTTP streaming seek issues
-        const resp = await fetch(videoUrl);
+        const resp = await fetch(videoUrl, { signal: AbortSignal.timeout(120000) });
         if (!resp.ok) throw new Error(`Failed to download video: ${resp.status}`);
         const buffer = Buffer.from(await resp.arrayBuffer());
         fs.writeFileSync(videoPath, buffer);
@@ -85,12 +85,12 @@ export async function muxAudioOntoVideo(videoUrl, audioUrl) {
 
     try {
         // Download video
-        const videoResp = await fetch(videoUrl);
+        const videoResp = await fetch(videoUrl, { signal: AbortSignal.timeout(120000) });
         if (!videoResp.ok) throw new Error(`Failed to download video: ${videoResp.status}`);
         fs.writeFileSync(videoPath, Buffer.from(await videoResp.arrayBuffer()));
 
         // Download audio
-        const audioResp = await fetch(audioUrl);
+        const audioResp = await fetch(audioUrl, { signal: AbortSignal.timeout(60000) });
         if (!audioResp.ok) throw new Error(`Failed to download audio: ${audioResp.status}`);
         fs.writeFileSync(audioPath, Buffer.from(await audioResp.arrayBuffer()));
 
@@ -145,7 +145,7 @@ export async function concatSceneAudios(sceneAudios, tmpDir) {
         if (audioUrl) {
             // Download the TTS audio
             const audioFilePath = path.join(tmpDir, `tts-raw-${i}.mp3`);
-            const resp = await fetch(audioUrl);
+            const resp = await fetch(audioUrl, { signal: AbortSignal.timeout(60000) });
             if (!resp.ok) {
                 console.warn(`⚠️ [ConcatAudio] Failed to download audio ${i}: ${resp.status}`);
                 // Generate silence for this scene
@@ -238,7 +238,7 @@ export async function mixAudioAndMux(videoPath, voiceoverPath, bgmUrl, tmpDir) {
     if (bgmUrl) {
         bgmPath = path.join(tmpDir, 'bgm.mp3');
         try {
-            const resp = await fetch(bgmUrl);
+            const resp = await fetch(bgmUrl, { signal: AbortSignal.timeout(60000) });
             if (resp.ok) {
                 fs.writeFileSync(bgmPath, Buffer.from(await resp.arrayBuffer()));
             } else {
