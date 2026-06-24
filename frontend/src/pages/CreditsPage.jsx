@@ -1176,7 +1176,7 @@ export default function CreditsPage() {
                                     </div>
                                     <div className="space-y-2.5 pl-6 text-xs text-[var(--sys-text-muted)] leading-relaxed">
                                         <p>Access to 200+ image, video, audio, music models including <strong className="text-[var(--sys-text)] font-semibold">Seedance 2.0, Veo 3.1, Kling 3.0, Nano banana pro & Elevenlabs music</strong>.</p>
-                                        <p>Access to invideo v4 agent that can create up to 30 mins of video from a single prompt.</p>
+                                        <p>Access to Mantram v4 agent that can create up to 30 mins of video from a single prompt.</p>
                                         <p>Access to top stock providers like iStock, Storyblocks & more.</p>
                                         <p>Model & agent prices are subject to change.</p>
                                         <p>On-demand credit top-ups available.</p>
