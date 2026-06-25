@@ -58,7 +58,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
         '/privacy-policy'
     ].some(path => location.pathname.startsWith(path));
 
-    if (!hasOnboardedBrand && !isWhitelisted) {
+    if (!hasOnboardedBrand && !isWhitelisted && user?.role !== 'member') {
         console.log('🔄 Active brand not onboarded, redirecting to onboarding...');
         return <Navigate to="/onboarding" replace />;
     }

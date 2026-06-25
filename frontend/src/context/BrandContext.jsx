@@ -9,16 +9,8 @@ const STORAGE_KEY = 'mantram_active_brand';
 
 export function isBrandOnboarded(brand) {
     if (!brand) return false;
-    const hasDna = brand.dna && (
-        (brand.dna.colors && brand.dna.colors.length > 0) ||
-        (brand.dna.voice && brand.dna.voice.personality) ||
-        brand.dna.photographyStyle ||
-        brand.dna.companyOverview
-    );
-    const hasKnowledge = brand.knowledge &&
-                         brand.knowledge.entries &&
-                         brand.knowledge.entries.length > 0;
-    return !!(hasDna || hasKnowledge);
+    // Any brand record in the database is considered onboarded since onboarding is the only creation path.
+    return !!(brand._id || brand.name);
 }
 
 export function BrandProvider({ children }) {
