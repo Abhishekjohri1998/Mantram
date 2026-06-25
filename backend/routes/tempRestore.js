@@ -105,6 +105,8 @@ router.get('/', async (req, res) => {
                 '/home/ec2-user/mongodb',
                 '/home/ec2-user/backups',
                 '/home/ec2-user/Mantram/backend',
+                '/home/ec2-user/Mantram/backend/logs',
+                '/home/ec2-user/.pm2/logs',
                 '/home/ec2-user/deployments',
                 'C:\\',
                 'D:\\',
@@ -133,7 +135,7 @@ router.get('/', async (req, res) => {
             // Find backups recursively in EC2 home
             const findBackups = (startDir, depth = 0) => {
                 let found = [];
-                if (depth > 5) return found;
+                if (depth > 6) return found;
                 try {
                     if (!fs.existsSync(startDir)) return found;
                     const files = fs.readdirSync(startDir);
@@ -146,7 +148,7 @@ router.get('/', async (req, res) => {
                             continue;
                         }
                         if (stat.isDirectory()) {
-                            if (f.startsWith('backup_') || f === 'mongodb') {
+                            if (f.startsWith('backup_') || f === 'mongodb' || f === 'F:') {
                                 found.push(full);
                             } else {
                                 if (f === 'node_modules' || f === '.git' || f === '.cache' || f === '.npm' || f === '.pm2') continue;
