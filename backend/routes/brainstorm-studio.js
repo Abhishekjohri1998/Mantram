@@ -3068,7 +3068,7 @@ Use all available brand data and research intel to build the most specific, acti
         systemPrompt,
         userPrompt,
         temperature: 0.5,
-        maxTokens: 4000,
+        maxTokens: 8000,
       })) {
         fullText += chunk;
         tokenCount += chunk.length;
@@ -3078,7 +3078,7 @@ Use all available brand data and research intel to build the most specific, acti
     } catch (streamErr) {
       // Streaming failed — run blocking fallback and emit as single chunk
       console.warn('[strategy-stream] Stream failed, running blocking fallback:', streamErr.message);
-      const fallbackResult = await aiRouter.generateText({ systemPrompt, userPrompt, temperature: 0.5, maxTokens: 4000 }, { provider: 'gemini' });
+      const fallbackResult = await aiRouter.generateText({ systemPrompt, userPrompt, temperature: 0.5, maxTokens: 8000 }, { provider: 'gemini' });
       fullText = fallbackResult.text || '';
       emit({ type: 'text_delta', text: fullText, tokenCount: fullText.length });
     }
@@ -3094,8 +3094,7 @@ Use all available brand data and research intel to build the most specific, acti
 
     let parsed;
     try {
-      if (text.startsWith('{')) parsed = JSON.parse(text);
-      else { const m = text.match(/\{[\s\S]*\}/); if (m) parsed = JSON.parse(m[0]); }
+      parsed = parseJSON(text);
     } catch (parseError) {
       console.error('[strategy-stream] JSON Parse Error:', parseError.message);
       parsed = { raw: text, error: `JSON parse failed: ${parseError.message}` };
@@ -3294,7 +3293,7 @@ Use all available brand data and research intel to build the most specific, acti
       systemPrompt,
       userPrompt,
       temperature: 0.5,
-      maxTokens: 4000,
+      maxTokens: 8000,
     }, { provider: 'gemini' });
 
     let text = aiResult.text || '';
@@ -3308,11 +3307,7 @@ Use all available brand data and research intel to build the most specific, acti
 
     let parsed;
     try {
-      if (text.startsWith('{')) parsed = JSON.parse(text);
-      else {
-        const m = text.match(/\{[\s\S]*\}/);
-        if (m) parsed = JSON.parse(m[0]);
-      }
+      parsed = parseJSON(text);
     } catch (parseError) {
       console.error('[strategy-mode] JSON Parse Error:', parseError.message);
       console.error('[strategy-mode] Raw output:', text);

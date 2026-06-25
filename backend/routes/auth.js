@@ -37,6 +37,10 @@ const registerLimiter = rateLimit({
     message: { success: false, error: 'Too many registrations from this IP. Please try again later.' },
     standardHeaders: true,
     legacyHeaders: false,
+    skip: (req) => {
+        const host = req.headers.host || '';
+        return host.includes('localhost') || host.includes('127.0.0.1') || process.env.NODE_ENV === 'test';
+    }
 });
 
 // Email operations: 3 per 15 minutes per IP (forgot-password, resend-verification)

@@ -311,7 +311,6 @@ class VideoAudioMixHandler extends NodeHandler {
         const localOutput = path.join(tmpDir, 'output.mp4');
 
         try {
-            console.log(`📥 [VideoAudioMix] Downloading video: ${videoUrl.substring(0, 80)}...`);
             const videoResp = await fetch(videoUrl);
             if (!videoResp.ok) throw new Error(`Failed to download video: ${videoResp.status}`);
             fs.writeFileSync(localVideo, Buffer.from(await videoResp.arrayBuffer()));

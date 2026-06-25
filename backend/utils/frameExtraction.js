@@ -102,7 +102,7 @@ export async function intelligentFrameExtraction(videoId, videoUrl, duration, ch
             const ts = i * interval;
             try {
                 // -ss before -i is extremely fast for network streams
-                await execPromise(`"${ffmpegPath}" -y -ss ${ts} -i "${videoUrl}" -frames:v 1 -q:v 2 -scale=640:-1 "${tmpDir}/interval_${ts}.jpg"`);
+                await execPromise(`"${ffmpegPath}" -y -ss ${ts} -i "${videoUrl}" -frames:v 1 -q:v 2 -vf scale=640:-1 "${tmpDir}/interval_${ts}.jpg"`);
             } catch (e) {
                 console.warn(`⚠️ FFmpeg interval extraction failed at ${ts}s:`, e.message);
             }
@@ -113,12 +113,12 @@ export async function intelligentFrameExtraction(videoId, videoUrl, duration, ch
             const startSec = chapter.startTime || 0;
             if (startSec > 0) {
                 try {
-                    await execPromise(`"${ffmpegPath}" -y -ss ${startSec} -i "${videoUrl}" -frames:v 1 -q:v 2 -scale=640:-1 "${tmpDir}/chapter_${startSec}.jpg"`);
+                    await execPromise(`"${ffmpegPath}" -y -ss ${startSec} -i "${videoUrl}" -frames:v 1 -q:v 2 -vf scale=640:-1 "${tmpDir}/chapter_${startSec}.jpg"`);
                 } catch (e) { /* ignore */ }
             }
         }
 
-        files = fs.readdirSync(tmpDir).filter(f => f.endsWith('.jpg'));
+        const files = fs.readdirSync(tmpDir).filter(f => f.endsWith('.jpg'));
         console.log(`🎬 [frameExtraction] Extracted ${files.length} raw frames.`);
 
         if (files.length === 0) {

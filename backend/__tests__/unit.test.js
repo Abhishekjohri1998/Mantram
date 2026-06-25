@@ -84,19 +84,26 @@ describe('Input Sanitization', () => {
 import { safeErrorMessage } from '../utils/safeError.js';
 
 describe('Safe Error Messages', () => {
-    it('should extract message from Error objects', () => {
+    it('should map general errors to models busy message', () => {
         const err = new Error('Something went wrong');
-        assert.equal(safeErrorMessage(err), 'Something went wrong');
+        assert.equal(safeErrorMessage(err), 'AI models are currently busy — please try again');
     });
 
-    it('should handle string errors', () => {
-        assert.equal(safeErrorMessage('raw string error'), 'raw string error');
+    it('should handle string errors and map to models busy message', () => {
+        assert.equal(safeErrorMessage('raw string error'), 'AI models are currently busy — please try again');
+    });
+
+    it('should keep credit errors friendly', () => {
+        assert.equal(safeErrorMessage('insufficient credits'), 'Insufficient credits — please top up your account.');
+    });
+
+    it('should keep safety errors friendly', () => {
+        assert.equal(safeErrorMessage('content safety policy violation'), 'Content safety violation — please refine your prompt.');
     });
 
     it('should return fallback for null/undefined', () => {
         const result = safeErrorMessage(null);
-        assert.ok(typeof result === 'string');
-        assert.ok(result.length > 0);
+        assert.equal(result, 'AI models are currently busy — please try again');
     });
 });
 

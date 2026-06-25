@@ -95,10 +95,8 @@ export async function stitchVideoClips(clipUrls, outputKey) {
         ];
 
         try {
-            await Promise.race([
-                execFileAsync(FFMPEG_PATH, args),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('FFmpeg concat timed out')), STITCH_TIMEOUT_MS))
-            ]);
+            // Use native execFile timeout option so Node kills the child process automatically on timeout
+            await execFileAsync(FFMPEG_PATH, args, { timeout: STITCH_TIMEOUT_MS });
         } catch (ffmpegErr) {
             // Retry with re-encode if stream copy failed (mixed codecs)
             console.warn(`[VideoStitcher] Stream copy failed (${ffmpegErr.message}), retrying with re-encode...`);
@@ -116,10 +114,7 @@ export async function stitchVideoClips(clipUrls, outputKey) {
                 '-movflags', '+faststart',
                 outputPath,
             ];
-            await Promise.race([
-                execFileAsync(FFMPEG_PATH, reencodeArgs),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('FFmpeg re-encode timed out')), STITCH_TIMEOUT_MS))
-            ]);
+            await execFileAsync(FFMPEG_PATH, reencodeArgs, { timeout: STITCH_TIMEOUT_MS });
         }
 
         // Upload to S3

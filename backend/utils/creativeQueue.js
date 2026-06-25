@@ -66,8 +66,8 @@ const redisConfig = buildBullRedisConfig();
 export const creativeQueue = new Bull('creative-generation', {
     redis: redisConfig,
     settings: {
-        lockDuration:      300000, // 5 min — prevents stale lock issues
-        stalledInterval:   300000,
+        lockDuration:      900000, // 15 min — prevents premature stall detection on long videos
+        stalledInterval:   900000,
         maxStalledCount:   1,
     },
     defaultJobOptions: {

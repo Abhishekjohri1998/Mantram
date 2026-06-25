@@ -69,10 +69,11 @@ const avatarSchema = new mongoose.Schema({
 
 // Existing indexes
 avatarSchema.index({ isTemplate: 1, isActive: 1 });
-avatarSchema.index({ createdBy: 1, isActive: 1 });
+avatarSchema.index({ createdBy: 1, isActive: 1, createdAt: -1 }, { background: true });
 avatarSchema.index({ name: 'text', tags: 'text' });
 
 // ── New compound index for user + library split queries ───────────────────────
 avatarSchema.index({ createdBy: 1, createdByRole: 1, isPublished: 1 });
+avatarSchema.index({ createdByRole: 1, isPublished: 1, isActive: 1 }, { background: true });
 
 export default mongoose.model('Avatar', avatarSchema);

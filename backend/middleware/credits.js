@@ -728,8 +728,17 @@ export const logTokenUsage = async (userId, tokenData, meta = {}) => {
     if (!userId || !tokenData) return;
     const { inputTokens = 0, outputTokens = 0, model = '', provider = '' } = tokenData;
     const totalTokens = inputTokens + outputTokens;
-    const modelCost = MODEL_COSTS[model] || { input: 0.05, output: 0.15 };
-    const estimatedCost = Math.round(((inputTokens / 1000) * modelCost.input + (outputTokens / 1000) * modelCost.output) * 100) / 100;
+    
+    const baseCost = MODEL_COSTS[model] || { input: 0.05, output: 0.15 };
+    const modelCost = {
+        input: typeof baseCost.input === 'number' ? baseCost.input : 0.05,
+        output: typeof baseCost.output === 'number' ? baseCost.output : 0.15,
+        flatCost: typeof baseCost.flatCost === 'number' ? baseCost.flatCost : 0
+    };
+    
+    const estimatedCost = modelCost.flatCost > 0
+        ? modelCost.flatCost
+        : Math.round(((inputTokens / 1000) * modelCost.input + (outputTokens / 1000) * modelCost.output) * 100) / 100;
 
     try {
         // 1. Update the most recent CreditUsage record if it exists

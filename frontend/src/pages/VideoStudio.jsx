@@ -111,11 +111,19 @@ const LazyVideoThumbnail = ({ src, poster }) => {
                     )}
                 </>
             ) : (
-                <video ref={videoRef} src={videoUrl}
-                    className="w-full h-full object-cover block"
-                    muted loop playsInline
-                    preload="metadata"
-                />
+                isHovered ? (
+                    <video ref={videoRef} src={videoUrl}
+                        className="w-full h-full object-cover block"
+                        muted loop playsInline
+                        preload="none"
+                    />
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                        <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-xl">
+                            movie
+                        </span>
+                    </div>
+                )
             )}
         </div>
     )
@@ -195,6 +203,8 @@ export default function VideoStudio() {
     // History
     const [projects, setProjects] = useState([])
     const [projectsLoaded, setProjectsLoaded] = useState(false)
+    const [capabilitiesLoaded, setCapabilitiesLoaded] = useState(false)
+    const [hasInitialized, setHasInitialized] = useState(false)
     const [showHistory, setShowHistory] = useState(() => sessionStorage.getItem('vs-showHistory') === 'true')
     const [playingVideo, setPlayingVideo] = useState(null)
     const [viralityOpenId, setViralityOpenId] = useState(null) // ID of card with virality panel open
@@ -399,7 +409,10 @@ export default function VideoStudio() {
     useEffect(() => { sessionStorage.setItem('vs-showHistory', showHistory ? 'true' : 'false') }, [showHistory])
 
     useEffect(() => {
-        api('/video-studio/models/capabilities').then(d => setModelCapabilities(d.capabilities || null)).catch(() => { })
+        api('/video-studio/models/capabilities')
+            .then(d => setModelCapabilities(d.capabilities || null))
+            .catch(() => { })
+            .finally(() => setCapabilitiesLoaded(true))
 
         // ── Template Routing ──────────────────────────────────────────────────
         const modeParam = searchParams.get('mode');
@@ -466,6 +479,23 @@ export default function VideoStudio() {
             setSearchParams({}, { replace: true })
         }
     }, [searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    // ── Preload avatars on mount in background ──
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            import('../components/VideoStudio/AvatarPicker')
+                .then(m => m.preloadAvatars())
+                .catch(err => console.warn('[VideoStudio] Dynamic avatar preload failed:', err))
+        }, 1500)
+        return () => clearTimeout(timer)
+    }, [])
+
+    // ── Track unified initialization ──
+    useEffect(() => {
+        if (projectsLoaded && capabilitiesLoaded) {
+            setHasInitialized(true)
+        }
+    }, [projectsLoaded, capabilitiesLoaded])
 
     // ── Avatar Studio handoff: pick up pending avatar URL from sessionStorage ──
     useEffect(() => {
@@ -900,6 +930,18 @@ export default function VideoStudio() {
     // ══════════════════════════════════════════════════════════════════════════
     // RENDER
     // ══════════════════════════════════════════════════════════════════════════
+    if (!hasInitialized) {
+        return (
+            <DashboardLayout title="Video Studio" subtitle="AI-powered video generation & editing">
+                <SEOHead title="Video Studio — Mantram AI" noIndex={true} />
+                <div className="w-full min-h-[60vh] flex flex-col items-center justify-center gap-4 text-[var(--sys-text-muted)]">
+                    <div className="w-12 h-12 border-4 border-t-primary border-r-primary border-b-[var(--sys-surface)] border-l-[var(--sys-surface)] rounded-full animate-spin"></div>
+                    <span className="text-sm font-semibold text-[var(--sys-text-muted)] animate-pulse">Initializing Video Studio... Loading assets & cache</span>
+                </div>
+            </DashboardLayout>
+        )
+    }
+
     return (
         <DashboardLayout title="Video Studio" subtitle="AI-powered video generation & editing">
             <SEOHead title="Video Studio — Mantram AI" noIndex={true} />

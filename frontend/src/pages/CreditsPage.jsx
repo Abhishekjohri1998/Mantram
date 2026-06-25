@@ -146,8 +146,10 @@ export default function CreditsPage() {
         if (activeBillingProvider === 'shopify') {
             if (type === 'subscription') {
                 const usdPrices = {
-                    creator: { monthly: 19.99, quarterly: 49.99, yearly: 199.99 },
-                    professional: { monthly: 49.99, quarterly: 129.99, yearly: 499.99 }
+                    plus: { monthly: 20.00, quarterly: 55.00, yearly: 200.00 },
+                    max: { monthly: 100.00, quarterly: 270.00, yearly: 1000.00 },
+                    generative: { monthly: 200.00, quarterly: 540.00, yearly: 2000.00 },
+                    elite: { monthly: 1000.00, quarterly: 2850.00, yearly: 10800.00 }
                 };
                 const slug = item.slug;
                 if (usdPrices[slug] && usdPrices[slug][cycle]) {
@@ -1016,7 +1018,8 @@ export default function CreditsPage() {
                                     <div className="size-8 border border-primary border-t-transparent rounded-full animate-spin" />
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                <>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                                     {packages.map((pkg) => {
                                         const isCurrent = pkg.slug === balance?.plan;
                                         const currentTier = packages.find(p => p.slug === balance?.plan)?.tier || 0;
@@ -1164,6 +1167,22 @@ export default function CreditsPage() {
                                     })}
                                 </div>
 
+                                {/* All paid plans include info box */}
+                                <div className="mt-8 p-6 rounded-2xl border border-[var(--sys-border)] bg-[var(--sys-surface)]/10 backdrop-blur-md relative overflow-hidden">
+                                    <div className="absolute inset-0 opacity-[0.02] pointer-events-none bg-gradient-to-r from-primary to-transparent" />
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <span className="material-symbols-outlined text-primary text-lg">auto_awesome</span>
+                                        <h4 className="text-sm font-bold text-[var(--sys-text)]">All paid plans include:</h4>
+                                    </div>
+                                    <div className="space-y-2.5 pl-6 text-xs text-[var(--sys-text-muted)] leading-relaxed">
+                                        <p>Access to 200+ image, video, audio, music models including <strong className="text-[var(--sys-text)] font-semibold">Seedance 2.0, Veo 3.1, Kling 3.0, Nano banana pro & Elevenlabs music</strong>.</p>
+                                        <p>Access to Mantram v4 agent that can create up to 30 mins of video from a single prompt.</p>
+                                        <p>Access to top stock providers like iStock, Storyblocks & more.</p>
+                                        <p>Model & agent prices are subject to change.</p>
+                                        <p>On-demand credit top-ups available.</p>
+                                    </div>
+                                </div>
+                                </>
                             )}
                         </div>
                     ) : (

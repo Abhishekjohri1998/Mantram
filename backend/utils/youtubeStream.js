@@ -63,6 +63,54 @@ async function ensureYtDlpUpdated() {
 
 import crypto from 'crypto';
 import os from 'os';
+
+/**
+ * Automatically prunes older cached youtube stream files from the OS temp directory
+ * to prevent disk space exhaustion (keeps total size under 500MB and/or 5 files).
+ */
+async function pruneYoutubeCache() {
+    try {
+        const tmpDir = os.tmpdir();
+        const files = fs.readdirSync(tmpDir)
+            .filter(f => f.startsWith('mantram_vid_') && f.endsWith('.mp4'))
+            .map(f => {
+                const fp = path.join(tmpDir, f);
+                try {
+                    const stat = fs.statSync(fp);
+                    return { path: fp, mtime: stat.mtimeMs, size: stat.size };
+                } catch {
+                    return null;
+                }
+            })
+            .filter(Boolean);
+
+        const maxCacheSize = 500 * 1024 * 1024; // 500 MB
+        const maxFiles = 5;
+
+        // Sort files by mtimeMs ascending (oldest first)
+        files.sort((a, b) => a.mtime - b.mtime);
+
+        let totalSize = files.reduce((sum, f) => sum + f.size, 0);
+
+        while (files.length > maxFiles || totalSize > maxCacheSize) {
+            const oldest = files.shift();
+            if (oldest) {
+                console.log(`🧹 [youtubeStream] Pruning old cache file: ${oldest.path} (${Math.round(oldest.size / 1024 / 1024)}MB)`);
+                try {
+                    fs.unlinkSync(oldest.path);
+                    totalSize -= oldest.size;
+                } catch (err) {
+                    console.warn(`⚠️ Failed to delete cached video ${oldest.path}: ${err.message}`);
+                }
+            } else {
+                break;
+            }
+        }
+    } catch (err) {
+        console.warn(`⚠️ Error pruning youtube cache:`, err.message);
+    }
+}
+
 /**
  * Resolves a YouTube video ID or URL to a direct video stream URL that FFmpeg can use.
  * Implements a multi-strategy fallback to bypass bot detection.
@@ -172,6 +220,7 @@ export async function getYouTubeStreamUrl(videoIdOrUrl) {
         }
 
         console.log(`   📥 Downloading video stream to local cache for fast seeking...`);
+        await pruneYoutubeCache(); // Clean up old cached files to prevent disk space issues
         const res = await fetch(resolvedUrl);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         

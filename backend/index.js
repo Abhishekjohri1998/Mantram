@@ -127,6 +127,7 @@ const globalApiLimiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     skip: (req) => {
+        if (process.env.NODE_ENV === 'test') return true;
         const host = req.headers.host || '';
         return host.includes('localhost') || host.includes('127.0.0.1') || req.path === '/api/health' || req.path === '/health';
     },
@@ -348,6 +349,12 @@ const server = app.listen(config.port, '0.0.0.0', () => {
         console.log('✅ PM2 Ready signal sent (Fast-Start)');
     }
 });
+
+// Configure server timeouts to match 10-hour Nginx proxy settings (prevent connection drops on long generation tasks)
+server.timeout = 10 * 60 * 60 * 1000;         // 10 hours
+server.headersTimeout = 10 * 60 * 60 * 1000;  // 10 hours
+server.requestTimeout = 10 * 60 * 60 * 1000;  // 10 hours
+server.keepAliveTimeout = 65000;              // 65 seconds
 
 // ── DEFERRED INITIALIZATION (WAIT FOR DB) ─────────────────────
 connectDB().then(() => {
@@ -666,15 +673,26 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err, req, res, next) => {
-    // REL-017: Enhanced error handler with structured context
-    console.error(`❌ Server Error [req_id: ${req.id || 'unknown'}]:`, {
-        message: err.message,
-        stack: err.stack,
-        url: req.originalUrl,
-        method: req.method,
-        userId: req.user ? req.user._id : 'unauthenticated',
-        body: req.method !== 'GET' ? req.body : undefined
-    });
+    const statusCode = err.statusCode || err.status || 500;
+    
+    if (statusCode >= 500) {
+        // REL-017: Enhanced error handler with structured context for actual server errors
+        console.error(`❌ Server Error [req_id: ${req.id || 'unknown'}]:`, {
+            message: err.message,
+            stack: err.stack,
+            url: req.originalUrl,
+            method: req.method,
+            userId: req.user ? req.user._id : 'unauthenticated',
+            body: req.method !== 'GET' ? req.body : undefined
+        });
+    } else {
+        // Log client errors as warnings to keep logs clean and avoid false alerts
+        console.warn(`⚠️ Client Error [req_id: ${req.id || 'unknown'}]: ${statusCode} - ${err.message}`, {
+            url: req.originalUrl,
+            method: req.method,
+            userId: req.user ? req.user._id : 'unauthenticated',
+        });
+    }
     
     // Ensure CORS headers are present even on errors
     const origin = req.headers.origin;
@@ -686,7 +704,7 @@ app.use((err, req, res, next) => {
 
     const response = {
         success: false,
-        error: config.nodeEnv === 'development' ? err.message : 'Server Error',
+        error: config.nodeEnv === 'development' ? err.message : (statusCode === 404 ? `Route ${req.originalUrl} not found` : 'Server Error'),
         requestId: req.id, // Expose request ID to client for debugging
     };
 
@@ -697,7 +715,7 @@ app.use((err, req, res, next) => {
         response.error = err.message; // Use the specific user-friendly message
     }
 
-    res.status(err.statusCode || 500).json(response);
+    res.status(statusCode).json(response);
 });
 
 // Keep-Alive timeouts
