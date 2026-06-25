@@ -39,8 +39,8 @@ export const generationRateLimiter = rateLimit({
     },
     standardHeaders: 'draft-7',
     legacyHeaders: false,
-    // Skip rate limiting for superadmins
-    skip: (req) => req.user?.role === 'superadmin',
+    // Skip rate limiting for superadmins or during test runs
+    skip: (req) => req.user?.role === 'superadmin' || process.env.NODE_ENV === 'test',
     validate: { keyGenerator: false },
 });
 
@@ -63,8 +63,8 @@ const CONCURRENT_LIMITS = {
 export function requireConcurrencySlot(jobModel = 'GenerationJob') {
     return async (req, res, next) => {
         try {
-            // Superadmins bypass concurrency limits
-            if (req.user?.role === 'superadmin') return next();
+            // Superadmins or test environment bypass concurrency limits
+            if (req.user?.role === 'superadmin' || process.env.NODE_ENV === 'test') return next();
 
             const mongoose = (await import('mongoose')).default;
             const JobModel = mongoose.model(jobModel);
