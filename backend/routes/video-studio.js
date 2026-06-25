@@ -9480,9 +9480,11 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
             brochureExtractedText = '',
             isBrochure: bodyIsBrochure = 'false',
             briefAudioUrl = '',
+            audioSync: bodyAudioSync,
         } = req.body;
 
         const isBrochure = bodyIsBrochure === 'true' || bodyIsBrochure === true;
+        const audioSync = bodyAudioSync === 'false' || bodyAudioSync === false ? false : true;
 
         // Parse includeBranding (default true — branding ON by default)
         const includeBranding = bodyIncludeBranding === 'false' || bodyIncludeBranding === false ? false : true;
@@ -9620,15 +9622,20 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
 
             if (parsedCuts && parsedCuts.length > 0) {
                 console.log(`[Storyboard Create] 🎬 Using ${parsedCuts.length} pre-seeded cuts/scenes!`);
-                const cuts = parsedCuts.map((c, i) => ({
-                    id: c.id || i + 1,
-                    lens: c.lens || '50mm prime',
-                    duration: Math.max(2, parseInt(c.duration) || 3),
-                    move: c.move || 'STEADICAM',
-                    shot: c.shot || 'MEDIUM',
-                    scene: c.scene || '',
-                    framePrompt: c.framePrompt || c.scene || '',
-                }));
+                const cuts = parsedCuts.map((c, i) => {
+                    const vo = c.voiceover || c.dialogue || '';
+                    return {
+                        id: c.id || i + 1,
+                        lens: c.lens || '50mm prime',
+                        duration: Math.max(2, parseInt(c.duration) || 3),
+                        move: c.move || 'STEADICAM',
+                        shot: c.shot || 'MEDIUM',
+                        scene: c.scene || '',
+                        framePrompt: c.framePrompt || c.scene || '',
+                        voiceover: vo,
+                        dialogue: vo,
+                    };
+                });
 
                 const totalCalculatedDuration = cuts.reduce((sum, c) => sum + c.duration, 0);
 
@@ -9661,6 +9668,8 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
                     materialNotes: 'Clean studio lighting, brand colors, minimal layout',
                     environmentFingerprint: 'A high-end, clean creator studio set with soft background lighting',
                     cuts,
+                    voiceoverScript: cuts.map(c => c.voiceover).filter(Boolean).join(' '),
+                    audioSync,
                     moodKeywords: ['engaging', 'modern', 'clean', 'professional', 'bold'],
                     cinematographyRules: 'Soft key light, shallow depth of field, steady focus tracking.',
                     emotionalArc: 'hook → explain → solve → detail → CTA',
@@ -9736,6 +9745,7 @@ Format: ${format} | Style: ${style === '3d' ? 'Pixar/Unreal Engine 3D animated' 
                 brochureExtractedText,
                 isBrochure,
             });
+            plan.audioSync = audioSync;
         }
 
         // Step 2: Generate single storyboard poster via LaoZhang → GPT Image 2 / NanoBanana
@@ -9882,6 +9892,8 @@ Format: ${format} | Style: ${style === '3d' ? 'Pixar/Unreal Engine 3D animated' 
                 style,
                 dialogueLanguage,
                 includeBranding,
+                audioSync,
+                voiceoverScript: plan.voiceoverScript || '',
                 // ── 4-section structured plan ──
                 structuredPlan: {
                     colorPalette:           plan.colorPalette || [],
@@ -10345,6 +10357,10 @@ Write the final video prompt now. Follow the cut plan timings exactly. Ensure ev
         { temperature: 0.72, maxTokens: 2500, returnRaw: true, provider: 'claude' }
     );
 
+    if (!rawPrompt || typeof rawPrompt !== 'string' || rawPrompt.error) {
+        throw new Error(rawPrompt?.error || 'Empty or invalid response from LLM');
+    }
+
     let cleaned = (rawPrompt || '').trim()
         .replace(/^```(?:json)?[\s\S]*?```$/m, '')
         .replace(/^\{[\s\S]*?"videoPrompt"\s*:\s*"/, '')
@@ -10394,6 +10410,8 @@ router.post('/storyboard/animate', protect, async (req, res) => {
             model = 'seedance-2.0-fast',
             // Generation mode: 'automatic' (default) | 'manual'
             generateMode = 'automatic',
+            audioSync,
+            voiceoverScript,
         } = req.body;
 
         // Mutable — may be re-signed or overridden by DB copy below
@@ -10419,6 +10437,7 @@ router.post('/storyboard/animate', protect, async (req, res) => {
         let dbIncludeBranding = true;    // branding flag — read from DB below
         let dbCharRefSheetUrl = null;    // pre-generated character reference sheet URL
         let dbRefAudio = '';
+        let dbAudioSync = true;
 
         if (projectId) {
             const project = await VideoProject.findById(projectId)
@@ -10440,6 +10459,7 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                 dbStyle              = project.storyboard?.style || 'hyperrealistic';
                 dbDialogueLanguage   = project.storyboard?.dialogueLanguage || 'English';
                 dbStructuredPlan     = project.storyboard?.structuredPlan || null;
+                dbAudioSync          = project.storyboard?.audioSync !== false;
                 // Read branding toggle from DB
                 if (typeof project.storyboard?.includeBranding === 'boolean') {
                     dbIncludeBranding = project.storyboard.includeBranding;
@@ -10635,16 +10655,18 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                 // ── Generation mode (automatic | manual) ──
                 generateMode,
                 // ── Uploaded audio brief ──
-                refAudio: dbRefAudio || '',
+                refAudio: (audioSync !== false && audioSync !== 'false' && dbAudioSync !== false && dbRefAudio) ? dbRefAudio : '',
             });
 
             if (projectId) {
+                const resolvedAudioSync = audioSync !== undefined ? (audioSync === true || audioSync === 'true') : dbAudioSync;
                 await VideoProject.findByIdAndUpdate(projectId, {
                     $set: {
                         'storyboard.longFormJobId': jobId,
                         'storyboard.status': 'animating',
                         'storyboard.totalDuration': rawDuration,
                         'storyboard.voiceoverScript': voiceoverScript,
+                        'storyboard.audioSync': resolvedAudioSync,
                         status: 'animating',
                     },
                 });
@@ -10693,10 +10715,12 @@ router.post('/storyboard/animate', protect, async (req, res) => {
             }
             taskId = genResult.taskId;
             if (projectId) {
+                const resolvedAudioSync = audioSync !== undefined ? (audioSync === true || audioSync === 'true') : dbAudioSync;
                 await VideoProject.findByIdAndUpdate(projectId, {
                     $set: {
                         'storyboard.taskId': taskId,
                         'storyboard.status': 'animating',
+                        'storyboard.audioSync': resolvedAudioSync,
                         status: 'animating',
                     }
                 });
@@ -11120,7 +11144,7 @@ router.post('/storyboard/compile', protect, async (req, res) => {
         tmpDir = dir;
 
         let finalPath = filePath;
-        const refAudio = project.refAudio || '';
+        const refAudio = (sb.audioSync !== false) ? (project.refAudio || '') : '';
         if (refAudio) {
             try {
                 console.log(`[SB Compile] Mixing brief audio ref: ${refAudio}`);

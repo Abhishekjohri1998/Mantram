@@ -112,6 +112,9 @@ class AssistantHandler extends NodeHandler {
                 model: modelId,
                 returnRaw: true
             });
+            if (!responseText || typeof responseText !== 'string' || responseText.error) {
+                throw new Error(responseText?.error || 'Empty or invalid response from LLM');
+            }
         } else {
             responseText = await callAgentText(systemPrompt, userPrompt, 0.7, 4096, {
                 provider,

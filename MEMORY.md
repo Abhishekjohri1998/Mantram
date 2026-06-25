@@ -18,6 +18,16 @@
   - Subsequent scenes chain using the last frame of the previous scene.
   - Always clean up duplicate schema fields (e.g. `totalDuration`) to avoid validation/consistency confusion.
 
+### Storyboard Audio Sync & Localized Voiceovers (Sprint 9)
+- **Feature**: Audio Sync Toggle & Native Voiceover Script Generation.
+- **Goal**: Allow users to toggle whether the final video compiled in Storyboard Studio matches the uploaded audio brief ("Sync Audio") or is a video-only compile ("Just Video"). Also, strengthen the director agent to decide if a voiceover is required and write native script voiceover lines in the selected language.
+- **Workflow**:
+  - `storyboardDirector.js` prompt updated to include a `voiceover` field per cut. The agent writes natural, localized voiceover lines in the selected dialogue language's native script (e.g., Devanagari script for Hindi).
+  - The parsed voiceover lines are joined into a unified, editable `voiceoverScript` textarea on the review screen.
+  - The user can toggle "Sync Audio" / "Just Video" at the creation phase or review phase. If "Just Video" is chosen, `refAudio` is set to empty when starting the long-form job or compiling segments, skipping the FFmpeg mixing phase.
+- **Learnings / Gotchas**:
+  - Storing the selected `audioSync` state (Boolean) on the mongoose `VideoProject` ensures that manual compiles (`/storyboard/compile`) and background jobs (`storyboardLongForm.js`) behave consistently when mixed or stitched.
+
 ### Gemini Omni Flash Long-Form Video Support (Sprint 8)
 - **Feature**: Sequential multi-segment generation and model mapping harmonization.
 - **Goal**: Resolve the 10-second limit for Gemini Flash (`gemini-flash` and `gemini-omni-flash`) in both Advanced Mode and Storyboard Studio.
@@ -131,3 +141,14 @@
 - **Key Pattern / Learnings**:
   - In-place updating is highly cohesive when leveraging existing asynchronous polling systems (matching by `sourceJobId`). Changing the `sourceJobId` on the target template automatically chains it to the global status poller without changing any background handler logic.
   - Adding a preview of the active asset within the edit modal is critical to closing the loop for the user, allowing them to verify regeneration before saving.
+
+### Backend LLM Error Recovery & Gemini Router Fallbacks (Sprint 9)
+- **Feature**: Type safety for raw agent returns and automatic native Gemini routing fallbacks.
+- **Goal**: Prevent type errors (`.trim is not a function`) when multimodal agents return structured errors during API outages/quota limits, and implement robust fallback paths to native Gemini if the primary Laozhang proxy fails.
+- **Workflow**:
+  - Added strict checks to verify that outputs of `callMultimodalAgent` with `returnRaw: true` are strings and do not contain `.error` keys before performing `.trim()` or regex replacements.
+  - Initialized direct native Gemini provider as `'native_gemini'` in `ModelRouter` to make its name unique from the primary `'gemini'` (Laozhang proxy) provider.
+  - Enhanced `getTextProvider()` and the `generateText()` fallback loop to route requests to `'native_gemini'` if the primary `'gemini'` provider hits billing limits, is in cooldown, or trips the circuit breaker.
+- **Learnings**:
+  - Downstream agents must never assume that LLM calls returning raw strings will succeed. If the underlying provider is rate-limited or out of credit, the agent helper returns a structured error object. Callers must validate the type and error keys before executing string manipulations.
+  - Designing a parallel direct API client alongside a proxy client allows seamless failover fallback routing, keeping client studios functional even during billing or proxy outages.

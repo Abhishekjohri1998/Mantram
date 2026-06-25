@@ -35,6 +35,7 @@ class ModelRouter {
                 gcpLocation: providerConfigs.gemini.gcpLocation,
                 googleApplicationCredentials: providerConfigs.gemini.googleApplicationCredentials,
             });
+            this.nativeGemini.name = 'native_gemini'; // Make name unique for fallback logging
         }
 
         // Register all providers — they self-check if API key exists
@@ -105,6 +106,11 @@ class ModelRouter {
      * Priority: user preference > brand preference > global default > any available
      */
     getTextProvider(preferences = {}) {
+        // If they explicitly requested 'native_gemini', and it's available, return it directly.
+        if (preferences.provider === 'native_gemini' && this.nativeGemini?.isAvailable()) {
+            return this.nativeGemini;
+        }
+
         const priority = [
             preferences.provider,
             config.ai.defaultTextProvider,
@@ -114,7 +120,17 @@ class ModelRouter {
         ].filter(Boolean);
 
         for (const name of priority) {
-            const p = this.providers[name];
+            let p = this.providers[name];
+
+            // Special fallback logic for gemini: if the primary routed Gemini (e.g. Laozhang)
+            // is not available, in cooldown, or circuit-broken, fall back to nativeGemini.
+            if (name === 'gemini' && (!p || !p.isAvailable() || (p.cooldownUntil && Date.now() < p.cooldownUntil) || this._isProviderThrottled('gemini'))) {
+                if (this.nativeGemini && this.nativeGemini.isAvailable() && !(this.nativeGemini.cooldownUntil && Date.now() < this.nativeGemini.cooldownUntil)) {
+                    console.log('🔄 Primary Gemini is unavailable, throttled, or in cooldown. Routing to native Gemini.');
+                    return this.nativeGemini;
+                }
+            }
+
             if (!p?.isAvailable()) continue;
             // Skip providers in cooldown
             if (p.cooldownUntil && Date.now() < p.cooldownUntil) continue;
@@ -128,6 +144,9 @@ class ModelRouter {
 
         // If all preferred providers are throttled/cooldown, fall back to ANY available
         for (const name of priority) {
+            if (name === 'gemini' && this.nativeGemini?.isAvailable()) {
+                return this.nativeGemini;
+            }
             if (this.providers[name]?.isAvailable()) return this.providers[name];
         }
         throw new Error('No text AI provider available. Add an API key to .env');
@@ -204,6 +223,14 @@ class ModelRouter {
             const remainingProviders = Object.entries(this.providers)
                 .filter(([name, p]) => !triedProviders.has(name) && p.isAvailable() && !(p.cooldownUntil && Date.now() < p.cooldownUntil))
                 .map(([_, p]) => p);
+
+            // Add native Gemini if it's available, not already tried, and not in cooldown
+            if (this.nativeGemini && 
+                this.nativeGemini.isAvailable() && 
+                !triedProviders.has(this.nativeGemini.name) && 
+                !(this.nativeGemini.cooldownUntil && Date.now() < this.nativeGemini.cooldownUntil)) {
+                remainingProviders.push(this.nativeGemini);
+            }
 
             for (const fallback of remainingProviders) {
                 try {

@@ -33,7 +33,11 @@ router.post('/trending', protect, async (req, res) => {
     try {
         const { brandId } = req.body;
         let brand = brandId ? await Brand.findById(brandId) : null;
-        if (!brand) brand = await Brand.findOne({ user: req.user._id }).sort('-createdAt');
+        if (!brand && req.user) {
+            const isSuperAdmin = req.user.role === 'superadmin' || req.user.email === 'user@mantram.ai';
+            const query = isSuperAdmin ? {} : { user: req.user._id };
+            brand = await Brand.findOne(query).sort('-createdAt');
+        }
         if (!brand) return res.status(400).json({ success: false, error: 'No brand found' });
 
         // Check cache
@@ -144,7 +148,9 @@ router.post('/generate', protect, requireStudio('contentStudio'), requireCredits
             brand = await Brand.findById(brandId);
         }
         if (!brand && req.user) {
-            brand = await Brand.findOne({ user: req.user._id }).sort('-createdAt');
+            const isSuperAdmin = req.user.role === 'superadmin' || req.user.email === 'user@mantram.ai';
+            const query = isSuperAdmin ? {} : { user: req.user._id };
+            brand = await Brand.findOne(query).sort('-createdAt');
         }
         // If still no brand, create a minimal placeholder for generation
         if (!brand) {
@@ -455,7 +461,11 @@ router.post('/refine-text', optionalAuth, async (req, res) => {
 
         let brand = null;
         if (brandId) brand = await Brand.findById(brandId);
-        if (!brand && req.user) brand = await Brand.findOne({ user: req.user._id }).sort('-createdAt');
+        if (!brand && req.user) {
+            const isSuperAdmin = req.user.role === 'superadmin' || req.user.email === 'user@mantram.ai';
+            const query = isSuperAdmin ? {} : { user: req.user._id };
+            brand = await Brand.findOne(query).sort('-createdAt');
+        }
         if (!brand) brand = { name: 'Brand', dna: {}, _id: null };
 
         const orchestrator = getOrchestrator();
