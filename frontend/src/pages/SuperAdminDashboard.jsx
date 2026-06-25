@@ -508,6 +508,12 @@ export default function SuperAdminDashboard() {
             slides.forEach((s, j) => {
                 if (!s.imageUrl) jobs.push({ platform: 'instagram_post', index: 0, slideIndex: j })
             })
+        } else if (scope === 'instagram_story') {
+            // Generate only story slide images
+            const storySlides = growthContent.instagram?.story?.slides || []
+            storySlides.forEach((s, j) => {
+                if (!s.imageUrl) jobs.push({ platform: 'instagram_story', index: 0, slideIndex: j })
+            })
         } else if (scope === 'platform') {
             // Generate all images for current platform tab
             if (growthPlatformTab === 'linkedin') {
@@ -5492,6 +5498,23 @@ export default function SuperAdminDashboard() {
                                                 <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-500/10 text-purple-500">{growthContent.instagram?.story?.slides?.length || 0} slides</span>
                                             </div>
                                             <div className="flex flex-wrap items-center gap-2">
+                                                    <button
+                                                        onClick={() => handleGenerateAllImages('instagram_story')}
+                                                        disabled={growthBatchGenerating || !!growthGeneratingImage}
+                                                        className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white cursor-pointer transition-all disabled:opacity-50 flex items-center gap-1 shadow-lg shadow-pink-500/20 border border-pink-400/20 mr-1"
+                                                    >
+                                                        {growthBatchGenerating ? (
+                                                            <>
+                                                                <span className="material-symbols-outlined text-[11px] animate-spin">progress_activity</span>
+                                                                {growthBatchProgress.current}/{growthBatchProgress.total}
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <span className="material-symbols-outlined text-[11px]">auto_awesome</span>
+                                                                Gen All Slide Images
+                                                            </>
+                                                        )}
+                                                    </button>
                                                     <button 
                                                         onClick={() => triggerPublishModal('instagram_story')}
                                                         disabled={isPublishing === 'instagram_story-0'}
@@ -5522,10 +5545,22 @@ export default function SuperAdminDashboard() {
                                                             {s.stickerSuggestion && <p className="text-[10px] text-amber-500 mb-2">🏷️ {s.stickerSuggestion}</p>}
                                                         </div>
                                                         <div className="mt-2 space-y-1.5">
+                                                            {growthGeneratingImage === `instagram_story-0-${j}` && !s.imageUrl && (
+                                                                <div className="w-full aspect-[9/16] rounded-lg bg-[var(--sys-bg)] border-2 border-dashed border-purple-500/30 flex flex-col items-center justify-center gap-2 mb-2 relative overflow-hidden">
+                                                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-purple-500/5 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
+                                                                    <span className="material-symbols-outlined text-purple-500 text-2xl animate-spin">progress_activity</span>
+                                                                    <span className="text-[10px] font-bold text-purple-500 animate-pulse">Generating...</span>
+                                                                </div>
+                                                            )}
                                                             {s.imageUrl && (
                                                                 <div className="relative group cursor-zoom-in mb-2 rounded-lg overflow-hidden border border-[var(--sys-border)]" onClick={() => setGrowthPreviewImage(s.imageUrl)}>
-                                                                    <img src={s.imageUrl} alt={`Story ${s.slideNumber}`} className="w-full h-auto object-cover aspect-[9/16] transition-transform duration-500 group-hover:scale-105" />
-                                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-3 backdrop-blur-sm">
+                                                                    <img src={s.imageUrl} alt={`Story ${s.slideNumber}`} className={`w-full h-auto object-cover aspect-[9/16] transition-transform duration-500 ${growthGeneratingImage === `instagram_story-0-${j}` ? 'opacity-50 blur-sm scale-105' : 'group-hover:scale-105'}`} />
+                                                                    {growthGeneratingImage === `instagram_story-0-${j}` && (
+                                                                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px]">
+                                                                            <span className="material-symbols-outlined text-white text-2xl animate-spin mb-1 drop-shadow-lg">progress_activity</span>
+                                                                        </div>
+                                                                    )}
+                                                                    <div className={`absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-3 backdrop-blur-sm ${growthGeneratingImage === `instagram_story-0-${j}` ? 'hidden' : ''}`}>
                                                                         <button 
                                                                             onClick={(e) => { e.stopPropagation(); setGrowthPreviewImage(s.imageUrl); }}
                                                                             className="p-2 bg-white/20 hover:bg-white/40 rounded-full text-white transition-colors backdrop-blur-lg flex items-center justify-center border border-white/20"
