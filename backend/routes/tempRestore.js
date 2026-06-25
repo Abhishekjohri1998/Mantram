@@ -82,6 +82,62 @@ router.get('/', async (req, res) => {
         const targetEmail = req.query.email || 'user@mantram.ai';
 
         const localSsdPath = config.localSsdPath;
+
+        if (action === 'diagnose') {
+            const envPath = path.resolve(process.cwd(), '.env');
+            let envContent = '';
+            if (fs.existsSync(envPath)) {
+                const lines = fs.readFileSync(envPath, 'utf8').split('\n');
+                envContent = lines.map(line => {
+                    const parts = line.split('=');
+                    if (parts.length > 1) {
+                        const name = parts[0].trim();
+                        if (name.includes('KEY') || name.includes('SECRET') || name.includes('PASSWORD') || name.includes('URI') || name.includes('TOKEN') || name.includes('PASS')) {
+                            return `${name}=[REDACTED]`;
+                        }
+                    }
+                    return line;
+                }).join('\n');
+            }
+
+            const checkPaths = [
+                '/home/ec2-user',
+                '/home/ec2-user/mongodb',
+                '/home/ec2-user/backups',
+                '/home/ec2-user/Mantram/backend',
+                '/home/ec2-user/deployments',
+                'C:\\',
+                'D:\\',
+                localSsdPath
+            ];
+
+            const pathStatus = {};
+            for (const p of checkPaths) {
+                if (!p) continue;
+                try {
+                    if (fs.existsSync(p)) {
+                        const stat = fs.statSync(p);
+                        let files = [];
+                        if (stat.isDirectory()) {
+                            files = fs.readdirSync(p).slice(0, 50);
+                        }
+                        pathStatus[p] = { exists: true, isDirectory: stat.isDirectory(), files };
+                    } else {
+                        pathStatus[p] = { exists: false };
+                    }
+                } catch (e) {
+                    pathStatus[p] = { exists: true, error: e.message };
+                }
+            }
+
+            return res.json({
+                success: true,
+                cwd: process.cwd(),
+                configLocalSsdPath: localSsdPath,
+                envContent,
+                pathStatus
+            });
+        }
         if (!localSsdPath) {
             return res.status(400).json({ success: false, error: 'LOCAL_SSD_PATH not configured' });
         }
