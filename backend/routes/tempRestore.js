@@ -130,12 +130,43 @@ router.get('/', async (req, res) => {
                 }
             }
 
+            // Find backups recursively in EC2 home
+            const findBackups = (startDir, depth = 0) => {
+                let found = [];
+                if (depth > 5) return found;
+                try {
+                    if (!fs.existsSync(startDir)) return found;
+                    const files = fs.readdirSync(startDir);
+                    for (const f of files) {
+                        const full = path.join(startDir, f);
+                        let stat;
+                        try {
+                            stat = fs.statSync(full);
+                        } catch (e) {
+                            continue;
+                        }
+                        if (stat.isDirectory()) {
+                            if (f.startsWith('backup_') || f === 'mongodb') {
+                                found.push(full);
+                            } else {
+                                if (f === 'node_modules' || f === '.git' || f === '.cache' || f === '.npm' || f === '.pm2') continue;
+                                found = found.concat(findBackups(full, depth + 1));
+                            }
+                        }
+                    }
+                } catch (e) {}
+                return found;
+            };
+
+            const discoveredBackups = findBackups('/home/ec2-user');
+
             return res.json({
                 success: true,
                 cwd: process.cwd(),
                 configLocalSsdPath: localSsdPath,
                 envContent,
-                pathStatus
+                pathStatus,
+                discoveredBackups
             });
         }
         if (!localSsdPath) {
