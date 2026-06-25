@@ -113,7 +113,6 @@ const growthContentSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Compound index for efficient queries
-growthContentSchema.index({ dateKey: 1 });
 growthContentSchema.index({ createdAt: -1 });
 
 export default mongoose.model('GrowthContent', growthContentSchema);
