@@ -203,6 +203,59 @@ const css = `
 }
 `
 
+let cachedMyAvatars = null;
+let cachedPublicAvatars = null;
+let preloadingPromise = null;
+
+export function clearAvatarCache() {
+    cachedMyAvatars = null;
+    cachedPublicAvatars = null;
+    preloadingPromise = null;
+}
+
+export async function preloadAvatars() {
+    if (cachedMyAvatars && cachedPublicAvatars) {
+        return { myAvatars: cachedMyAvatars, publicAvatars: cachedPublicAvatars };
+    }
+    if (preloadingPromise) {
+        return preloadingPromise;
+    }
+
+    preloadingPromise = (async () => {
+        try {
+            const d = await api('/avatar-studio/library');
+            const mine = d.myAvatars || [];
+            const pub  = d.publicAvatars || [];
+
+            // Preload up to 50 avatar images to browser cache in parallel
+            const allUrls = [...pub, ...mine].map(a => a.imageUrl).filter(Boolean);
+            if (allUrls.length > 0) {
+                const preloadBatch = allUrls.slice(0, 50);
+                await Promise.all(
+                    preloadBatch.map(url => {
+                        return new Promise((resolve) => {
+                            const img = new Image();
+                            img.src = url;
+                            img.onload = () => resolve(url);
+                            img.onerror = () => resolve(url);
+                        });
+                    })
+                );
+            }
+
+            cachedMyAvatars = mine;
+            cachedPublicAvatars = pub;
+            return { myAvatars: mine, publicAvatars: pub };
+        } catch (e) {
+            console.error('[AvatarPicker Cache] Preload failed:', e);
+            preloadingPromise = null;
+            return { myAvatars: [], publicAvatars: [] };
+        }
+    })();
+
+    return preloadingPromise;
+}
+
 export default function AvatarPicker({ isOpen, onClose, onSelect, activeBrand }) {
     const [filter, setFilter] = useState('all')
     const [gender, setGender] = useState('all')
@@ -230,11 +283,10 @@ export default function AvatarPicker({ isOpen, onClose, onSelect, activeBrand })
 
     // ── Load library from new canonical endpoint ────────────────────────────────
     const loadAvatars = useCallback(async () => {
-        setLoading(true)
-        try {
-            const d = await api('/avatar-studio/library')
-            let mine = d.myAvatars || []
-            let pub  = d.publicAvatars || []
+        // If we have cached avatars, use them immediately to prevent loader flickers
+        if (cachedMyAvatars && cachedPublicAvatars) {
+            let mine = [...cachedMyAvatars];
+            let pub  = [...cachedPublicAvatars];
 
             if (search) {
                 const q = search.toLowerCase()
@@ -243,29 +295,37 @@ export default function AvatarPicker({ isOpen, onClose, onSelect, activeBrand })
             }
             if (gender !== 'all') {
                 mine = mine.filter(a => a.gender === gender)
-                pub  = pub.filter(a  => a.gender === gender)
+                pub  = pub.filter(a  => (a.gender === gender))
             }
             if (filter === 'my') { pub = [] }
 
-            // Preload the first 35 avatar images to ensure they show up instantly
-            const allUrls = [...pub, ...mine].map(a => a.imageUrl).filter(Boolean);
-            if (allUrls.length > 0) {
-                const preloadBatch = allUrls.slice(0, 35);
-                await Promise.all(
-                    preloadBatch.map(url => {
-                        return new Promise((resolve) => {
-                            const img = new Image();
-                            img.src = url;
-                            img.onload = () => resolve(url);
-                            img.onerror = () => resolve(url);
-                        });
-                    })
-                );
+            setMyAvatars(mine)
+            setPublicAvatars(pub)
+            setLoading(false)
+            return;
+        }
+
+        // If not cached, trigger preload (or wait for in-progress preloading)
+        setLoading(true)
+        try {
+            const { myAvatars: mineFetched, publicAvatars: pubFetched } = await preloadAvatars();
+            let mine = [...mineFetched];
+            let pub  = [...pubFetched];
+
+            if (search) {
+                const q = search.toLowerCase()
+                mine = mine.filter(a => (a.name||'').toLowerCase().includes(q))
+                pub  = pub.filter(a  => (a.name||'').toLowerCase().includes(q))
             }
+            if (gender !== 'all') {
+                mine = mine.filter(a => a.gender === gender)
+                pub  = pub.filter(a  => (a.gender === gender))
+            }
+            if (filter === 'my') { pub = [] }
 
             setMyAvatars(mine)
             setPublicAvatars(pub)
-        } catch { /* silent — never crash */ }
+        } catch { /* silent */ }
         setLoading(false)
     }, [filter, gender, search])
 
@@ -290,6 +350,7 @@ export default function AvatarPicker({ isOpen, onClose, onSelect, activeBrand })
             if (activeBrand?._id) form.append('brandId', activeBrand._id)
             const d = await api('/video-studio/ugc-pro/avatars', { method:'POST', body:form, headers:{} })
             // ✅ FIX: Auto-select the uploaded avatar immediately — don't make the user find it in the gallery
+            clearAvatarCache()
             if (d?.avatar) {
                 onSelect({ _id: d.avatar._id, name: d.avatar.name || nameToUse, imageUrl: d.avatar.imageUrl })
                 handleClose()
@@ -350,6 +411,7 @@ export default function AvatarPicker({ isOpen, onClose, onSelect, activeBrand })
                 })
             })
             await Promise.all(promises.filter(Boolean))
+            clearAvatarCache()
             await loadAvatars(); resetCreate()
         } catch(err) { console.error('[AvatarPicker] Save failed:', err.message) }
         setSaveBusy(false)
@@ -375,7 +437,11 @@ export default function AvatarPicker({ isOpen, onClose, onSelect, activeBrand })
     const handleDelete = useCallback(async (id, e) => {
         e.stopPropagation()
         if (!confirm('Delete this avatar?')) return
-        try { await api(`/video-studio/ugc-pro/avatars/${id}`, { method:'DELETE' }); loadAvatars() } catch {}
+        try { 
+            await api(`/video-studio/ugc-pro/avatars/${id}`, { method:'DELETE' }); 
+            clearAvatarCache(); 
+            loadAvatars(); 
+        } catch {}
     }, [loadAvatars])
 
     if (!isOpen) return null

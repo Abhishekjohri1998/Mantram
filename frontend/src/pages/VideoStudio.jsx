@@ -23,6 +23,7 @@ import TemplateGenerationModal from '../components/Templates/TemplateGenerationM
 import TemplateLibrary from './TemplateLibrary'
 import Walkthrough from '../components/Walkthrough'
 import ViralityMiniPanel from '../components/ViralityMiniPanel'
+import { preloadAvatars } from '../components/VideoStudio/AvatarPicker'
 import './VideoStudio.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
@@ -195,6 +196,9 @@ export default function VideoStudio() {
     // History
     const [projects, setProjects] = useState([])
     const [projectsLoaded, setProjectsLoaded] = useState(false)
+    const [capabilitiesLoaded, setCapabilitiesLoaded] = useState(false)
+    const [avatarsPreloaded, setAvatarsPreloaded] = useState(false)
+    const [hasInitialized, setHasInitialized] = useState(false)
     const [showHistory, setShowHistory] = useState(() => sessionStorage.getItem('vs-showHistory') === 'true')
     const [playingVideo, setPlayingVideo] = useState(null)
     const [viralityOpenId, setViralityOpenId] = useState(null) // ID of card with virality panel open
@@ -399,7 +403,10 @@ export default function VideoStudio() {
     useEffect(() => { sessionStorage.setItem('vs-showHistory', showHistory ? 'true' : 'false') }, [showHistory])
 
     useEffect(() => {
-        api('/video-studio/models/capabilities').then(d => setModelCapabilities(d.capabilities || null)).catch(() => { })
+        api('/video-studio/models/capabilities')
+            .then(d => setModelCapabilities(d.capabilities || null))
+            .catch(() => { })
+            .finally(() => setCapabilitiesLoaded(true))
 
         // ── Template Routing ──────────────────────────────────────────────────
         const modeParam = searchParams.get('mode');
@@ -466,6 +473,20 @@ export default function VideoStudio() {
             setSearchParams({}, { replace: true })
         }
     }, [searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    // ── Preload avatars on mount ──
+    useEffect(() => {
+        preloadAvatars()
+            .catch(() => {})
+            .finally(() => setAvatarsPreloaded(true))
+    }, [])
+
+    // ── Track unified initialization ──
+    useEffect(() => {
+        if (projectsLoaded && capabilitiesLoaded && avatarsPreloaded) {
+            setHasInitialized(true)
+        }
+    }, [projectsLoaded, capabilitiesLoaded, avatarsPreloaded])
 
     // ── Avatar Studio handoff: pick up pending avatar URL from sessionStorage ──
     useEffect(() => {
@@ -900,6 +921,18 @@ export default function VideoStudio() {
     // ══════════════════════════════════════════════════════════════════════════
     // RENDER
     // ══════════════════════════════════════════════════════════════════════════
+    if (!hasInitialized) {
+        return (
+            <DashboardLayout title="Video Studio" subtitle="AI-powered video generation & editing">
+                <SEOHead title="Video Studio — Mantram AI" noIndex={true} />
+                <div className="w-full min-h-[60vh] flex flex-col items-center justify-center gap-4 text-[var(--sys-text-muted)]">
+                    <div className="w-12 h-12 border-4 border-t-primary border-r-primary border-b-[var(--sys-surface)] border-l-[var(--sys-surface)] rounded-full animate-spin"></div>
+                    <span className="text-sm font-semibold text-[var(--sys-text-muted)] animate-pulse">Initializing Video Studio... Loading assets & cache</span>
+                </div>
+            </DashboardLayout>
+        )
+    }
+
     return (
         <DashboardLayout title="Video Studio" subtitle="AI-powered video generation & editing">
             <SEOHead title="Video Studio — Mantram AI" noIndex={true} />
