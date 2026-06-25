@@ -227,10 +227,10 @@ export async function preloadAvatars() {
             const mine = d.myAvatars || [];
             const pub  = d.publicAvatars || [];
 
-            // Preload up to 50 avatar images to browser cache in parallel
+            // Preload up to 12 avatar images to browser cache in parallel
             const allUrls = [...pub, ...mine].map(a => a.imageUrl).filter(Boolean);
             if (allUrls.length > 0) {
-                const preloadBatch = allUrls.slice(0, 50);
+                const preloadBatch = allUrls.slice(0, 12);
                 await Promise.all(
                     preloadBatch.map(url => {
                         return new Promise((resolve) => {

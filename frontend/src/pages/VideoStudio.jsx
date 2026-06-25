@@ -23,7 +23,6 @@ import TemplateGenerationModal from '../components/Templates/TemplateGenerationM
 import TemplateLibrary from './TemplateLibrary'
 import Walkthrough from '../components/Walkthrough'
 import ViralityMiniPanel from '../components/ViralityMiniPanel'
-import { preloadAvatars } from '../components/VideoStudio/AvatarPicker'
 import './VideoStudio.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
@@ -112,11 +111,19 @@ const LazyVideoThumbnail = ({ src, poster }) => {
                     )}
                 </>
             ) : (
-                <video ref={videoRef} src={videoUrl}
-                    className="w-full h-full object-cover block"
-                    muted loop playsInline
-                    preload="metadata"
-                />
+                isHovered ? (
+                    <video ref={videoRef} src={videoUrl}
+                        className="w-full h-full object-cover block"
+                        muted loop playsInline
+                        preload="none"
+                    />
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-[var(--sys-surface)] border border-[var(--sys-border)]">
+                        <span className="material-symbols-outlined text-[var(--sys-text-muted)] text-xl">
+                            movie
+                        </span>
+                    </div>
+                )
             )}
         </div>
     )
@@ -197,7 +204,6 @@ export default function VideoStudio() {
     const [projects, setProjects] = useState([])
     const [projectsLoaded, setProjectsLoaded] = useState(false)
     const [capabilitiesLoaded, setCapabilitiesLoaded] = useState(false)
-    const [avatarsPreloaded, setAvatarsPreloaded] = useState(false)
     const [hasInitialized, setHasInitialized] = useState(false)
     const [showHistory, setShowHistory] = useState(() => sessionStorage.getItem('vs-showHistory') === 'true')
     const [playingVideo, setPlayingVideo] = useState(null)
@@ -474,19 +480,22 @@ export default function VideoStudio() {
         }
     }, [searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    // ── Preload avatars on mount ──
+    // ── Preload avatars on mount in background ──
     useEffect(() => {
-        preloadAvatars()
-            .catch(() => {})
-            .finally(() => setAvatarsPreloaded(true))
+        const timer = setTimeout(() => {
+            import('../components/VideoStudio/AvatarPicker')
+                .then(m => m.preloadAvatars())
+                .catch(err => console.warn('[VideoStudio] Dynamic avatar preload failed:', err))
+        }, 1500)
+        return () => clearTimeout(timer)
     }, [])
 
     // ── Track unified initialization ──
     useEffect(() => {
-        if (projectsLoaded && capabilitiesLoaded && avatarsPreloaded) {
+        if (projectsLoaded && capabilitiesLoaded) {
             setHasInitialized(true)
         }
-    }, [projectsLoaded, capabilitiesLoaded, avatarsPreloaded])
+    }, [projectsLoaded, capabilitiesLoaded])
 
     // ── Avatar Studio handoff: pick up pending avatar URL from sessionStorage ──
     useEffect(() => {
