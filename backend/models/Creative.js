@@ -52,5 +52,7 @@ creativeSchema.index({ user: 1, brand: 1, type: 1 });
 // PERF-016: Compound index for sorted listing queries
 creativeSchema.index({ user: 1, brand: 1, createdAt: -1 });
 creativeSchema.index({ user: 1, createdAt: -1 });
+// Compound index for brand-filtered dashboard queries (without user filter)
+creativeSchema.index({ brand: 1, createdAt: -1 }, { background: true });
 
 export default mongoose.model('Creative', creativeSchema);
