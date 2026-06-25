@@ -517,6 +517,9 @@ export async function runQAdsAgent({
             imageUrls,
             { temperature: 0.75, maxTokens: 5000, returnRaw: true, provider: promptProvider }
         );
+        if (!rawOutput || typeof rawOutput !== 'string' || rawOutput.error) {
+            throw new Error(rawOutput?.error || 'Empty or invalid response from LLM');
+        }
     } catch (llmErr) {
         console.error(`[Q-Ads Agent] LLM call failed: ${llmErr.message}`);
         throw new Error(`Q-Ads generation failed: ${llmErr.message}`);
@@ -543,6 +546,9 @@ export async function runQAdsAgent({
                 imageUrls,
                 { temperature: 0.65, maxTokens: 5000, returnRaw: true, provider: promptProvider }
             );
+            if (!rawOutput || typeof rawOutput !== 'string' || rawOutput.error) {
+                throw new Error(rawOutput?.error || 'Empty or invalid response from LLM');
+            }
             variants = parseVariants(rawOutput);
             const retryIssues = validateVariants(variants);
             if (retryIssues.length > 0) {

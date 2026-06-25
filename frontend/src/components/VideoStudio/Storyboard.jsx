@@ -169,6 +169,8 @@ export default function Storyboard({
     const [directorModel, setDirectorModel] = useState('claude');
     const [imageModel, setImageModel] = useState('nanobanana-2');
     const [dialogueLanguage, setDialogueLanguage] = useState('English');
+    const [audioSync, setAudioSync] = useState(true);
+    const [projectAudioBriefUrl, setProjectAudioBriefUrl] = useState('');
 
     useEffect(() => {
         if (initialBrief) setBrief(initialBrief);
@@ -630,6 +632,7 @@ export default function Storyboard({
             fd.append('directorModel', directorModel);
             fd.append('imageModel', imageModel);
             fd.append('dialogueLanguage', dialogueLanguage);
+            fd.append('audioSync', String(audioSync));
             // Brochure/document analysis data — send FULL content, no truncation
             // briefAnalysisResult is persisted in state from handleBriefMediaAnalysis
             if (briefAnalysisResult?.productFeatures) {
@@ -666,6 +669,13 @@ export default function Storyboard({
             if (onProjectIdCreated) {
                 onProjectIdCreated(data.projectId);
             }
+            if (data.plan?.audioSync !== undefined) {
+                setAudioSync(data.plan.audioSync);
+            }
+            if (briefAnalysisResult?.briefAudioUrl) {
+                setProjectAudioBriefUrl(briefAnalysisResult.briefAudioUrl);
+            }
+
             setPlan(data.plan);
             if (data.plan) {
                 setImageUrl(data.plan.imageUrl);
@@ -737,6 +747,8 @@ export default function Storyboard({
                     model,
                     brandId: activeBrand?._id,
                     generateMode, // 'automatic' | 'manual'
+                    audioSync,
+                    voiceoverScript: plan?.voiceoverScript || '',
                 }),
             });
 
@@ -833,6 +845,11 @@ export default function Storyboard({
         if (proj.generation?.duration) setDuration(proj.generation.duration);
         else if (sb.totalDuration) setDuration(sb.totalDuration);
         if (sb.generateMode) setGenerateMode(sb.generateMode);
+        
+        if (sb.audioSync !== undefined) setAudioSync(sb.audioSync);
+        else setAudioSync(true);
+        if (proj.refAudio) setProjectAudioBriefUrl(proj.refAudio);
+        else setProjectAudioBriefUrl('');
         
         // Restore structured plan if present
         if (sb.structuredPlan) {
@@ -1189,6 +1206,28 @@ export default function Storyboard({
                                                         <span className="material-symbols-outlined">check_circle</span>
                                                         Brief extracted
                                                     </span>
+                                                )}
+                                                {briefSourceFile.type === 'audio' && (
+                                                    <div style={{ display: 'flex', gap: 6, marginTop: 8 }} onClick={e => e.stopPropagation()}>
+                                                        <button
+                                                            type="button"
+                                                            className={`scott-style-pill ${audioSync ? 'active' : ''}`}
+                                                            onClick={(e) => { e.stopPropagation(); setAudioSync(true); }}
+                                                            style={{ cursor: 'pointer', padding: '3px 8px', fontSize: 10, height: 22 }}
+                                                        >
+                                                            <span className="material-symbols-outlined" style={{ fontSize: 11 }}>sync</span>
+                                                            Sync Audio
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className={`scott-style-pill ${!audioSync ? 'active' : ''}`}
+                                                            onClick={(e) => { e.stopPropagation(); setAudioSync(false); }}
+                                                            style={{ cursor: 'pointer', padding: '3px 8px', fontSize: 10, height: 22 }}
+                                                        >
+                                                            <span className="material-symbols-outlined" style={{ fontSize: 11 }}>videocam</span>
+                                                            Just Video
+                                                        </button>
+                                                    </div>
                                                 )}
                                             </div>
                                             <button
@@ -1593,6 +1632,65 @@ export default function Storyboard({
                                 </p>
                             </div>
 
+                            {/* Audio sync toggle in review stage if project has audio brief */}
+                            {projectAudioBriefUrl && (
+                                <div className="sb-prompt-group">
+                                    <label className="sb-prompt-label">
+                                        <span className="material-symbols-outlined">music_note</span>
+                                        Audio Sync Mode
+                                    </label>
+                                    <div style={{ display: 'flex', gap: 8 }}>
+                                        <button
+                                            type="button"
+                                            className={`scott-style-pill ${audioSync ? 'active' : ''}`}
+                                            onClick={() => setAudioSync(true)}
+                                            style={{ cursor: 'pointer', padding: '6px 12px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}
+                                        >
+                                            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>sync</span>
+                                            Sync Audio
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`scott-style-pill ${!audioSync ? 'active' : ''}`}
+                                            onClick={() => setAudioSync(false)}
+                                            style={{ cursor: 'pointer', padding: '6px 12px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}
+                                        >
+                                            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>videocam</span>
+                                            Just Video
+                                        </button>
+                                    </div>
+                                    <p style={{ margin: '6px 0 0', fontSize: 11, color: 'rgba(255,255,255,0.35)', lineHeight: 1.4 }}>
+                                        {audioSync 
+                                            ? 'Compiled video will stitch with the uploaded audio brief.' 
+                                            : 'Just Video: Compiled video will be silent / video-only (no audio brief mixed).'}
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Voiceover Script Editor */}
+                            <div className="sb-prompt-group">
+                                <label className="sb-prompt-label">
+                                    <span className="material-symbols-outlined">record_voice_over</span>
+                                    Voiceover Script ({dialogueLanguage})
+                                </label>
+                                <textarea
+                                    className="sb-prompt-textarea"
+                                    rows={4}
+                                    value={plan?.voiceoverScript || ''}
+                                    onChange={e => {
+                                        const val = e.target.value;
+                                        setPlan(prev => ({
+                                            ...prev,
+                                            voiceoverScript: val
+                                        }));
+                                    }}
+                                    placeholder="Enter the voiceover script for the video..."
+                                />
+                                <p style={{ margin: '6px 0 0', fontSize: 11, color: 'rgba(255,255,255,0.35)', lineHeight: 1.4 }}>
+                                    This script will be generated as a voiceover using TTS in the selected dialogue language.
+                                </p>
+                            </div>
+
                              {/* ── 4-Section Structured Storyboard Plan ── */}
                              {structuredPlan && (
                                  <div style={{ marginTop: 4 }}>
@@ -1649,6 +1747,9 @@ export default function Storyboard({
                                                                          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>{start}s–{end}s</span>
                                                                      </div>
                                                                      <p style={{ margin: 0, fontSize: 10, color: 'rgba(255,255,255,0.42)', lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cut.scene}</p>
+                                                                     {cut.voiceover && (
+                                                                         <p style={{ margin: '2px 0 0', fontSize: 10, color: 'rgba(56,189,248,0.75)', lineHeight: 1.4, fontStyle: 'italic' }}>VO: "{cut.voiceover}"</p>
+                                                                     )}
                                                                  </div>
                                                              </div>
                                                          );

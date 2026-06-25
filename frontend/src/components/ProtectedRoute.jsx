@@ -44,8 +44,11 @@ export default function ProtectedRoute({ children, allowedRoles }) {
 
     // 5. Onboarding Enforcement
     // Check if the user has an active brand and if it is fully onboarded (contains DNA/Knowledge)
-    const hasOnboardedBrand = activeBrand && isBrandOnboarded(activeBrand);
+    // Superadmins bypass this check to allow inspection and management
+    const isSuperAdmin = user?.role === 'superadmin' || user?.email === 'user@mantram.ai';
+    const hasOnboardedBrand = isSuperAdmin || (activeBrand && isBrandOnboarded(activeBrand));
     const isWhitelisted = [
+
         '/onboarding',
         '/settings',
         '/credits',

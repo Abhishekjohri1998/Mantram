@@ -519,10 +519,13 @@ router.post('/:id/use', protect, async (req, res) => {
         // Resolve brandId — use provided, or fall back to user's first brand
         let brandId = inputBrandId || null;
         if (!brandId) {
-            const fallbackBrand = await Brand.findOne({ user: req.user._id }, '_id').lean();
+            const isSuperAdmin = req.user.role === 'superadmin' || req.user.email === 'user@mantram.ai';
+            const query = isSuperAdmin ? {} : { user: req.user._id };
+            const fallbackBrand = await Brand.findOne(query, '_id').lean();
             brandId = fallbackBrand?._id?.toString() || null;
             if (brandId) console.log(`[Template] No brandId in request — using fallback brand: ${brandId}`);
         }
+
 
         // 1. Stage 4: Run two-pass product intelligence if product image is present
         //    This classifies the product and extracts detailed specs for accurate generation

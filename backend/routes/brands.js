@@ -57,12 +57,32 @@ async function logAudit(brand, user, action, { section = '', summary = '', chang
 }
 
 // Helper: Check brand ownership or shared access
-async function findBrandWithAccess(brandId, userId) {
+// Bypasses checks for superadmins
+async function findBrandWithAccess(brandId, userIdOrUser) {
+    let isSuperAdmin = false;
+    let userId = userIdOrUser;
+
+    if (userIdOrUser && typeof userIdOrUser === 'object') {
+        isSuperAdmin = userIdOrUser.role === 'superadmin' || userIdOrUser.email === 'user@mantram.ai';
+        userId = userIdOrUser._id;
+    } else if (userIdOrUser) {
+        const User = mongoose.model('User');
+        const user = await User.findById(userIdOrUser).lean();
+        if (user) {
+            isSuperAdmin = user.role === 'superadmin' || user.email === 'user@mantram.ai';
+        }
+    }
+
+    if (isSuperAdmin) {
+        return Brand.findById(brandId);
+    }
+
     return Brand.findOne({
         _id: brandId,
         $or: [{ user: userId }, { sharedWith: userId }],
     });
 }
+
 
 /**
  * Sign all S3 URLs in the brand object (DNA assets, images, templates)
@@ -127,9 +147,12 @@ async function signBrandAssets(brand) {
 // ═══════════════════════════════════════════════════════════════
 router.get('/', protect, async (req, res) => {
     try {
-        const query = {
-            $or: [{ user: req.user._id }, { sharedWith: req.user._id }]
-        };
+        const query = {};
+        const isSuperAdmin = req.user.role === 'superadmin' || req.user.email === 'user@mantram.ai';
+        if (!isSuperAdmin) {
+            query.$or = [{ user: req.user._id }, { sharedWith: req.user._id }];
+        }
+
 
         // Status filtering — exclude archived by default
         const include = req.query.include;
@@ -597,8 +620,9 @@ router.post('/:id/rescan', protect, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 router.delete('/:id', protect, requireBrandOwner, async (req, res) => {
     try {
-        const brand = await Brand.findOne({ _id: req.params.id, user: req.user._id });
+        const brand = req.brand || await findBrandWithAccess(req.params.id, req.user);
         if (!brand) return res.status(404).json({ success: false, error: 'Brand not found or access denied' });
+
 
         const brandName = brand.name;
 
@@ -645,8 +669,8 @@ router.put('/:id/status', protect, requireBrandOwner, async (req, res) => {
         if (!['active', 'archived'].includes(status)) {
             return res.status(400).json({ success: false, error: 'Status must be active or archived' });
         }
-        const brand = await Brand.findOneAndUpdate(
-            { _id: req.params.id, user: req.user._id },
+        const brand = await Brand.findByIdAndUpdate(
+            req.params.id,
             { status },
             { returnDocument: 'after' }
         );
@@ -675,8 +699,9 @@ router.post('/:id/templates', protect, async (req, res) => {
         if (!label || !promptFormula) {
             return res.status(400).json({ success: false, error: 'label and promptFormula are required' });
         }
-        const brand = await Brand.findOne({ _id: req.params.id, user: req.user._id });
+        const brand = await findBrandWithAccess(req.params.id, req.user);
         if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
+
 
         const newTemplate = {
             templateId: templateId || `custom-${Date.now()}`,
@@ -709,7 +734,7 @@ router.get('/:id/templates', protect, async (req, res) => {
 // DELETE /api/brands/:id/templates/:templateId — delete a custom template
 router.delete('/:id/templates/:templateId', protect, async (req, res) => {
     try {
-        const brand = await Brand.findOne({ _id: req.params.id, user: req.user._id });
+        const brand = await findBrandWithAccess(req.params.id, req.user);
         if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
         brand.customTemplates = brand.customTemplates.filter(t => t.templateId !== req.params.templateId);
         await brand.save();
@@ -730,7 +755,7 @@ router.post('/:id/categories', protect, async (req, res) => {
         if (!label) {
             return res.status(400).json({ success: false, error: 'label is required' });
         }
-        const brand = await Brand.findOne({ _id: req.params.id, user: req.user._id });
+        const brand = await findBrandWithAccess(req.params.id, req.user);
         if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
 
         const categoryId = `custom-cat-${Date.now()}`;
@@ -763,7 +788,7 @@ router.get('/:id/categories', protect, async (req, res) => {
 // DELETE /api/brands/:id/categories/:categoryId — delete a custom category
 router.delete('/:id/categories/:categoryId', protect, async (req, res) => {
     try {
-        const brand = await Brand.findOne({ _id: req.params.id, user: req.user._id });
+        const brand = await findBrandWithAccess(req.params.id, req.user);
         if (!brand) return res.status(404).json({ success: false, error: 'Brand not found' });
         brand.customCategories = brand.customCategories.filter(c => c.categoryId !== req.params.categoryId);
         brand.customTemplates = brand.customTemplates.filter(t => t.category !== req.params.categoryId);

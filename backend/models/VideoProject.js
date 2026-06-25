@@ -225,6 +225,9 @@ const videoProjectSchema = new mongoose.Schema({
         // ── Branding control (set at create time, read at animate time) ──
         includeBranding: { type: Boolean, default: true },
 
+        // ── Audio brief synchronization control ──
+        audioSync: { type: Boolean, default: true },
+
         // ── Character Reference Sheet (generated at create time if avatars present) ──
         // Single consolidated image showing all characters in labelled panels.
         // Injected as the stable @imageN face anchor in every video segment.

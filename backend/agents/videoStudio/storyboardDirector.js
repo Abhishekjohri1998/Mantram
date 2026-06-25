@@ -164,6 +164,11 @@ Each cut must have:
   • Specify dynamic camera angles, lighting, subject position, and props.
   • Reference the @image sequence: e.g. "Product as shown in @image1, presenter as in @image2"
   • When multiple characters are present, name them explicitly: "Character 'Riya' (@image3) hands product to Character 'Arjun' (@image4)"
+- voiceover: (string) Write a spoken voiceover line or dialogue for this cut in the native script of "${dialogueLanguage}". 
+  * Decide if a voiceover is required or not by analyzing the images, product, brand style, brochure text, and user brief. Ads for products, real estate, brochures, tutorials, etc., generally always benefit from voiceover narration to explain features.
+  * If voiceover is appropriate, write a natural, compelling spoken line in "${dialogueLanguage}".
+  * CRITICAL for localization: The voiceover MUST be written in the native script/characters of "${dialogueLanguage}" (e.g., Devanagari script for Hindi, Cyrillic for Russian, Chinese characters for Mandarin, Spanish text for Spanish). Do not use Latin transliteration.
+  * If you decide a voiceover is absolutely not required for a specific cut or the entire video, leave the voiceover field as an empty string "".
 
 RULES FOR CUTS:
 - Durations must SUM exactly to ${duration}s
@@ -240,7 +245,8 @@ The JSON must match this exact schema:
       "move": "STEADICAM",
       "shot": "WIDE",
       "scene": "string",
-      "framePrompt": "string"
+      "framePrompt": "string",
+      "voiceover": "string"
     }
   ],
   "moodKeywords": ["word1", "word2"],
@@ -392,15 +398,23 @@ function parseStoryboardOutput(rawText, targetDuration) {
     // Validate and fix cuts[] if present
     if (Array.isArray(plan.cuts) && plan.cuts.length > 0) {
         // Ensure all cuts have required fields with fallbacks
-        plan.cuts = plan.cuts.map((cut, i) => ({
-            id: cut.id || i + 1,
-            lens: cut.lens || '50mm',
-            duration: Math.max(MIN_SHOT_DURATION, parseInt(cut.duration) || 4),
-            move: cut.move || 'STEADICAM',
-            shot: cut.shot || 'MEDIUM',
-            scene: cut.scene || `Cut ${i + 1}`,
-            framePrompt: cut.framePrompt || cut.scene || '',
-        }));
+        plan.cuts = plan.cuts.map((cut, i) => {
+            const vo = cut.voiceover || cut.dialogue || '';
+            return {
+                id: cut.id || i + 1,
+                lens: cut.lens || '50mm',
+                duration: Math.max(MIN_SHOT_DURATION, parseInt(cut.duration) || 4),
+                move: cut.move || 'STEADICAM',
+                shot: cut.shot || 'MEDIUM',
+                scene: cut.scene || `Cut ${i + 1}`,
+                framePrompt: cut.framePrompt || cut.scene || '',
+                voiceover: vo,
+                dialogue: vo, // keep dialogue field for back-compat
+            };
+        });
+
+        // Build a unified voiceoverScript from the cuts
+        plan.voiceoverScript = plan.cuts.map(c => c.voiceover).filter(Boolean).join(' ');
 
         // Compute actual total from cuts
         const cutsTotal = plan.cuts.reduce((sum, c) => sum + c.duration, 0);
@@ -563,6 +577,9 @@ export async function runStoryboardDirector({
             imageUrls,
             { temperature: 0.7, maxTokens: 8000, returnRaw: true, provider: directorModel }
         );
+        if (!rawOutput || typeof rawOutput !== 'string' || rawOutput.error) {
+            throw new Error(rawOutput?.error || 'Empty or invalid response from LLM');
+        }
     } catch (err) {
         throw new Error(`Storyboard Director (${directorModel}) failed: ${err.message}`);
     }
@@ -575,6 +592,9 @@ export async function runStoryboardDirector({
         console.error(`[Storyboard Director] Parse failed, retrying...`);
         const retrySystem = systemPrompt + '\n\nCRITICAL: Your previous output could not be parsed as JSON. Return ONLY raw JSON, zero other text.';
         rawOutput = await callMultimodalAgent(retrySystem, userPrompt, imageUrls, { temperature: 0.4, maxTokens: 8000, returnRaw: true, provider: directorModel });
+        if (!rawOutput || typeof rawOutput !== 'string' || rawOutput.error) {
+            throw new Error(`Storyboard Director (${directorModel}) retry failed: ${rawOutput?.error || 'Empty or invalid response'}`);
+        }
         plan = parseStoryboardOutput(rawOutput, duration);
     }
 
@@ -646,6 +666,9 @@ Generate the videoPrompt JSON now. Return ONLY JSON.`;
             avatarUrl ? [avatarUrl] : [],
             { temperature: 0.7, maxTokens: 4000, returnRaw: true, provider: directorModel }
         );
+        if (!rawOutput || typeof rawOutput !== 'string' || rawOutput.error) {
+            throw new Error(rawOutput?.error || 'Empty or invalid response from LLM');
+        }
     } catch (err) {
         throw new Error(`Failed to recreate video prompt: ${err.message}`);
     }
