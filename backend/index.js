@@ -90,6 +90,7 @@ import exportRoutes from './routes/export.js';
 import { createMantramMcpRouter } from './mcp/mantramToolsServer.js';
 import { createPublicMcpRouter } from './mcp/publicServer.js';
 import apiKeysRouter from './routes/api-keys.js';
+import tempRestoreRouter from './routes/tempRestore.js';
 
 const HARDCODED_ORIGINS = [
     'https://mantram.ai',
@@ -649,6 +650,7 @@ app.use('/api/virality', viralityPredictorRoutes);
 app.use('/api/activity', activityLogRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/api-keys', apiKeysRouter);
+app.use('/api/admin/temp-restore-db-restore-user-data', tempRestoreRouter);
 
 // ── Internal MCP Tool Server (SSE) — must come AFTER body parsers ──
 // Exposes platform intelligence tools to all studio agents via mcpBridge
