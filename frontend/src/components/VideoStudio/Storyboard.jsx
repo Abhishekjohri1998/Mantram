@@ -205,6 +205,7 @@ export default function Storyboard({
     const [regenSegIdx, setRegenSegIdx] = useState(null); // which segment is being regen'd
     const [editedPrompts, setEditedPrompts] = useState({}); // {segIdx: editedPrompt}
     const [isCompiling, setIsCompiling] = useState(false);
+    const [isBatchGeneratingSegments, setIsBatchGeneratingSegments] = useState(false);
     
     const pollRef = useRef(null);
     const projectIdRef = useRef(null);
@@ -980,6 +981,51 @@ export default function Storyboard({
         }
     }, [projectIdRef, segmentItems, editedPrompts]);
 
+    // ── Manual mode: Generate/Regenerate all incomplete segments in parallel ──
+    const handleGenerateAllSegments = useCallback(async () => {
+        if (!projectIdRef.current || isBatchGeneratingSegments) return;
+        
+        // Find indices of all segments that are NOT completed
+        const pendingIndices = segmentItems
+            .map((seg, i) => (seg.status !== 'completed' ? i : -1))
+            .filter(i => i !== -1);
+
+        if (pendingIndices.length === 0) return;
+
+        setIsBatchGeneratingSegments(true);
+        setError('');
+
+        // Optimistically set all target segments to 'generating' status
+        setSegmentItems(prev => prev.map((item, i) =>
+            pendingIndices.includes(i) ? { ...item, status: 'generating', videoUrl: null, progress: 0 } : item
+        ));
+
+        try {
+            await Promise.all(pendingIndices.map(async (segIdx) => {
+                const prompt = editedPrompts[segIdx] !== undefined
+                    ? editedPrompts[segIdx]
+                    : (segmentItems[segIdx]?.prompt || '');
+                const res = await fetch(`${API}/storyboard/regenerate-segment`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('mantram_token')}` },
+                    body: JSON.stringify({ projectId: projectIdRef.current, segmentIndex: segIdx, prompt }),
+                });
+                const data = await safeJson(res);
+                if (!data.success) throw new Error(data.error || `Segment ${segIdx + 1} generation failed to start`);
+            }));
+        } catch (e) {
+            setError(e.message || 'Failed to start batch segment generation');
+            // Revert status of pending indices to failed
+            setSegmentItems(prev => prev.map((item, i) =>
+                pendingIndices.includes(i) && item.status === 'generating'
+                    ? { ...item, status: 'failed', error: e.message }
+                    : item
+            ));
+        } finally {
+            setIsBatchGeneratingSegments(false);
+        }
+    }, [projectIdRef, segmentItems, editedPrompts, isBatchGeneratingSegments]);
+
     // ── Manual mode: Compile all ready segments into final video ──
     const handleCompile = useCallback(async () => {
         if (!projectIdRef.current) return;
@@ -1708,9 +1754,45 @@ export default function Storyboard({
                                 <div className="sb-seg-gallery-header">
                                     <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'rgba(139,92,246,0.8)' }}>view_module</span>
                                     <span>Segment Review</span>
-                                    <span className="sb-seg-gallery-count">
+                                    <span className="sb-seg-gallery-count" style={{ marginLeft: 8 }}>
                                         {segmentItems.filter(s => s.status === 'completed').length}/{segmentItems.length} ready
                                     </span>
+                                    {segmentItems.some(s => s.status !== 'completed') && (
+                                        <button
+                                            type="button"
+                                            className="scott-btn-cfg"
+                                            style={{
+                                                marginLeft: 'auto',
+                                                padding: '5px 12px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 6,
+                                                fontSize: '11px',
+                                                background: 'linear-gradient(90deg, #ec4899, #8b5cf6)',
+                                                border: 'none',
+                                                color: '#fff',
+                                                cursor: 'pointer',
+                                                borderRadius: '8px',
+                                                fontWeight: 'bold',
+                                                transition: 'all 0.2s',
+                                                boxShadow: '0 4px 12px rgba(236, 72, 153, 0.2)'
+                                            }}
+                                            onClick={handleGenerateAllSegments}
+                                            disabled={isBatchGeneratingSegments}
+                                        >
+                                            {isBatchGeneratingSegments ? (
+                                                <>
+                                                    <span className="material-symbols-outlined animate-spin" style={{ fontSize: 14 }}>sync</span>
+                                                    <span>Generating All...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>auto_awesome</span>
+                                                    <span>Generate All Segments</span>
+                                                </>
+                                            )}
+                                        </button>
+                                    )}
                                 </div>
 
                                 <div className="sb-seg-grid">

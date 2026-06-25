@@ -70,7 +70,6 @@ function VariantCard({ variant, selected, onSelect, generating }) {
                 src={variant.url}
                 alt={`Avatar variant ${variant.slot + 1}`}
                 style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 13 }}
-                loading="lazy"
             />
             {/* Slot label */}
             <div style={{

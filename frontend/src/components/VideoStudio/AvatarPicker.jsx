@@ -247,6 +247,22 @@ export default function AvatarPicker({ isOpen, onClose, onSelect, activeBrand })
             }
             if (filter === 'my') { pub = [] }
 
+            // Preload the first 35 avatar images to ensure they show up instantly
+            const allUrls = [...pub, ...mine].map(a => a.imageUrl).filter(Boolean);
+            if (allUrls.length > 0) {
+                const preloadBatch = allUrls.slice(0, 35);
+                await Promise.all(
+                    preloadBatch.map(url => {
+                        return new Promise((resolve) => {
+                            const img = new Image();
+                            img.src = url;
+                            img.onload = () => resolve(url);
+                            img.onerror = () => resolve(url);
+                        });
+                    })
+                );
+            }
+
             setMyAvatars(mine)
             setPublicAvatars(pub)
         } catch { /* silent — never crash */ }
@@ -618,7 +634,7 @@ export default function AvatarPicker({ isOpen, onClose, onSelect, activeBrand })
                             {/* Public (By Mantram) — teal pill */}
                             {!loading && publicAvatars.map(avatar => (
                                 <div key={avatar._id} className="avpk-card" onClick={() => handleSelect(avatar)}>
-                                    <img src={avatar.imageUrl} alt={avatar.name} loading="lazy" />
+                                    <img src={avatar.imageUrl} alt={avatar.name} />
                                     <div className="avpk-badge-platform">By Mantram</div>
                                     <div className="avpk-card-overlay">
                                         <span className="avpk-card-name">{avatar.name||'Avatar'}</span>
@@ -630,7 +646,7 @@ export default function AvatarPicker({ isOpen, onClose, onSelect, activeBrand })
                             {/* User's own avatars */}
                             {!loading && myAvatars.map(avatar => (
                                 <div key={avatar._id} className="avpk-card" onClick={() => handleSelect(avatar)}>
-                                    <img src={avatar.imageUrl} alt={avatar.name} loading="lazy" />
+                                    <img src={avatar.imageUrl} alt={avatar.name} />
                                     <div className="avpk-card-overlay">
                                         <span className="avpk-card-name">{avatar.name||'Avatar'}</span>
                                         <button className="avpk-card-select" onClick={e => { e.stopPropagation(); handleSelect(avatar) }}>Select</button>
