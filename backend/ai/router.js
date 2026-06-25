@@ -304,11 +304,69 @@ class ModelRouter {
     }
 
     async analyzeText(params, preferences = {}) {
-        const provider = this.getTextProvider(preferences);
+        const resolvedPrefs = { provider: params.provider, ...preferences };
+        let provider = this.getTextProvider(resolvedPrefs);
+
+        // If primary is in cooldown, find next best available
+        if (provider.cooldownUntil && Date.now() < provider.cooldownUntil) {
+            console.warn(`⏳ Primary provider ${provider.name} is in cooldown for analyzeText, searching for alternative...`);
+            const fallback = this._getFallback(provider.name, 'text');
+            if (fallback) {
+                provider = fallback;
+            }
+        }
+
+        const triedProviders = new Set([provider.name]);
+        let lastError = null;
+
         try {
             return await provider.analyzeText(params);
         } catch (error) {
-            throw this._categorizeError(error, 'text', provider.name);
+            lastError = error;
+            const isQuotaError = this._testQuotaError(error);
+            const is503Error = this._test503Error(error);
+
+            if (isQuotaError) {
+                provider.cooldownUntil = Date.now() + (5 * 60 * 1000); // 5 min cooldown for quota
+                console.warn(`⏳ Provider ${provider.name} hit quota/credit limits. Cooling down 5m.`);
+            } else if (is503Error) {
+                this._record503(provider.name);
+                if (this._isProviderThrottled(provider.name)) {
+                    provider.cooldownUntil = Date.now() + (2 * 60 * 1000); // 2 min cooldown for 503
+                    console.warn(`⚡ Provider ${provider.name} circuit breaker tripped. Cooling down 2m.`);
+                }
+            }
+
+            console.error(`Provider ${provider.name} analyzeText failed, searching for fallback:`, error.message);
+
+            // Try ALL other available providers in order
+            const remainingProviders = Object.entries(this.providers)
+                .filter(([name, p]) => !triedProviders.has(name) && p.isAvailable() && !(p.cooldownUntil && Date.now() < p.cooldownUntil))
+                .map(([_, p]) => p);
+
+            // Add native Gemini if it's available, not already tried, and not in cooldown
+            if (this.nativeGemini && 
+                this.nativeGemini.isAvailable() && 
+                !triedProviders.has(this.nativeGemini.name) && 
+                !(this.nativeGemini.cooldownUntil && Date.now() < this.nativeGemini.cooldownUntil)) {
+                remainingProviders.push(this.nativeGemini);
+            }
+
+            for (const fallback of remainingProviders) {
+                try {
+                    triedProviders.add(fallback.name);
+                    console.log(`Trying fallback provider for analyzeText: ${fallback.name}`);
+                    const result = await fallback.analyzeText(params);
+                    this._resetErrors(fallback.name);
+                    return result;
+                } catch (fallbackError) {
+                    lastError = fallbackError;
+                    if (this._test503Error(fallbackError)) this._record503(fallback.name);
+                    console.error(`Fallback ${fallback.name} also failed for analyzeText:`, fallbackError.message);
+                }
+            }
+
+            throw this._categorizeError(lastError, 'text');
         }
     }
 
