@@ -234,6 +234,8 @@ userSchema.statics.generateUserId = async function () {
     }
     // Fallback: use timestamp
     return `user-${Date.now().toString(36)}`;
+};
+
 // Indexes for lookup performance on verification and reset routes
 userSchema.index({ verificationToken: 1 }, { sparse: true, background: true });
 userSchema.index({ resetPasswordToken: 1 }, { sparse: true, background: true });
