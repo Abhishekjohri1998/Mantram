@@ -61,6 +61,27 @@ function isBotChallengePage(html) {
 
 let _cfSession = null; // { cookies: string, userAgent: string, solved: boolean }
 
+async function launchChromiumWithSelfHealing(pw, launchOptions) {
+  try {
+    return await pw.chromium.launch(launchOptions);
+  } catch (launchErr) {
+    const errMsg = launchErr.message || '';
+    if (errMsg.includes("Executable doesn't exist") || errMsg.includes("playwright install") || errMsg.includes("download new browsers")) {
+      console.warn('⚠️  Playwright browser executables not found. Running self-healing install: npx playwright install chromium...');
+      try {
+        const { execSync } = await import('child_process');
+        execSync('npx playwright install chromium', { stdio: 'inherit' });
+        console.log('✅ Playwright browser installation finished. Retrying launch...');
+        return await pw.chromium.launch(launchOptions);
+      } catch (installErr) {
+        console.error('❌ Failed to run npx playwright install chromium:', installErr.message);
+        throw launchErr;
+      }
+    }
+    throw launchErr;
+  }
+}
+
 /**
  * Solve Cloudflare challenge for a domain using Playwright.
  * Launches Chromium ONCE, navigates to the site, waits for challenge to pass,
@@ -81,7 +102,7 @@ async function solveCloudflare(url, customUA = null) {
   let browser;
   try {
     console.log(`🛡️  Cloudflare Solver: launching Chromium for ${url}...`);
-    browser = await pw.chromium.launch({
+    browser = await launchChromiumWithSelfHealing(pw, {
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage']
     });
@@ -1646,7 +1667,7 @@ export async function researchDomain(baseUrl, options = {}) {
         if (pw) {
             let browser;
             try {
-                browser = await pw.chromium.launch({
+                browser = await launchChromiumWithSelfHealing(pw, {
                     headless: true,
                     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
                 });
@@ -1998,7 +2019,7 @@ export async function researchDomain(baseUrl, options = {}) {
         if (pw) {
             let h1Browser;
             try {
-                h1Browser = await pw.chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'] });
+                h1Browser = await launchChromiumWithSelfHealing(pw, { headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'] });
                 const h1Context = await h1Browser.newContext({
                     userAgent: _cfSession?.solved ? _cfSession.userAgent : 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
                     viewport: { width: 1280, height: 800 }, ignoreHTTPSErrors: true,

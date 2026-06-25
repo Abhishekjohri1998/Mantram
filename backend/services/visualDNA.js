@@ -68,7 +68,7 @@ Return ONLY the JSON. No markdown, no explanation.`;
             userPrompt,
             temperature: 0.3,
             maxTokens: 800,
-        }, { provider: 'anthropic' });
+        }, { provider: options.provider || undefined });
 
         const raw = result.text || '';
         const jsonMatch = raw.match(/\{[\s\S]*\}/);
