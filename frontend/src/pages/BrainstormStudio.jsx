@@ -1098,6 +1098,7 @@ export default function BrainstormStudio() {
     screenplayGenerated: false, lastIdeas: null, lastScreenplay: null,
   })
   const [phase, setPhase] = useState('explore')
+  const [customizing, setCustomizing] = useState(false)
   const [isListening, setIsListening] = useState(false)
   const [error, setError] = useState(null)
   // Note: reasoningSteps are now stored per-message (msg.reasoningSteps)
@@ -1291,6 +1292,7 @@ export default function BrainstormStudio() {
       }))
       setMessages(msgs)
       setSidebarOpen(false)
+      setCustomizing(false)
     } catch (e) {
       console.warn('Failed to load session:', e.message)
     }
@@ -1325,6 +1327,7 @@ export default function BrainstormStudio() {
 
   // Brand-aware greeting on mount — Fidato references the brand's DNA
   useEffect(() => {
+    setCustomizing(false)
     if (!activeBrand) {
       setMessages([{
         id: 'welcome',
@@ -1409,6 +1412,7 @@ export default function BrainstormStudio() {
   const sendMessage = useCallback(async (text) => {
     const msg = (text || input).trim()
     if (!msg || streaming) return
+    setCustomizing(false)
     setInput('')
     setError(null)
 
@@ -1586,6 +1590,7 @@ export default function BrainstormStudio() {
 
   // ── New session ─────────────────────────────────────────────────────────────
   const resetSession = useCallback(() => {
+    setCustomizing(false)
     setSessionState({ intent: null, collectedAnswers: {}, ideasGenerated: false, screenplayGenerated: false, lastIdeas: null, lastScreenplay: null })
     setPhase('explore')
     setActiveSessionId(null)
@@ -1599,7 +1604,7 @@ export default function BrainstormStudio() {
   }, [brandName])
 
   const phaseInfo = PHASES[phase] || PHASES.explore
-  const isHeroScreen = messages.length === 1 && !streaming && !smResult
+  const isHeroScreen = messages.length === 1 && !streaming && !smResult && !customizing
 
   return (
     <DashboardLayout title="Brainstorm Studio" subtitle="Powered by Fidato AI">
@@ -1648,6 +1653,7 @@ export default function BrainstormStudio() {
                         setSmResult(null)
                         setSmError(null)
                         setSmInputs({})
+                        setCustomizing(false)
                       }}
                     >
                       <span className="material-symbols-outlined bs-mode-item-icon" style={{ color: mode.color }}>{mode.icon}</span>
@@ -1788,9 +1794,11 @@ export default function BrainstormStudio() {
                   ) : (
                     <div className="bs-action-buttons">
                       <button className="bs-btn-customise" onClick={() => {
-                        const inputField = document.querySelector('.bs-input');
-                        if (inputField) inputField.focus();
+                        setCustomizing(true)
                         setInput(`I want to build a ${smActiveMode?.label} strategy, but let's customize it first. `)
+                        setTimeout(() => {
+                          inputRef.current?.focus()
+                        }, 50)
                       }}>
                         <span className="material-symbols-outlined" style={{fontSize:16,verticalAlign:'middle',marginRight:4}}>tune</span>
                         Customise first
