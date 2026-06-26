@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { templates as templatesAPI } from '../services/api';
 import DashboardLayout from '../components/DashboardLayout';
 import TemplateGenerationModal from '../components/Templates/TemplateGenerationModal';
@@ -249,6 +249,20 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
     const [previewModal, setPreviewModal] = useState({ open: false, src: '', type: 'image', name: '' });
     const [displayLimit, setDisplayLimit] = useState(24);
 
+    const filteredTemplates = useMemo(() => {
+        return templates.filter(t => {
+            const matchesSearch = !search ||
+                t.name.toLowerCase().includes(search.toLowerCase()) ||
+                t.tags?.some(tag => tag.toLowerCase().includes(search.toLowerCase())) ||
+                t.categoryId?.name?.toLowerCase().includes(search.toLowerCase());
+            // Sub-tab filtering
+            if (activeSubTab === 'Shorts') return matchesSearch && t.previewType === 'video';
+            if (activeSubTab === 'Creatives') return matchesSearch && (t.studioOrigin === 'creative' || t.studioOrigin === 'image');
+            if (activeSubTab === 'Motion Control') return matchesSearch && t.previewType === 'video';
+            return matchesSearch;
+        });
+    }, [templates, search, activeSubTab]);
+
     // Reset limit on search, tab or filter change
     useEffect(() => {
         setDisplayLimit(24);
@@ -307,18 +321,6 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
             setLoading(false);
         }
     };
-
-    const filteredTemplates = templates.filter(t => {
-        const matchesSearch = !search ||
-            t.name.toLowerCase().includes(search.toLowerCase()) ||
-            t.tags?.some(tag => tag.toLowerCase().includes(search.toLowerCase())) ||
-            t.categoryId?.name?.toLowerCase().includes(search.toLowerCase());
-        // Sub-tab filtering
-        if (activeSubTab === 'Shorts') return matchesSearch && t.previewType === 'video';
-        if (activeSubTab === 'Creatives') return matchesSearch && (t.studioOrigin === 'creative' || t.studioOrigin === 'image');
-        if (activeSubTab === 'Motion Control') return matchesSearch && t.previewType === 'video';
-        return matchesSearch;
-    });
 
     // ── Template click handler (preserved from original) ──
     const handleTemplateClick = (template) => {
