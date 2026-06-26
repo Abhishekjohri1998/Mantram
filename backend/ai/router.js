@@ -142,14 +142,19 @@ class ModelRouter {
             return p;
         }
 
-        // If all preferred providers are throttled/cooldown, fall back to ANY available
-        for (const name of priority) {
-            if (name === 'gemini' && this.nativeGemini?.isAvailable()) {
-                return this.nativeGemini;
-            }
-            if (this.providers[name]?.isAvailable()) return this.providers[name];
+        // If all preferred providers are throttled/cooldown, see if any provider is NOT in cooldown
+        if (this.nativeGemini?.isAvailable() && !(this.nativeGemini.cooldownUntil && Date.now() < this.nativeGemini.cooldownUntil)) {
+            return this.nativeGemini;
         }
-        throw new Error('No text AI provider available. Add an API key to .env');
+        for (const name of priority) {
+            const p = this.providers[name];
+            if (p?.isAvailable() && !(p.cooldownUntil && Date.now() < p.cooldownUntil)) {
+                return p;
+            }
+        }
+
+        // If absolutely everything is in cooldown, throw an error immediately to avoid timeout latency
+        throw new Error('All AI providers are currently exhausted or blocked. Please try again in 5 minutes.');
     }
 
     /**
@@ -204,10 +209,11 @@ class ModelRouter {
             lastError = error;
             const isQuotaError = this._testQuotaError(error);
             const is503Error = this._test503Error(error);
+            const isConnectionError = this._testConnectionError(error);
 
-            if (isQuotaError) {
-                provider.cooldownUntil = Date.now() + (5 * 60 * 1000); // 5 min cooldown for quota
-                console.warn(`⏳ Provider ${provider.name} hit quota/credit limits. Cooling down 5m.`);
+            if (isQuotaError || isConnectionError) {
+                provider.cooldownUntil = Date.now() + (5 * 60 * 1000); // 5 min cooldown for quota/connection errors
+                console.warn(`⏳ Provider ${provider.name} hit quota/connection limits/errors. Cooling down 5m.`);
             } else if (is503Error) {
                 // 503 = server overloaded — shorter cooldown, track in circuit breaker
                 this._record503(provider.name);
@@ -245,8 +251,18 @@ class ModelRouter {
                     return result;
                 } catch (fallbackError) {
                     lastError = fallbackError;
-                    // Track 503s on fallback providers too
-                    if (this._test503Error(fallbackError)) this._record503(fallback.name);
+                    const fbQuota = this._testQuotaError(fallbackError);
+                    const fbConn = this._testConnectionError(fallbackError);
+                    if (fbQuota || fbConn) {
+                        fallback.cooldownUntil = Date.now() + (5 * 60 * 1000);
+                        console.warn(`⏳ Fallback provider ${fallback.name} hit quota/connection limits/errors. Cooling down 5m.`);
+                    } else if (this._test503Error(fallbackError)) {
+                        this._record503(fallback.name);
+                        if (this._isProviderThrottled(fallback.name)) {
+                            fallback.cooldownUntil = Date.now() + (2 * 60 * 1000);
+                            console.warn(`⚡ Fallback provider ${fallback.name} circuit breaker tripped. Cooling down 2m.`);
+                        }
+                    }
                     console.error(`Fallback ${fallback.name} also failed:`, fallbackError.message);
                 }
             }
@@ -325,10 +341,11 @@ class ModelRouter {
             lastError = error;
             const isQuotaError = this._testQuotaError(error);
             const is503Error = this._test503Error(error);
+            const isConnectionError = this._testConnectionError(error);
 
-            if (isQuotaError) {
-                provider.cooldownUntil = Date.now() + (5 * 60 * 1000); // 5 min cooldown for quota
-                console.warn(`⏳ Provider ${provider.name} hit quota/credit limits. Cooling down 5m.`);
+            if (isQuotaError || isConnectionError) {
+                provider.cooldownUntil = Date.now() + (5 * 60 * 1000); // 5 min cooldown for quota/connection errors
+                console.warn(`⏳ Provider ${provider.name} hit quota/connection limits/errors. Cooling down 5m.`);
             } else if (is503Error) {
                 this._record503(provider.name);
                 if (this._isProviderThrottled(provider.name)) {
@@ -361,7 +378,18 @@ class ModelRouter {
                     return result;
                 } catch (fallbackError) {
                     lastError = fallbackError;
-                    if (this._test503Error(fallbackError)) this._record503(fallback.name);
+                    const fbQuota = this._testQuotaError(fallbackError);
+                    const fbConn = this._testConnectionError(fallbackError);
+                    if (fbQuota || fbConn) {
+                        fallback.cooldownUntil = Date.now() + (5 * 60 * 1000);
+                        console.warn(`⏳ Fallback provider ${fallback.name} hit quota/connection limits/errors. Cooling down 5m.`);
+                    } else if (this._test503Error(fallbackError)) {
+                        this._record503(fallback.name);
+                        if (this._isProviderThrottled(fallback.name)) {
+                            fallback.cooldownUntil = Date.now() + (2 * 60 * 1000);
+                            console.warn(`⚡ Fallback provider ${fallback.name} circuit breaker tripped. Cooling down 2m.`);
+                        }
+                    }
                     console.error(`Fallback ${fallback.name} also failed for analyzeText:`, fallbackError.message);
                 }
             }
@@ -378,6 +406,17 @@ class ModelRouter {
                msg.includes('credit') || 
                msg.includes('balance') ||
                msg.includes('billing');
+    }
+
+    _testConnectionError(error) {
+        const msg = error.message?.toLowerCase() || '';
+        return msg.includes('fetch failed') ||
+               msg.includes('timeout') ||
+               msg.includes('connect') ||
+               msg.includes('econnrefused') ||
+               msg.includes('etimedout') ||
+               msg.includes('dns') ||
+               msg.includes('network error');
     }
 
     /**
