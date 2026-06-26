@@ -196,14 +196,15 @@ export async function generateStoryboardPoster(
     console.log(`  raw buffers: product=${rawProductBuffers.length}, avatars=${allRawAvatarBuffers.length}, logo=${!!rawLogoBuffer}, refs=${rawRefBuffers.length}`);
     console.log(`  Prompt (first 120): ${finalPrompt.substring(0, 120)}...`);
 
-    const TIMEOUT_MS = 240000;
+    const PRIMARY_TIMEOUT_MS = 30000;
+    const FALLBACK_TIMEOUT_MS = 60000;
 
     if (useNanoBanana) {
         try {
             const result = await generateWithNanoBanana(
                 finalPrompt, ar,
                 rawProductBuffers, null, productImageUrls, null,
-                TIMEOUT_MS, imageSize, logoUrl, rawLogoBuffer,
+                PRIMARY_TIMEOUT_MS, imageSize, logoUrl, rawLogoBuffer,
                 allRawAvatarBuffers, allAvatarUrls, avatarNames,
                 rawRefBuffers, refImageUrls,
             );
@@ -221,7 +222,7 @@ export async function generateStoryboardPoster(
         result = await generateWithGptImage2(
             finalPrompt, ar,
             rawProductBuffers, null, productImageUrls, null,
-            TIMEOUT_MS, logoUrl, rawLogoBuffer,
+            PRIMARY_TIMEOUT_MS, logoUrl, rawLogoBuffer,
             allRawAvatarBuffers, allAvatarUrls, avatarNames,
             rawRefBuffers, refImageUrls,
         );
@@ -247,7 +248,7 @@ export async function generateStoryboardPoster(
                 result = await generateWithNanoBanana(
                     finalPrompt, ar,
                     rawProductBuffers, null, productImageUrls, null,
-                    TIMEOUT_MS, imageSize, logoUrl, rawLogoBuffer,
+                    FALLBACK_TIMEOUT_MS, imageSize, logoUrl, rawLogoBuffer,
                     allRawAvatarBuffers, allAvatarUrls, avatarNames,
                     rawRefBuffers, refImageUrls,
                 );
