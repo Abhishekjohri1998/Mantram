@@ -10851,7 +10851,16 @@ router.get('/storyboard/status/:projectId', protect, async (req, res) => {
         // SINGLE-SHOT PATH — poll Atlas taskId (original behavior)
         // ══════════════════════════════════════════════════════════════════════
         const taskId = storyboard.taskId;
-        if (!taskId) return res.status(400).json({ success: false, error: 'No animation task found' });
+        if (!taskId) {
+            return res.json({
+                success: true,
+                projectId: project._id,
+                allDone: false,
+                status: 'NOT_STARTED',
+                overallProgress: 0,
+                message: 'No active animation task found. Generate script first.'
+            });
+        }
 
         try {
             const result = await getUnifiedGenerationStatus('atlascloud', taskId, null, null);
