@@ -164,8 +164,37 @@ class ModelRouter {
             }
         }
 
-        // If absolutely everything is in cooldown, throw an error immediately to avoid timeout latency
-        throw new Error('All AI providers are currently exhausted or blocked. Please try again in 5 minutes.');
+        // ── LAST RESORT: All providers are in cooldown ──
+        // Instead of throwing (which blocks the user for 5 minutes), pick the provider 
+        // with the soonest cooldown expiry and force a retry. This allows transient 
+        // issues to self-heal.
+        console.warn('⚠️ All AI providers are in cooldown. Forcing a retry on the soonest-expiring provider...');
+        
+        // Prefer native_gemini (free, direct Google API) — clear its cooldown and retry
+        if (this.nativeGemini?.isAvailable()) {
+            console.log('🔄 Force-clearing native_gemini cooldown for retry attempt');
+            this.nativeGemini.cooldownUntil = 0;
+            return this.nativeGemini;
+        }
+
+        // Find the provider whose cooldown expires soonest
+        let soonest = null;
+        let soonestTime = Infinity;
+        for (const name of priority) {
+            const p = this.providers[name];
+            if (p?.isAvailable() && p.cooldownUntil && p.cooldownUntil < soonestTime) {
+                soonest = p;
+                soonestTime = p.cooldownUntil;
+            }
+        }
+        if (soonest) {
+            console.log(`🔄 Force-clearing ${soonest.name} cooldown for retry attempt`);
+            soonest.cooldownUntil = 0;
+            return soonest;
+        }
+
+        // Absolute last resort — should never reach here unless no providers are configured
+        throw new Error('No AI providers are configured. Please check your API keys in the .env file.');
     }
 
     /**
@@ -226,14 +255,14 @@ class ModelRouter {
             const isConnectionError = this._testConnectionError(error);
 
             if (isQuotaError || isConnectionError || error.message.includes('empty response')) {
-                provider.cooldownUntil = Date.now() + (5 * 60 * 1000); // 5 min cooldown for quota/connection/empty errors
-                console.warn(`⏳ Provider ${provider.name} hit quota/connection limits/errors. Cooling down 5m.`);
+                provider.cooldownUntil = Date.now() + (60 * 1000); // 60s cooldown (was 5m — too long)
+                console.warn(`⏳ Provider ${provider.name} hit quota/connection limits/errors. Cooling down 60s.`);
             } else if (is503Error) {
                 // 503 = server overloaded — shorter cooldown, track in circuit breaker
                 this._record503(provider.name);
                 if (this._isProviderThrottled(provider.name)) {
-                    provider.cooldownUntil = Date.now() + (2 * 60 * 1000); // 2 min cooldown for 503
-                    console.warn(`⚡ Provider ${provider.name} circuit breaker tripped (${this._recentErrors[provider.name].count} 503s). Cooling down 2m.`);
+                    provider.cooldownUntil = Date.now() + (30 * 1000); // 30s cooldown for 503
+                    console.warn(`⚡ Provider ${provider.name} circuit breaker tripped (${this._recentErrors[provider.name].count} 503s). Cooling down 30s.`);
                 }
             }
 
@@ -271,13 +300,13 @@ class ModelRouter {
                     const fbQuota = this._testQuotaError(fallbackError);
                     const fbConn = this._testConnectionError(fallbackError);
                     if (fbQuota || fbConn || fallbackError.message.includes('empty response')) {
-                        fallback.cooldownUntil = Date.now() + (5 * 60 * 1000);
-                        console.warn(`⏳ Fallback provider ${fallback.name} hit quota/connection limits/errors. Cooling down 5m.`);
+                        fallback.cooldownUntil = Date.now() + (60 * 1000);
+                        console.warn(`⏳ Fallback provider ${fallback.name} hit quota/connection limits/errors. Cooling down 60s.`);
                     } else if (this._test503Error(fallbackError)) {
                         this._record503(fallback.name);
                         if (this._isProviderThrottled(fallback.name)) {
-                            fallback.cooldownUntil = Date.now() + (2 * 60 * 1000);
-                            console.warn(`⚡ Fallback provider ${fallback.name} circuit breaker tripped. Cooling down 2m.`);
+                            fallback.cooldownUntil = Date.now() + (30 * 1000);
+                            console.warn(`⚡ Fallback provider ${fallback.name} circuit breaker tripped. Cooling down 30s.`);
                         }
                     }
                     console.error(`Fallback ${fallback.name} also failed:`, fallbackError.message);
