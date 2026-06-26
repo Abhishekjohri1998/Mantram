@@ -473,11 +473,23 @@ class ModelRouter {
             throw new AIProviderBusyError(provider.name, `${provider.name} is in cooldown. Please try again in a few minutes.`);
         }
 
+        let timeoutId;
         try {
-            const result = await provider.generateImage(params);
+            const timeoutPromise = new Promise((_, reject) => {
+                timeoutId = setTimeout(() => {
+                    reject(new Error(`TIMEOUT: Image provider ${provider.name} timed out after 25 seconds.`));
+                }, 25000);
+            });
+
+            const result = await Promise.race([
+                provider.generateImage(params),
+                timeoutPromise
+            ]);
+            clearTimeout(timeoutId);
             this._resetErrors(provider.name);
             return result;
         } catch (error) {
+            clearTimeout(timeoutId);
             const isQuotaError = this._testQuotaError(error);
             const is503Error = this._test503Error(error);
 

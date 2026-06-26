@@ -322,15 +322,30 @@ router.post('/:id/generate-image', async (req, res) => {
                     model: imageModel
                 }, { provider: providerPreference });
             } catch (err) {
-                console.warn(`[Growth Image Gen] ⚠️ Generation failed with model ${imageModel}: ${err.message}. Trying fallback to gemini...`);
                 if (isOpenAIModel) {
-                    result = await aiRouter.generateImage({
-                        prompt: promptText,
-                        aspectRatio,
-                        model: 'gemini-3.1-flash-image-preview'
-                    }, { provider: 'gemini' });
+                    console.warn(`[Growth Image Gen] ⚠️ Generation failed with model ${imageModel}: ${err.message}. Trying fallback to gemini...`);
+                    try {
+                        result = await aiRouter.generateImage({
+                            prompt: promptText,
+                            aspectRatio,
+                            model: 'gemini-3.1-flash-image-preview'
+                        }, { provider: 'gemini' });
+                    } catch (fallbackErr) {
+                        console.error(`[Growth Image Gen] ❌ Fallback to gemini failed: ${fallbackErr.message}`);
+                        throw fallbackErr;
+                    }
                 } else {
-                    throw err;
+                    console.warn(`[Growth Image Gen] ⚠️ Generation failed with model ${imageModel}: ${err.message}. Trying fallback to openai...`);
+                    try {
+                        result = await aiRouter.generateImage({
+                            prompt: promptText,
+                            aspectRatio,
+                            model: 'gpt-image-2'
+                        }, { provider: 'openai' });
+                    } catch (fallbackErr) {
+                        console.error(`[Growth Image Gen] ❌ Fallback to openai failed: ${fallbackErr.message}`);
+                        throw fallbackErr;
+                    }
                 }
             }
 
