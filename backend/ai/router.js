@@ -17,6 +17,8 @@ class ModelRouter {
         // Circuit breaker: track recent 503 errors per provider for preemptive avoidance
         // Structure: { providerName: { count, firstSeen, lastSeen } }
         this._recentErrors = {};
+        // Max time (ms) a single provider API call is allowed before aborting
+        this.PER_CALL_TIMEOUT_MS = 20_000; // 20 seconds
         this._initProviders();
     }
 
@@ -200,7 +202,7 @@ class ModelRouter {
         let lastError = null;
 
         try {
-            const result = await provider.generateText(params);
+            const result = await this._withTimeout(provider.generateText(params), provider.name);
             if (!result || !result.text || !result.text.trim()) {
                 throw new Error(`Model returned an empty response (likely blocked by safety/recitation filters or rate limits).`);
             }
@@ -248,7 +250,7 @@ class ModelRouter {
                     
                     // Strip the model ID so the fallback uses its own default model
                     const { model: _, ...fallbackParams } = params;
-                    const result = await fallback.generateText(fallbackParams);
+                    const result = await this._withTimeout(fallback.generateText(fallbackParams), fallback.name);
                     if (!result || !result.text || !result.text.trim()) {
                         throw new Error(`Model returned an empty response.`);
                     }
@@ -290,7 +292,7 @@ class ModelRouter {
             if (!gemini || typeof gemini.generateTextWithSearch !== 'function' || !gemini.isAvailable()) {
                 throw new Error('Gemini provider is not available or does not support search grounding');
             }
-            const result = await gemini.generateTextWithSearch(params);
+            const result = await this._withTimeout(gemini.generateTextWithSearch(params), 'gemini-search');
             if (!result || !result.text || !result.text.trim()) {
                 throw new Error('Gemini search grounding returned an empty response.');
             }
@@ -345,7 +347,7 @@ class ModelRouter {
         let lastError = null;
 
         try {
-            return await provider.analyzeText(params);
+            return await this._withTimeout(provider.analyzeText(params), provider.name);
         } catch (error) {
             lastError = error;
             const isQuotaError = this._testQuotaError(error);
@@ -382,7 +384,7 @@ class ModelRouter {
                 try {
                     triedProviders.add(fallback.name);
                     console.log(`Trying fallback provider for analyzeText: ${fallback.name}`);
-                    const result = await fallback.analyzeText(params);
+                    const result = await this._withTimeout(fallback.analyzeText(params), fallback.name);
                     this._resetErrors(fallback.name);
                     return result;
                 } catch (fallbackError) {
@@ -405,6 +407,22 @@ class ModelRouter {
 
             throw this._categorizeError(lastError, 'text');
         }
+    }
+
+    /**
+     * Wrap a provider call with a timeout to prevent indefinite hangs.
+     * If the provider doesn't respond within PER_CALL_TIMEOUT_MS, rejects with a timeout error.
+     */
+    _withTimeout(promise, providerName) {
+        return Promise.race([
+            promise,
+            new Promise((_, reject) =>
+                setTimeout(
+                    () => reject(new Error(`TIMEOUT: Provider ${providerName} did not respond within ${this.PER_CALL_TIMEOUT_MS / 1000}s`)),
+                    this.PER_CALL_TIMEOUT_MS
+                )
+            ),
+        ]);
     }
 
     _testQuotaError(error) {

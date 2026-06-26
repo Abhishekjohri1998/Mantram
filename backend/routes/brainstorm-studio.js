@@ -2175,16 +2175,24 @@ Return ONLY this JSON:
       if (action === 'ask_question' && isSimilarQuestion(finalResponse, askedQuestions)) {
         console.warn('[fidato-chat] DEDUP: AI repeated a question, forcing different question');
         emitStep('Avoiding repeated question — finding new angle...', '🔄');
-        const retryResult = await aiCall(
-          systemPrompt + `\n\n‼️ CRITICAL: Your previous response was rejected because it repeated a question. You MUST ask about a COMPLETELY DIFFERENT TOPIC. Remember: answerChips must be SHORT ANSWERS (2-5 words) not questions.`,
-          `Your last question was rejected as a duplicate. Ask about a DIFFERENT strategic topic. Message: "${message}"`,
-          { temperature: 0.6, maxTokens: 800, ...fastOpts }
-        );
-        const retryParsed = parseJSON(retryResult);
-        if (retryParsed?.fidatoResponse && !isSimilarQuestion(retryParsed.fidatoResponse, askedQuestions)) {
-          finalResponse = retryParsed.fidatoResponse;
-          const retryChips = retryParsed.answerChips || retryParsed.questionOptions || null;
-          finalOptions = retryChips || finalOptions;
+        try {
+          const retryResult = await Promise.race([
+            aiCall(
+              systemPrompt + `\n\n‼️ CRITICAL: Your previous response was rejected because it repeated a question. You MUST ask about a COMPLETELY DIFFERENT TOPIC. Remember: answerChips must be SHORT ANSWERS (2-5 words) not questions.`,
+              `Your last question was rejected as a duplicate. Ask about a DIFFERENT strategic topic. Message: "${message}"`,
+              { temperature: 0.6, maxTokens: 800, ...fastOpts }
+            ),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Dedup retry timeout')), 10000)),
+          ]);
+          const retryParsed = parseJSON(retryResult);
+          if (retryParsed?.fidatoResponse && !isSimilarQuestion(retryParsed.fidatoResponse, askedQuestions)) {
+            finalResponse = retryParsed.fidatoResponse;
+            const retryChips = retryParsed.answerChips || retryParsed.questionOptions || null;
+            finalOptions = retryChips || finalOptions;
+          }
+        } catch (retryErr) {
+          console.warn('[fidato-chat] DEDUP retry failed/timed out, using original response:', retryErr.message);
+          // Fall through — use the original (possibly repeated) response rather than hanging
         }
       }
 
