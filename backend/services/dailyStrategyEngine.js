@@ -36,6 +36,10 @@ export async function runDailyStrategyEngine(targetStrategyId = null, pushStepFn
 
     for (const strategy of activeStrategies) {
         try {
+            if (!strategy.brand) {
+                console.warn(`[DailyStrategyEngine] Strategy ${strategy._id} has no valid brand (is null or deleted). Skipping.`);
+                continue;
+            }
             console.log(`[DailyStrategyEngine] Processing brand: ${strategy.brand.name}`);
             if (pushStepFn) await pushStepFn(`Analyzing live trends for ${strategy.brand.name}...`);
             
