@@ -198,6 +198,43 @@ class ModelRouter {
     }
 
     /**
+     * Get options for the fastest/most available model
+     */
+    getFastModelOptions() {
+        // Check Laozhang Gemini first — if it's available AND not in cooldown
+        const lzGemini = this.providers.gemini;
+        if (lzGemini?.isAvailable() && !(lzGemini.cooldownUntil && Date.now() < lzGemini.cooldownUntil)) {
+            return { provider: 'gemini', model: 'gemini-2.5-flash' };
+        }
+        // Native Gemini (direct Google API) — most reliable fallback
+        if (this.nativeGemini?.isAvailable() && !(this.nativeGemini.cooldownUntil && Date.now() < this.nativeGemini.cooldownUntil)) {
+            return { provider: 'native_gemini', model: 'gemini-2.5-flash' };
+        }
+        // OpenAI
+        const openai = this.providers.openai;
+        if (openai?.isAvailable() && !(openai.cooldownUntil && Date.now() < openai.cooldownUntil)) {
+            return { provider: 'openai', model: 'gpt-4o-mini' };
+        }
+        // Anthropic
+        const anthropic = this.providers.anthropic;
+        if (anthropic?.isAvailable() && !(anthropic.cooldownUntil && Date.now() < anthropic.cooldownUntil)) {
+            return { provider: 'anthropic' };
+        }
+        // xAI
+        const xai = this.providers.xai;
+        if (xai?.isAvailable() && !(xai.cooldownUntil && Date.now() < xai.cooldownUntil)) {
+            return { provider: 'xai' };
+        }
+        // DeepSeek via Laozhang — cheap fallback
+        const deepseek = this.providers.deepseek;
+        if (deepseek?.isAvailable() && !(deepseek.cooldownUntil && Date.now() < deepseek.cooldownUntil)) {
+            return { provider: 'deepseek', model: 'deepseek-chat' };
+        }
+        // Fallback
+        return { provider: 'native_gemini', model: 'gemini-2.5-flash' };
+    }
+
+    /**
      * Get the image provider.
      * Priority: explicit preference → config default → openai (gpt-image-2) → gemini
      * Both OpenAI and Gemini support image generation.

@@ -70,14 +70,23 @@ export async function callAgent(systemPrompt, userPrompt, temperature = 0.7, max
         timeoutHandle = setTimeout(() => reject(new Error(`callAgent timeout after ${AGENT_TIMEOUT_MS}ms`)), AGENT_TIMEOUT_MS);
     });
 
-    // ⚡ preferFast: route to Gemini instead of default provider (Claude) for speed-sensitive tasks.
-    // Gemini 2.5 Flash: ~3-8s per call vs Claude 3.5 Sonnet: ~15-25s per call.
-    // Use in agentic pipeline nodes where volume > quality, keeping Claude for premium tasks.
+    // ⚡ preferFast: route to the fastest available provider/model based on cooldown status.
+    let fastOpts = null;
+    if (options.preferFast) {
+        try {
+            fastOpts = router.getFastModelOptions();
+        } catch (e) {
+            console.error('Error getting fast model options in callAgent:', e.message);
+        }
+    }
+
     const routingPrefs = options.provider
         ? { provider: options.provider }
-        : options.preferFast
-            ? { provider: 'gemini' }
+        : fastOpts
+            ? { provider: fastOpts.provider }
             : undefined;
+
+    const modelOverride = options.model || (fastOpts ? fastOpts.model : undefined);
 
     let result;
     try {
@@ -87,6 +96,7 @@ export async function callAgent(systemPrompt, userPrompt, temperature = 0.7, max
                 userPrompt: safeUser,
                 temperature,
                 maxTokens,
+                model: modelOverride,
                 jsonMode: options.jsonMode || false,
             }, routingPrefs),
             timeoutPromise,
