@@ -967,18 +967,18 @@ export const credits = {
 
 // ============ Brainstorm Studio API ============
 export const brainstormStudio = {
-    start: (data) => apiFetch('/brainstorm-studio/start', { method: 'POST', body: JSON.stringify(data) }),
-    confirm: (data) => apiFetch('/brainstorm-studio/confirm', { method: 'POST', body: JSON.stringify(data) }),
-    generate: (data) => apiFetch('/brainstorm-studio/generate', { method: 'POST', body: JSON.stringify(data) }),
-    refine: (data) => apiFetch('/brainstorm-studio/refine', { method: 'POST', body: JSON.stringify(data) }),
-    feedback: (data) => apiFetch('/brainstorm-studio/feedback', { method: 'POST', body: JSON.stringify(data) }),
-    screenplay: (data) => apiFetch('/brainstorm-studio/screenplay', { method: 'POST', body: JSON.stringify(data) }),
-    chat: (data) => apiFetch('/brainstorm-studio/chat', { method: 'POST', body: JSON.stringify(data) }),
+    start: (data) => apiFetch('/brainstorm-studio/start', { method: 'POST', body: JSON.stringify(data), timeout: 300000 }),
+    confirm: (data) => apiFetch('/brainstorm-studio/confirm', { method: 'POST', body: JSON.stringify(data), timeout: 300000 }),
+    generate: (data) => apiFetch('/brainstorm-studio/generate', { method: 'POST', body: JSON.stringify(data), timeout: 300000 }),
+    refine: (data) => apiFetch('/brainstorm-studio/refine', { method: 'POST', body: JSON.stringify(data), timeout: 300000 }),
+    feedback: (data) => apiFetch('/brainstorm-studio/feedback', { method: 'POST', body: JSON.stringify(data), timeout: 300000 }),
+    screenplay: (data) => apiFetch('/brainstorm-studio/screenplay', { method: 'POST', body: JSON.stringify(data), timeout: 300000 }),
+    chat: (data) => apiFetch('/brainstorm-studio/chat', { method: 'POST', body: JSON.stringify(data), timeout: 300000 }),
     // Brand Strategy
-    strategy: (data) => apiFetch('/brainstorm-studio/strategy', { method: 'POST', body: JSON.stringify(data) }),
-    strategySlides: (data) => apiFetch('/brainstorm-studio/strategy-slides', { method: 'POST', body: JSON.stringify(data) }),
+    strategy: (data) => apiFetch('/brainstorm-studio/strategy', { method: 'POST', body: JSON.stringify(data), timeout: 300000 }),
+    strategySlides: (data) => apiFetch('/brainstorm-studio/strategy-slides', { method: 'POST', body: JSON.stringify(data), timeout: 300000 }),
     // ── NEW: 8-Mode Research-Backed Strategy Generator ──
-    strategyMode: (data) => apiFetch('/brainstorm-studio/strategy-mode', { method: 'POST', body: JSON.stringify(data) }),
+    strategyMode: (data) => apiFetch('/brainstorm-studio/strategy-mode', { method: 'POST', body: JSON.stringify(data), timeout: 300000 }),
     // Phase 4: SSE streaming version — returns raw fetch Response for caller to stream
     strategyModeStream: (data) => {
         const token = typeof window !== 'undefined' ? (localStorage.getItem('mantram_token') || sessionStorage.getItem('mantram_token')) : null;
@@ -986,7 +986,7 @@ export const brainstormStudio = {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
             body: JSON.stringify(data),
-            signal: AbortSignal.timeout(180000),
+            signal: AbortSignal.timeout(300000),
         });
     },
     listStrategies: () => apiFetch('/brainstorm-studio/strategies'),
