@@ -201,6 +201,9 @@ class ModelRouter {
 
         try {
             const result = await provider.generateText(params);
+            if (!result || !result.text || !result.text.trim()) {
+                throw new Error(`Model returned an empty response (likely blocked by safety/recitation filters or rate limits).`);
+            }
             this._logUsage('text', provider.name, result.tokensUsed);
             // Success — reset circuit breaker for this provider
             this._resetErrors(provider.name);
@@ -211,8 +214,8 @@ class ModelRouter {
             const is503Error = this._test503Error(error);
             const isConnectionError = this._testConnectionError(error);
 
-            if (isQuotaError || isConnectionError) {
-                provider.cooldownUntil = Date.now() + (5 * 60 * 1000); // 5 min cooldown for quota/connection errors
+            if (isQuotaError || isConnectionError || error.message.includes('empty response')) {
+                provider.cooldownUntil = Date.now() + (5 * 60 * 1000); // 5 min cooldown for quota/connection/empty errors
                 console.warn(`⏳ Provider ${provider.name} hit quota/connection limits/errors. Cooling down 5m.`);
             } else if (is503Error) {
                 // 503 = server overloaded — shorter cooldown, track in circuit breaker
@@ -246,6 +249,9 @@ class ModelRouter {
                     // Strip the model ID so the fallback uses its own default model
                     const { model: _, ...fallbackParams } = params;
                     const result = await fallback.generateText(fallbackParams);
+                    if (!result || !result.text || !result.text.trim()) {
+                        throw new Error(`Model returned an empty response.`);
+                    }
                     
                     this._logUsage('text', fallback.name, result.tokensUsed);
                     return result;
@@ -253,7 +259,7 @@ class ModelRouter {
                     lastError = fallbackError;
                     const fbQuota = this._testQuotaError(fallbackError);
                     const fbConn = this._testConnectionError(fallbackError);
-                    if (fbQuota || fbConn) {
+                    if (fbQuota || fbConn || fallbackError.message.includes('empty response')) {
                         fallback.cooldownUntil = Date.now() + (5 * 60 * 1000);
                         console.warn(`⏳ Fallback provider ${fallback.name} hit quota/connection limits/errors. Cooling down 5m.`);
                     } else if (this._test503Error(fallbackError)) {
@@ -285,6 +291,9 @@ class ModelRouter {
                 throw new Error('Gemini provider is not available or does not support search grounding');
             }
             const result = await gemini.generateTextWithSearch(params);
+            if (!result || !result.text || !result.text.trim()) {
+                throw new Error('Gemini search grounding returned an empty response.');
+            }
             this._logUsage('search', 'gemini', result.tokensUsed);
             return result;
         } catch (error) {
