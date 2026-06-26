@@ -232,4 +232,7 @@ templateSchema.index({ studioSection: 1, isPublished: 1, isActive: 1 });
 // ── Compound index for brand-scoped user-created template queries ─────────────
 templateSchema.index({ brandId: 1, userCreated: 1, isActive: 1, createdAt: -1 });
 
+// ── Compound index for browse query coverage (Step 11 optimization) ───────────
+templateSchema.index({ isActive: 1, isPublished: 1, isFeatured: -1, usageCount: -1, createdAt: -1 }, { background: true });
+
 export default mongoose.model('Template', templateSchema);

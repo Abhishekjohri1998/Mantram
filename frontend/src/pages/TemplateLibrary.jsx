@@ -119,7 +119,7 @@ const EXPLORE_CSS = `
 @media (max-width: 480px) { .explore-grid { columns: 1; } }
 
 /* Card */
-.explore-card { display: flex; flex-direction: column; cursor: pointer; border: none; background: none; padding: 0; text-align: left; position: relative; break-inside: avoid; margin-bottom: 14px; }
+.explore-card { display: flex; flex-direction: column; cursor: pointer; border: none; background: none; padding: 0; text-align: left; position: relative; break-inside: avoid; margin-bottom: 14px; backface-visibility: hidden; transform: translate3d(0, 0, 0); will-change: transform; }
 .explore-card-thumb { width: 100%; border-radius: 12px; overflow: hidden; position: relative; background: var(--sys-surface); border: 1px solid var(--sys-border); }
 .explore-card-thumb img, .explore-card-thumb video { width: 100%; height: auto; object-fit: cover; display: block; transition: transform 0.4s ease, filter 0.3s ease; }
 .explore-card:hover .explore-card-thumb img, .explore-card:hover .explore-card-thumb video { transform: scale(1.05); filter: brightness(1.1); }
@@ -140,6 +140,15 @@ const EXPLORE_CSS = `
 
 /* Card Hover Overlay */
 .card-hover-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(3px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; opacity: 0; transition: opacity 0.3s ease; z-index: 10; pointer-events: none; }
+
+/* Media loading & hover play animations */
+.template-img { opacity: 0; transition: opacity 0.35s ease-in-out; }
+.template-img.loaded { opacity: 1; }
+.fade-in-media { animation: fadeInMedia 0.25s ease-out forwards; }
+@keyframes fadeInMedia {
+    from { opacity: 0; transform: scale(0.98); }
+    to { opacity: 1; transform: scale(1); }
+}
 .explore-card:hover .card-hover-overlay { opacity: 1; pointer-events: auto; }
 .hover-btn-use { background: var(--sys-primary); color: #fff; padding: 9px 20px; border-radius: 8px; font-size: 13px; font-weight: 700; border: none; cursor: pointer; transform: translateY(10px); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
 .explore-card:hover .hover-btn-use { transform: translateY(0); }
@@ -238,6 +247,36 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
     const [activeTab, setActiveTab] = useState('Recommended');
     const [activeSubTab, setActiveSubTab] = useState('For You');
     const [previewModal, setPreviewModal] = useState({ open: false, src: '', type: 'image', name: '' });
+    const [displayLimit, setDisplayLimit] = useState(24);
+
+    // Reset limit on search, tab or filter change
+    useEffect(() => {
+        setDisplayLimit(24);
+    }, [search, activeTab, activeSubTab, studioOrigin]);
+
+    // Infinite scroll listener for standard page scroll
+    useEffect(() => {
+        if (overlayMode) return;
+        const handleScroll = () => {
+            const threshold = 400;
+            const currentScroll = window.innerHeight + window.scrollY;
+            const docHeight = document.documentElement.scrollHeight;
+            if (docHeight - currentScroll < threshold) {
+                setDisplayLimit(prev => Math.min(prev + 24, filteredTemplates.length));
+            }
+        };
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, [filteredTemplates.length, overlayMode]);
+
+    // Container scroll listener for overlay mode
+    const handleOverlayScroll = (e) => {
+        const target = e.target;
+        const threshold = 300;
+        if (target.scrollHeight - target.scrollTop - target.clientHeight < threshold) {
+            setDisplayLimit(prev => Math.min(prev + 24, filteredTemplates.length));
+        }
+    };
 
     // Carousel state
     const [leftIdx, setLeftIdx] = useState(0);
@@ -354,7 +393,7 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
                 </div>
             )}
 
-            <div className={overlayMode ? 'p-5 overflow-y-auto flex-1' : ''}>
+            <div className={overlayMode ? 'p-5 overflow-y-auto flex-1' : ''} onScroll={overlayMode ? handleOverlayScroll : undefined}>
                 {/* ═══ Full-Width Top Banner ═══ */}
                 {!overlayMode && (
                     <div className="top-banner" style={{ background: TOP_BANNER.gradient }}>
@@ -475,65 +514,17 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
                     </div>
                 ) : (
                     <div className="explore-grid">
-                        {filteredTemplates.map((template, idx) => {
-                            const isVideo = template.previewType === 'video';
-                            const isFeatured = template.isMantramExclusive || idx < 3;
-                            const likes = template.usageCount || Math.floor(Math.random() * 900) + 10;
-                            const username = pickUser(idx);
-                            const avatarColor = pickColor(idx);
-                            const titleText = (template.name || '').toUpperCase().replace(/\s+/g, ' • ');
-
-                            return (
-                                <div key={template._id} className="explore-card" onClick={() => handleTemplateClick(template)} onMouseLeave={() => setMobileTappedTemplateId(null)} role="button" tabIndex={0}>
-                                    <div className="explore-card-thumb">
-                                        {isVideo && (template.previewVideoUrl || template.previewUrl) ? (
-                                            <video src={template.previewVideoUrl || template.previewUrl} muted autoPlay loop playsInline />
-                                        ) : (template.previewUrl || template.previewImageUrl) ? (
-                                            <img src={template.previewUrl || template.previewImageUrl} alt={template.name}
-                                                onError={e => { e.target.style.display = 'none'; e.target.parentElement.classList.add('ex-shimmer'); }} />
-                                        ) : (
-                                            <div className="ex-shimmer" style={{ width: '100%', height: '100%' }} />
-                                        )}
-
-                                        <div className="card-hover-overlay">
-                                            <button className="hover-btn-use" onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleTemplateClick(template);
-                                            }}>
-                                                Use this template
-                                            </button>
-
-                                            <button className="hover-btn-preview" onClick={(e) => {
-                                                e.stopPropagation();
-                                                setPreviewModal({
-                                                    open: true,
-                                                    src: isVideo ? (template.previewVideoUrl || template.previewUrl) : (template.previewUrl || template.previewImageUrl),
-                                                    type: isVideo ? 'video' : 'image',
-                                                    name: template.name
-                                                });
-                                            }}>
-                                                <span className="material-symbols-outlined">zoom_in</span>
-                                            </button>
-                                        </div>
-
-                                        {isFeatured && <div className="card-badge-featured">Featured</div>}
-                                        {isVideo && <div className="card-badge-duration">{randDuration(idx)}</div>}
-
-                                        <div className="card-title-overlay">
-                                            <div className="card-title-text">{titleText}</div>
-                                        </div>
-                                    </div>
-
-                                    <div className="card-footer">
-                                        <div className="card-avatar" style={{ background: avatarColor }}>
-                                            <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{username.charAt(0)}</span>
-                                        </div>
-                                        <span className="card-username">{username}</span>
-                                        <span className="card-likes">♥ {fmtLikes(likes)}</span>
-                                    </div>
-                                </div>
-                            );
-                        })}
+                        {filteredTemplates.slice(0, displayLimit).map((template, idx) => (
+                            <TemplateCard
+                                key={template._id}
+                                template={template}
+                                idx={idx}
+                                onUse={handleTemplateClick}
+                                onPreview={setPreviewModal}
+                                isMobileTapped={mobileTappedTemplateId === template._id}
+                                onMobileTap={setMobileTappedTemplateId}
+                            />
+                        ))}
                     </div>
                 )}
             </div>
@@ -567,5 +558,120 @@ export default function TemplateLibrary({ overlayMode = false, onCloseOverlay, s
         <DashboardLayout title="EXPLORE" subtitle="">
             {content}
         </DashboardLayout>
+    );
+}
+
+function TemplateCard({ template, idx, onUse, onPreview, isMobileTapped, onMobileTap }) {
+    const isVideo = template.previewType === 'video';
+    const isFeatured = template.isMantramExclusive || idx < 3;
+    const likes = template.usageCount || Math.floor(Math.random() * 900) + 10;
+    const username = pickUser(idx);
+    const avatarColor = pickColor(idx);
+    const titleText = (template.name || '').toUpperCase().replace(/\s+/g, ' • ');
+
+    const [isHovered, setIsHovered] = useState(false);
+    const [isImageLoaded, setIsImageLoaded] = useState(false);
+    const hoverTimerRef = useRef(null);
+
+    const handleMouseEnter = () => {
+        if (window.innerWidth < 768) return;
+        hoverTimerRef.current = setTimeout(() => {
+            setIsHovered(true);
+        }, 150);
+    };
+
+    const handleMouseLeave = () => {
+        if (hoverTimerRef.current) {
+            clearTimeout(hoverTimerRef.current);
+            hoverTimerRef.current = null;
+        }
+        setIsHovered(false);
+    };
+
+    useEffect(() => {
+        return () => {
+            if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+        };
+    }, []);
+
+    const previewUrl = template.previewUrl || template.previewImageUrl;
+    const videoUrl = template.previewVideoUrl || template.previewUrl;
+
+    return (
+        <div 
+            className="explore-card" 
+            onClick={() => onUse(template)} 
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            onMouseLeaveCapture={() => onMobileTap(null)}
+            role="button" 
+            tabIndex={0}
+        >
+            <div className="explore-card-thumb">
+                {isVideo && videoUrl && isHovered ? (
+                    <video 
+                        src={videoUrl} 
+                        muted 
+                        autoPlay 
+                        loop 
+                        playsInline 
+                        className="fade-in-media"
+                    />
+                ) : previewUrl ? (
+                    <>
+                        {!isImageLoaded && <div className="ex-shimmer" style={{ position: 'absolute', inset: 0, borderRadius: 12 }} />}
+                        <img 
+                            src={previewUrl} 
+                            alt={template.name}
+                            loading="lazy"
+                            className={`template-img ${isImageLoaded ? 'loaded' : ''}`}
+                            onLoad={() => setIsImageLoaded(true)}
+                            onError={e => { 
+                                e.target.style.display = 'none'; 
+                                e.target.parentElement.classList.add('ex-shimmer'); 
+                            }} 
+                        />
+                    </>
+                ) : (
+                    <div className="ex-shimmer" style={{ width: '100%', height: '100%', aspectRatio: '3/4' }} />
+                )}
+
+                <div className="card-hover-overlay">
+                    <button className="hover-btn-use" onClick={(e) => {
+                        e.stopPropagation();
+                        onUse(template);
+                    }}>
+                        Use this template
+                    </button>
+
+                    <button className="hover-btn-preview" onClick={(e) => {
+                        e.stopPropagation();
+                        onPreview({
+                            open: true,
+                            src: isVideo ? videoUrl : previewUrl,
+                            type: isVideo ? 'video' : 'image',
+                            name: template.name
+                        });
+                    }}>
+                        <span className="material-symbols-outlined">zoom_in</span>
+                    </button>
+                </div>
+
+                {isFeatured && <div className="card-badge-featured">Featured</div>}
+                {isVideo && <div className="card-badge-duration">{randDuration(idx)}</div>}
+
+                <div className="card-title-overlay">
+                    <div className="card-title-text">{titleText}</div>
+                </div>
+            </div>
+
+            <div className="card-footer">
+                <div className="card-avatar" style={{ background: avatarColor }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{username.charAt(0)}</span>
+                </div>
+                <span className="card-username">{username}</span>
+                <span className="card-likes">♥ {fmtLikes(likes)}</span>
+            </div>
+        </div>
     );
 }
