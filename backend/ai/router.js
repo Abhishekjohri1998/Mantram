@@ -414,7 +414,11 @@ class ModelRouter {
                msg.includes('429') || 
                msg.includes('credit') || 
                msg.includes('balance') ||
-               msg.includes('billing');
+               msg.includes('billing') ||
+               msg.includes('403') ||
+               msg.includes('forbidden') ||
+               msg.includes('401') ||
+               msg.includes('unauthorized');
     }
 
     _testConnectionError(error) {
@@ -492,7 +496,11 @@ class ModelRouter {
                         msg.includes('credit') || 
                         msg.includes('balance') ||
                         msg.includes('billing') ||
-                        msg.includes('402');
+                        msg.includes('402') ||
+                        msg.includes('403') ||
+                        msg.includes('forbidden') ||
+                        msg.includes('401') ||
+                        msg.includes('unauthorized');
 
         const isModelError = msg.includes('404') ||
                              msg.includes('no longer available') ||

@@ -2087,34 +2087,46 @@ Return ONLY this JSON:
 
     const fastOpts = getFastModelOptions();
     let result;
-    if (useWebSearch) {
-      try {
-        const aiRouter = getRouter();
-        const searchResult = await aiRouter.generateTextWithSearch({
-          systemPrompt,
-          userPrompt: `Analyze conversation and decide next action. Use web search to find relevant market data, competitor insights, or industry trends if applicable. Latest message: "${message}"`,
-          temperature: 0.3,
-          maxTokens: 1200,
-          model: 'gemini-2.5-flash',
-        });
-        result = searchResult.text;
-        if (searchResult.citations?.length > 0) {
-          emitStep(`Found ${searchResult.citations.length} web sources`, '📎');
-          if (sseEmit) sseEmit({ type: 'citations', citations: searchResult.citations });
+
+    // ── Overall timeout: if AI providers are all failing, don't make user wait ──
+    const MCOT_TIMEOUT_MS = 15000; // 15 seconds max for MCoT reasoning
+    const aiCallPromise = (async () => {
+      if (useWebSearch) {
+        try {
+          const aiRouter = getRouter();
+          const searchResult = await aiRouter.generateTextWithSearch({
+            systemPrompt,
+            userPrompt: `Analyze conversation and decide next action. Use web search to find relevant market data, competitor insights, or industry trends if applicable. Latest message: "${message}"`,
+            temperature: 0.3,
+            maxTokens: 1200,
+            model: 'gemini-2.5-flash',
+          });
+          const text = searchResult.text;
+          if (searchResult.citations?.length > 0) {
+            emitStep(`Found ${searchResult.citations.length} web sources`, '📎');
+            if (sseEmit) sseEmit({ type: 'citations', citations: searchResult.citations });
+          }
+          return text;
+        } catch (searchErr) {
+          console.warn('[fidato-chat] Web search failed, falling back:', searchErr.message);
+          return await aiCall(systemPrompt, `Analyze conversation and decide next action. Latest message: "${message}"`, {
+            temperature: 0.3, maxTokens: 1000,
+            ...fastOpts,
+          });
         }
-      } catch (searchErr) {
-        console.warn('[fidato-chat] Web search failed, falling back:', searchErr.message);
-        result = await aiCall(systemPrompt, `Analyze conversation and decide next action. Latest message: "${message}"`, {
+      } else {
+        return await aiCall(systemPrompt, `Analyze conversation and decide next action. Latest message: "${message}"`, {
           temperature: 0.3, maxTokens: 1000,
           ...fastOpts,
         });
       }
-    } else {
-      result = await aiCall(systemPrompt, `Analyze conversation and decide next action. Latest message: "${message}"`, {
-        temperature: 0.3, maxTokens: 1000,
-        ...fastOpts,
-      });
-    }
+    })();
+
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('MCoT timeout: AI providers too slow, using deterministic fallback')), MCOT_TIMEOUT_MS)
+    );
+
+    result = await Promise.race([aiCallPromise, timeoutPromise]);
 
     const parsed = parseJSON(result);
 
