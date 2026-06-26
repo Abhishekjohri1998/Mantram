@@ -18,7 +18,7 @@ class ModelRouter {
         // Structure: { providerName: { count, firstSeen, lastSeen } }
         this._recentErrors = {};
         // Max time (ms) a single provider API call is allowed before aborting
-        this.PER_CALL_TIMEOUT_MS = 20_000; // 20 seconds
+        this.PER_CALL_TIMEOUT_MS = 12_000; // 12 seconds (reduced from 20s to fit within MCoT 15s window)
         this._initProviders();
     }
 
@@ -84,8 +84,16 @@ class ModelRouter {
             defaultModel: config.ai.defaultAnthropicModel || 'claude-sonnet-4-6',
         });
 
-
-
+        // DeepSeek via Laozhang — ultra-reliable last-resort (cheapest, always available)
+        if (providerConfigs.laozhang?.apiKey) {
+            const deepseekProvider = new OpenAIProvider({
+                apiKey: providerConfigs.laozhang.apiKey,
+                defaultModel: 'deepseek-chat',
+            });
+            deepseekProvider.name = 'deepseek';
+            deepseekProvider.baseUrl = providerConfigs.laozhang.baseUrl;
+            this.providers.deepseek = deepseekProvider;
+        }
         // Log available providers
         const available = Object.entries(this.providers)
             .filter(([_, p]) => p.isAvailable())
@@ -119,6 +127,7 @@ class ModelRouter {
             'gemini',
             'openai',
             'anthropic',
+            'deepseek',  // Last-resort via Laozhang — cheap, often has channels when premium models don't
         ].filter(Boolean);
 
         for (const name of priority) {

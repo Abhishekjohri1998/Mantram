@@ -64,6 +64,11 @@ function getFastModelOptions() {
     if (xai?.isAvailable() && !(xai.cooldownUntil && Date.now() < xai.cooldownUntil)) {
       return { provider: 'xai' };
     }
+    // DeepSeek via Laozhang — cheap, often has channels when premium models don't
+    const deepseek = aiRouter.providers.deepseek;
+    if (deepseek?.isAvailable() && !(deepseek.cooldownUntil && Date.now() < deepseek.cooldownUntil)) {
+      return { provider: 'deepseek', model: 'deepseek-chat' };
+    }
   } catch (e) {}
   // Fallback: let the router figure it out (it will try native_gemini as last resort)
   return { provider: 'native_gemini', model: 'gemini-2.5-flash' };
@@ -2108,7 +2113,8 @@ Return ONLY this JSON:
     let result;
 
     // ── Overall timeout: if AI providers are all failing, don't make user wait ──
-    const MCOT_TIMEOUT_MS = 15000; // 15 seconds max for MCoT reasoning
+    const MCOT_TIMEOUT_MS = 10000; // 10 seconds max for MCoT reasoning (per-call timeout is 12s)
+    console.log('[fidato-chat] MCoT reasoning started, timeout:', MCOT_TIMEOUT_MS, 'ms, fast provider:', JSON.stringify(fastOpts));
     const aiCallPromise = (async () => {
       if (useWebSearch) {
         try {
@@ -2246,9 +2252,11 @@ Return ONLY this JSON:
     console.warn('[fidato-chat] MCoT returned incomplete JSON, using fallback reasoning');
   } catch (err) {
     console.error('[fidato-chat] MCoT AI reasoning failed:', err.message);
+    console.error('[fidato-chat] Falling through to DETERMINISTIC FALLBACK — user will get a pre-built question');
   }
 
   // ── Deterministic fallback ─────────────────────────────────────────────────
+  console.log('[fidato-chat] DETERMINISTIC FALLBACK activated for turn', userMessageCount, 'intent:', detectedIntent);
   const fallback = getContextualFallbackQuestion(userMessageCount, detectedIntent, sessionState.collectedAnswers || {}, brand);
   const mergedAnswers = {
     ...sessionState.collectedAnswers,
@@ -2603,6 +2611,18 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
   const onClose = () => { try { res.end(); } catch {} };
   req.on('close', onClose);
 
+  // Hard safety timeout: if the ENTIRE handler hasn't finished in 45s, force-close with an error
+  let handlerFinished = false;
+  const safetyTimeout = setTimeout(() => {
+    if (handlerFinished) return;
+    console.error('[fidato-chat] ⚠️ SAFETY TIMEOUT — handler exceeded 45s, force-closing SSE');
+    try {
+      sseEvent(res, { type: 'error', message: 'AI providers are temporarily unavailable. Please try again in a moment.' });
+      sseEvent(res, { type: 'done', sessionState: sessionState });
+      res.end();
+    } catch {}
+  }, 45000);
+
   try {
     const brandCtx = buildCtx(brand);
 
@@ -2895,6 +2915,9 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
     console.error('fidato-chat error:', err);
     sseEvent(res, { type: 'error', message: err.message || 'Something went wrong' });
     res.end();
+  } finally {
+    handlerFinished = true;
+    clearTimeout(safetyTimeout);
   }
 });
 
