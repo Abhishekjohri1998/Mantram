@@ -27,6 +27,7 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
       userPrompt,
       temperature,
       maxTokens,
+      model: options.model,
     }, { provider: options.provider });
 
     return result.text;
@@ -34,6 +35,19 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
     console.error('Brainstorm aiCall bridge error:', error.message);
     throw error;
   }
+}
+
+function getFastModelOptions() {
+  try {
+    const aiRouter = getRouter();
+    if (aiRouter.providers.gemini?.isAvailable()) {
+      return { provider: 'gemini', model: 'gemini-2.5-flash' };
+    }
+    if (aiRouter.providers.openai?.isAvailable()) {
+      return { provider: 'openai', model: 'gpt-4o-mini' };
+    }
+  } catch (e) {}
+  return {};
 }
 
 function parseJSON(text) {
@@ -2071,6 +2085,7 @@ Return ONLY this JSON:
   try {
     emitStep('Crafting strategic response...', '💡');
 
+    const fastOpts = getFastModelOptions();
     let result;
     if (useWebSearch) {
       try {
@@ -2080,6 +2095,7 @@ Return ONLY this JSON:
           userPrompt: `Analyze conversation and decide next action. Use web search to find relevant market data, competitor insights, or industry trends if applicable. Latest message: "${message}"`,
           temperature: 0.3,
           maxTokens: 1200,
+          model: 'gemini-2.5-flash',
         });
         result = searchResult.text;
         if (searchResult.citations?.length > 0) {
@@ -2090,11 +2106,13 @@ Return ONLY this JSON:
         console.warn('[fidato-chat] Web search failed, falling back:', searchErr.message);
         result = await aiCall(systemPrompt, `Analyze conversation and decide next action. Latest message: "${message}"`, {
           temperature: 0.3, maxTokens: 1000,
+          ...fastOpts,
         });
       }
     } else {
       result = await aiCall(systemPrompt, `Analyze conversation and decide next action. Latest message: "${message}"`, {
         temperature: 0.3, maxTokens: 1000,
+        ...fastOpts,
       });
     }
 
@@ -2148,7 +2166,7 @@ Return ONLY this JSON:
         const retryResult = await aiCall(
           systemPrompt + `\n\n‼️ CRITICAL: Your previous response was rejected because it repeated a question. You MUST ask about a COMPLETELY DIFFERENT TOPIC. Remember: answerChips must be SHORT ANSWERS (2-5 words) not questions.`,
           `Your last question was rejected as a duplicate. Ask about a DIFFERENT strategic topic. Message: "${message}"`,
-          { temperature: 0.6, maxTokens: 800 }
+          { temperature: 0.6, maxTokens: 800, ...fastOpts }
         );
         const retryParsed = parseJSON(retryResult);
         if (retryParsed?.fidatoResponse && !isSimilarQuestion(retryParsed.fidatoResponse, askedQuestions)) {

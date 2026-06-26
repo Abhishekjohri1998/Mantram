@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import mongoose from 'mongoose';
 import Brand from '../models/Brand.js';
 import BrandAuditLog from '../models/BrandAuditLog.js';
 import Product from '../models/Product.js';
@@ -59,10 +60,13 @@ async function logAudit(brand, user, action, { section = '', summary = '', chang
 // Helper: Check brand ownership or shared access
 // Bypasses checks for superadmins
 async function findBrandWithAccess(brandId, userIdOrUser) {
+    if (!brandId || !mongoose.Types.ObjectId.isValid(brandId)) {
+        return null;
+    }
     let isSuperAdmin = false;
     let userId = userIdOrUser;
 
-    if (userIdOrUser && typeof userIdOrUser === 'object') {
+    if (userIdOrUser && typeof userIdOrUser === 'object' && !(userIdOrUser instanceof mongoose.Types.ObjectId)) {
         isSuperAdmin = userIdOrUser.role === 'superadmin' || userIdOrUser.email === 'user@mantram.ai';
         userId = userIdOrUser._id;
     } else if (userIdOrUser) {

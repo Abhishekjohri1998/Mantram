@@ -146,15 +146,27 @@
 }
 
 /* ── Thinking dots ── */
-.bs-thinking { display: flex; gap: 4px; padding: 0.25rem 0; }
+.bs-thinking { display: flex; gap: 5px; padding: 0.35rem 0; align-items: center; }
 .bs-thinking span {
-  width: 6px; height: 6px;
+  width: 7px; height: 7px;
   border-radius: 50%;
   background: var(--sys-primary);
-  animation: bsDot 1.2s infinite;
+  animation: bsDot 1.4s infinite ease-in-out;
+  display: inline-block;
 }
 .bs-thinking span:nth-child(2) { animation-delay: 0.2s; }
 .bs-thinking span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes bsDot {
+  0%, 100% {
+    transform: translateY(0);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translateY(-6px);
+    opacity: 1;
+  }
+}
 
 /* ── Ideas block ── */
 .bs-ideas-block { margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem; }
