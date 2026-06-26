@@ -156,6 +156,8 @@ export default function SuperAdminDashboard() {
     useEffect(() => {
         generatingImagesRef.current = growthGeneratingImages
     }, [growthGeneratingImages])
+    const hasAnyImageGenerating = Object.keys(growthGeneratingImages).length > 0
+    const isImageGenerating = (key) => !!growthGeneratingImages[key]
     const [growthBatchGenerating, setGrowthBatchGenerating] = useState(false)
     const [growthBatchProgress, setGrowthBatchProgress] = useState({ current: 0, total: 0 })
     const [growthImageModel, setGrowthImageModel] = useState('gpt-image-2')
