@@ -5766,17 +5766,15 @@ export default function SuperAdminDashboard() {
                                                         {growthContent.instagram?.reel?.videoUrl ? (
                                                             <div className="space-y-3">
                                                                 <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider">🎥 Video Preview</p>
-                                                                <div className="relative aspect-[9/16] w-full max-w-[260px] mx-auto rounded-2xl overflow-hidden bg-black border border-[var(--sys-border)] group shadow-lg">
-                                                                    <video src={growthContent.instagram.reel.videoUrl} className="w-full h-full object-cover animate-in fade-in" controls playsInline />
-                                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-3 backdrop-blur-sm">
-                                                                        <button 
-                                                                            onClick={() => handleOpenStoryboard()}
-                                                                            className="px-2.5 py-1.5 bg-white/20 hover:bg-white/40 rounded-lg text-white text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer border border-white/20 backdrop-blur-md"
-                                                                        >
-                                                                            <span className="material-symbols-outlined text-[12px]">edit</span> Edit Storyboard
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
+                                                                <div className="relative aspect-[9/16] w-full max-w-[260px] mx-auto rounded-2xl overflow-hidden bg-black border border-[var(--sys-border)] shadow-lg">
+                                                                     <video src={growthContent.instagram.reel.videoUrl} className="w-full h-full object-cover animate-in fade-in" controls playsInline />
+                                                                 </div>
+                                                                 <button 
+                                                                     onClick={() => handleOpenStoryboard()}
+                                                                     className="mt-3 w-full py-2 bg-[var(--sys-surface)] hover:bg-[var(--sys-bg)] border border-[var(--sys-border)] text-[var(--sys-text)] rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                                                                 >
+                                                                     <span className="material-symbols-outlined text-sm">edit</span> Edit Storyboard
+                                                                 </button>
                                                             </div>
                                                         ) : (
                                                             <div className="space-y-3">
