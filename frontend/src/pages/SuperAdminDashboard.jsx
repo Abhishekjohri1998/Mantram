@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import SEOHead from '../components/SEOHead'
@@ -150,7 +150,12 @@ export default function SuperAdminDashboard() {
     const [growthPlatformTab, setGrowthPlatformTab] = useState('linkedin')
     const [growthCopied, setGrowthCopied] = useState(null)
     const [growthRegenerating, setGrowthRegenerating] = useState(null)
-    const [growthGeneratingImage, setGrowthGeneratingImage] = useState(null)
+    const [growthGeneratingImages, setGrowthGeneratingImages] = useState({})
+    const [showTrafficModal, setShowTrafficModal] = useState(false)
+    const generatingImagesRef = useRef({})
+    useEffect(() => {
+        generatingImagesRef.current = growthGeneratingImages
+    }, [growthGeneratingImages])
     const [growthBatchGenerating, setGrowthBatchGenerating] = useState(false)
     const [growthBatchProgress, setGrowthBatchProgress] = useState({ current: 0, total: 0 })
     const [growthImageModel, setGrowthImageModel] = useState('gpt-image-2')
@@ -484,18 +489,96 @@ export default function SuperAdminDashboard() {
         finally { setGrowthRegenerating(null) }
     }
 
+    const mergeGrowthContent = (prev, next) => {
+        if (!prev) return next
+        const merged = { ...prev }
+        
+        if (next.linkedin && prev.linkedin) {
+            merged.linkedin = prev.linkedin.map((post, i) => {
+                const nextPost = next.linkedin[i]
+                if (nextPost && nextPost.imageUrl) {
+                    return { ...post, imageUrl: nextPost.imageUrl }
+                }
+                return post
+            })
+        }
+        
+        if (next.twitter && prev.twitter) {
+            merged.twitter = prev.twitter.map((post, i) => {
+                const nextPost = next.twitter[i]
+                if (nextPost && nextPost.imageUrl) {
+                    return { ...post, imageUrl: nextPost.imageUrl }
+                }
+                return post
+            })
+        }
+        
+        if (next.reddit && prev.reddit) {
+            merged.reddit = prev.reddit.map((post, i) => {
+                const nextPost = next.reddit[i]
+                if (nextPost && nextPost.imageUrl) {
+                    return { ...post, imageUrl: nextPost.imageUrl }
+                }
+                return post
+            })
+        }
+        
+        if (next.instagram && prev.instagram) {
+            merged.instagram = {
+                ...prev.instagram,
+                post: prev.instagram.post ? {
+                    ...prev.instagram.post,
+                    coverImageUrl: next.instagram.post?.coverImageUrl || prev.instagram.post.coverImageUrl,
+                    slides: prev.instagram.post.slides ? prev.instagram.post.slides.map((slide, j) => {
+                        const nextSlide = next.instagram.post.slides?.[j]
+                        if (nextSlide && nextSlide.imageUrl) {
+                            return { ...slide, imageUrl: nextSlide.imageUrl }
+                        }
+                        return slide
+                    }) : prev.instagram.post.slides
+                } : prev.instagram.post,
+                story: prev.instagram.story ? {
+                    ...prev.instagram.story,
+                    slides: prev.instagram.story.slides ? prev.instagram.story.slides.map((slide, j) => {
+                        const nextSlide = next.instagram.story.slides?.[j]
+                        if (nextSlide && nextSlide.imageUrl) {
+                            return { ...slide, imageUrl: nextSlide.imageUrl }
+                        }
+                        return slide
+                    }) : prev.instagram.story.slides
+                } : prev.instagram.story
+            }
+        }
+        
+        return merged
+    }
+
     const handleGenerateImage = async (platform, index = 0, slideIndex = null) => {
         if (!growthContent?._id) return
         const key = slideIndex !== null ? `${platform}-${index}-${slideIndex}` : `${platform}-${index}`
-        setGrowthGeneratingImage(key)
+        setGrowthGeneratingImages(prev => ({ ...prev, [key]: true }))
+
+        const timer = setTimeout(() => {
+            if (generatingImagesRef.current[key]) {
+                setShowTrafficModal(true)
+            }
+        }, 30000)
+
         try {
             const res = await API.generateGrowthImage(growthContent._id, { platform, index, slideIndex, imageModel: growthImageModel })
             if (res.success) {
-                setGrowthContent(res.content)
+                setGrowthContent(prev => mergeGrowthContent(prev, res.content))
                 showToast('Image generated successfully!')
             }
         } catch (e) { showToast(e.message || 'Image generation failed', 'error') }
-        finally { setGrowthGeneratingImage(null) }
+        finally {
+            clearTimeout(timer)
+            setGrowthGeneratingImages(prev => {
+                const next = { ...prev }
+                delete next[key]
+                return next
+            })
+        }
     }
 
     const handleGenerateAllImages = async (scope = 'platform') => {
@@ -519,12 +602,10 @@ export default function SuperAdminDashboard() {
             if (growthPlatformTab === 'linkedin') {
                 (growthContent.linkedin || []).forEach((_, i) => jobs.push({ platform: 'linkedin', index: i }))
             } else if (growthPlatformTab === 'instagram') {
-                // Cover image (slide 0)
                 const slides = growthContent.instagram?.post?.slides || []
                 slides.forEach((s, j) => {
                     if (!s.imageUrl) jobs.push({ platform: 'instagram_post', index: 0, slideIndex: j })
                 })
-                // Story slides
                 const storySlides = growthContent.instagram?.story?.slides || []
                 storySlides.forEach((s, j) => {
                     if (!s.imageUrl) jobs.push({ platform: 'instagram_story', index: 0, slideIndex: j })
@@ -559,13 +640,26 @@ export default function SuperAdminDashboard() {
         let successCount = 0
         let failCount = 0
 
-        for (let idx = 0; idx < jobs.length; idx++) {
-            const job = jobs[idx]
+        const initialGenerating = {}
+        jobs.forEach(job => {
             const key = job.slideIndex !== null && job.slideIndex !== undefined
                 ? `${job.platform}-${job.index}-${job.slideIndex}`
                 : `${job.platform}-${job.index}`
-            setGrowthGeneratingImage(key)
-            setGrowthBatchProgress({ current: idx + 1, total: jobs.length })
+            initialGenerating[key] = true
+        })
+        setGrowthGeneratingImages(prev => ({ ...prev, ...initialGenerating }))
+
+        const promises = jobs.map(async (job) => {
+            const key = job.slideIndex !== null && job.slideIndex !== undefined
+                ? `${job.platform}-${job.index}-${job.slideIndex}`
+                : `${job.platform}-${job.index}`
+
+            const timer = setTimeout(() => {
+                if (generatingImagesRef.current[key]) {
+                    setShowTrafficModal(true)
+                }
+            }, 30000)
+
             try {
                 const res = await API.generateGrowthImage(growthContent._id, {
                     platform: job.platform,
@@ -574,15 +668,26 @@ export default function SuperAdminDashboard() {
                     imageModel: growthImageModel
                 })
                 if (res.success) {
-                    setGrowthContent(res.content)
+                    setGrowthContent(prev => mergeGrowthContent(prev, res.content))
                     successCount++
+                } else {
+                    failCount++
                 }
             } catch (e) {
                 failCount++
                 console.error(`Failed to generate image for ${key}:`, e)
+            } finally {
+                clearTimeout(timer)
+                setGrowthGeneratingImages(prev => {
+                    const next = { ...prev }
+                    delete next[key]
+                    return next
+                })
+                setGrowthBatchProgress(prev => ({ ...prev, current: prev.current + 1 }))
             }
-            setGrowthGeneratingImage(null)
-        }
+        })
+
+        await Promise.all(promises)
 
         setGrowthBatchGenerating(false)
         setGrowthBatchProgress({ current: 0, total: 0 })
@@ -5079,7 +5184,7 @@ export default function SuperAdminDashboard() {
                                         </div>
                                         <button
                                             onClick={() => handleGenerateAllImages('platform')}
-                                            disabled={growthBatchGenerating || !!growthGeneratingImage}
+                                            disabled={growthBatchGenerating || hasAnyImageGenerating}
                                             className="px-3 py-2 rounded-xl text-[10px] font-bold bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white cursor-pointer transition-all disabled:opacity-50 flex items-center gap-1.5 shadow-lg shadow-purple-500/20 border border-purple-400/20"
                                         >
                                             {growthBatchGenerating ? (
@@ -5096,7 +5201,7 @@ export default function SuperAdminDashboard() {
                                         </button>
                                         <button
                                             onClick={() => handleGenerateAllImages('all')}
-                                            disabled={growthBatchGenerating || !!growthGeneratingImage}
+                                            disabled={growthBatchGenerating || hasAnyImageGenerating}
                                             className="px-3 py-2 rounded-xl text-[10px] font-bold bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white cursor-pointer transition-all disabled:opacity-50 flex items-center gap-1.5 shadow-lg shadow-orange-500/20 border border-orange-400/20"
                                             title="Generate images for ALL platforms at once"
                                         >
@@ -5147,10 +5252,10 @@ export default function SuperAdminDashboard() {
                                                         </button>
                                                         <button
                                                             onClick={() => handleGenerateImage('linkedin', i)}
-                                                            disabled={growthGeneratingImage === `linkedin-${i}`}
+                                                            disabled={isImageGenerating(`linkedin-${i}`)}
                                                             className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-blue-500 cursor-pointer transition-all disabled:opacity-50 flex items-center gap-1"
                                                         >
-                                                            {growthGeneratingImage === `linkedin-${i}` ? <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span> : '🖼️'} Gen Image
+                                                            {isImageGenerating(`linkedin-${i}`) ? <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span> : '🖼️'} Gen Image
                                                         </button>
                                                         <button
                                                             onClick={() => handleCopyContent(post.content + '\n\n' + (post.hashtags || []).join(' '), `li-${i}`)}
@@ -5273,7 +5378,7 @@ export default function SuperAdminDashboard() {
                                                                             alt="Cover Graphic" 
                                                                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
                                                                         />
-                                                                        {growthGeneratingImage === 'instagram_post-0-0' && (
+                                                                        {isImageGenerating('instagram_post-0-0') && (
                                                                             <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm">
                                                                                 <span className="material-symbols-outlined text-white text-3xl animate-spin mb-2">progress_activity</span>
                                                                                 <span className="text-[10px] text-white font-bold tracking-wider animate-pulse">GENERATING COVER...</span>
@@ -5329,7 +5434,7 @@ export default function SuperAdminDashboard() {
                                                                         </div>
 
                                                                         <div className="flex flex-col items-center gap-2.5 z-10 mb-2">
-                                                                            {growthGeneratingImage === 'instagram_post-0-0' ? (
+                                                                            {isImageGenerating('instagram_post-0-0') ? (
                                                                                 <div className="flex flex-col items-center gap-1">
                                                                                     <span className="material-symbols-outlined text-pink-500 text-lg animate-spin">progress_activity</span>
                                                                                     <span className="text-[9px] font-bold text-pink-500 animate-pulse">Generating Cover...</span>
@@ -5407,7 +5512,7 @@ export default function SuperAdminDashboard() {
                                                             <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider">📑 Carousel Slides</p>
                                                             <button
                                                                 onClick={() => handleGenerateAllImages('instagram_slides')}
-                                                                disabled={growthBatchGenerating || !!growthGeneratingImage}
+                                                                disabled={growthBatchGenerating || hasAnyImageGenerating}
                                                                 className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white cursor-pointer transition-all disabled:opacity-50 flex items-center gap-1 shadow-lg shadow-pink-500/20 border border-pink-400/20"
                                                             >
                                                                 {growthBatchGenerating ? (
@@ -5432,7 +5537,7 @@ export default function SuperAdminDashboard() {
                                                                         <p className="text-[10px] text-[var(--sys-text-muted)] italic mb-2">🎨 {s.visualDescription}</p>
                                                                     </div>
                                                                     <div className="mt-2 relative">
-                                                                        {growthGeneratingImage === `instagram_post-0-${j}` && !s.imageUrl && (
+                                                                        {isImageGenerating(`instagram_post-0-${j}`) && !s.imageUrl && (
                                                                             <div className="w-full h-32 rounded-lg bg-[var(--sys-bg)] border-2 border-dashed border-pink-500/30 flex flex-col items-center justify-center gap-2 mb-2 relative overflow-hidden">
                                                                                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-pink-500/5 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
                                                                                 <span className="material-symbols-outlined text-pink-500 text-2xl animate-spin">progress_activity</span>
@@ -5441,13 +5546,13 @@ export default function SuperAdminDashboard() {
                                                                         )}
                                                                         {s.imageUrl && (
                                                                             <div className="relative group cursor-zoom-in mb-2 rounded-lg overflow-hidden border border-[var(--sys-border)]" onClick={() => setGrowthPreviewImage(s.imageUrl)}>
-                                                                                <img src={s.imageUrl} alt={`Slide ${s.slideNumber}`} className={`w-full h-auto object-cover transition-all duration-500 ${growthGeneratingImage === `instagram_post-0-${j}` ? 'opacity-50 blur-sm scale-105' : 'group-hover:scale-105'}`} />
-                                                                                {growthGeneratingImage === `instagram_post-0-${j}` && (
+                                                                                <img src={s.imageUrl} alt={`Slide ${s.slideNumber}`} className={`w-full h-auto object-cover transition-all duration-500 ${isImageGenerating(`instagram_post-0-${j}`) ? 'opacity-50 blur-sm scale-105' : 'group-hover:scale-105'}`} />
+                                                                                {isImageGenerating(`instagram_post-0-${j}`) && (
                                                                                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px]">
                                                                                         <span className="material-symbols-outlined text-white text-2xl animate-spin mb-1 drop-shadow-lg">progress_activity</span>
                                                                                     </div>
                                                                                 )}
-                                                                                <div className={`absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-3 backdrop-blur-sm ${growthGeneratingImage === `instagram_post-0-${j}` ? 'hidden' : ''}`}>
+                                                                                <div className={`absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-3 backdrop-blur-sm ${isImageGenerating(`instagram_post-0-${j}`) ? 'hidden' : ''}`}>
                                                                                     <button 
                                                                                         onClick={(e) => { e.stopPropagation(); setGrowthPreviewImage(s.imageUrl); }}
                                                                                         className="p-1.5 bg-white/20 hover:bg-white/40 rounded-full text-white transition-colors backdrop-blur-lg flex items-center justify-center border border-white/20"
@@ -5467,10 +5572,10 @@ export default function SuperAdminDashboard() {
                                                                         )}
                                                                         <button
                                                                             onClick={() => handleGenerateImage('instagram_post', 0, j)}
-                                                                            disabled={growthGeneratingImage === `instagram_post-0-${j}`}
+                                                                            disabled={isImageGenerating(`instagram_post-0-${j}`)}
                                                                             className="w-full py-1.5 rounded-lg text-[10px] font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:bg-pink-500/10 hover:text-pink-500 hover:border-pink-500/30 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1"
                                                                         >
-                                                                            {growthGeneratingImage === `instagram_post-0-${j}` ? <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span> : '🖼️'} {growthGeneratingImage === `instagram_post-0-${j}` ? 'Generating...' : 'Gen Image'}
+                                                                            {isImageGenerating(`instagram_post-0-${j}`) ? <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span> : '🖼️'} {isImageGenerating(`instagram_post-0-${j}`) ? 'Generating...' : 'Gen Image'}
                                                                         </button>
                                                                     </div>
                                                                 </div>
@@ -5500,7 +5605,7 @@ export default function SuperAdminDashboard() {
                                             <div className="flex flex-wrap items-center gap-2">
                                                     <button
                                                         onClick={() => handleGenerateAllImages('instagram_story')}
-                                                        disabled={growthBatchGenerating || !!growthGeneratingImage}
+                                                        disabled={growthBatchGenerating || hasAnyImageGenerating}
                                                         className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white cursor-pointer transition-all disabled:opacity-50 flex items-center gap-1 shadow-lg shadow-pink-500/20 border border-pink-400/20 mr-1"
                                                     >
                                                         {growthBatchGenerating ? (
@@ -5545,7 +5650,7 @@ export default function SuperAdminDashboard() {
                                                             {s.stickerSuggestion && <p className="text-[10px] text-amber-500 mb-2">🏷️ {s.stickerSuggestion}</p>}
                                                         </div>
                                                         <div className="mt-2 space-y-1.5">
-                                                            {growthGeneratingImage === `instagram_story-0-${j}` && !s.imageUrl && (
+                                                            {isImageGenerating(`instagram_story-0-${j}`) && !s.imageUrl && (
                                                                 <div className="w-full aspect-[9/16] rounded-lg bg-[var(--sys-bg)] border-2 border-dashed border-purple-500/30 flex flex-col items-center justify-center gap-2 mb-2 relative overflow-hidden">
                                                                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-purple-500/5 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
                                                                     <span className="material-symbols-outlined text-purple-500 text-2xl animate-spin">progress_activity</span>
@@ -5554,13 +5659,13 @@ export default function SuperAdminDashboard() {
                                                             )}
                                                             {s.imageUrl && (
                                                                 <div className="relative group cursor-zoom-in mb-2 rounded-lg overflow-hidden border border-[var(--sys-border)]" onClick={() => setGrowthPreviewImage(s.imageUrl)}>
-                                                                    <img src={s.imageUrl} alt={`Story ${s.slideNumber}`} className={`w-full h-auto object-cover aspect-[9/16] transition-transform duration-500 ${growthGeneratingImage === `instagram_story-0-${j}` ? 'opacity-50 blur-sm scale-105' : 'group-hover:scale-105'}`} />
-                                                                    {growthGeneratingImage === `instagram_story-0-${j}` && (
+                                                                    <img src={s.imageUrl} alt={`Story ${s.slideNumber}`} className={`w-full h-auto object-cover aspect-[9/16] transition-transform duration-500 ${isImageGenerating(`instagram_story-0-${j}`) ? 'opacity-50 blur-sm scale-105' : 'group-hover:scale-105'}`} />
+                                                                    {isImageGenerating(`instagram_story-0-${j}`) && (
                                                                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px]">
                                                                             <span className="material-symbols-outlined text-white text-2xl animate-spin mb-1 drop-shadow-lg">progress_activity</span>
                                                                         </div>
                                                                     )}
-                                                                    <div className={`absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-3 backdrop-blur-sm ${growthGeneratingImage === `instagram_story-0-${j}` ? 'hidden' : ''}`}>
+                                                                    <div className={`absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-3 backdrop-blur-sm ${isImageGenerating(`instagram_story-0-${j}`) ? 'hidden' : ''}`}>
                                                                         <button 
                                                                             onClick={(e) => { e.stopPropagation(); setGrowthPreviewImage(s.imageUrl); }}
                                                                             className="p-2 bg-white/20 hover:bg-white/40 rounded-full text-white transition-colors backdrop-blur-lg flex items-center justify-center border border-white/20"
@@ -5580,10 +5685,10 @@ export default function SuperAdminDashboard() {
                                                             )}
                                                             <button
                                                                 onClick={() => handleGenerateImage('instagram_story', 0, j)}
-                                                                disabled={growthGeneratingImage === `instagram_story-0-${j}`}
+                                                                disabled={isImageGenerating(`instagram_story-0-${j}`)}
                                                                 className="w-full py-1.5 rounded-lg text-[10px] font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:bg-purple-500/10 hover:text-purple-500 hover:border-purple-500/30 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1"
                                                             >
-                                                                {growthGeneratingImage === `instagram_story-0-${j}` ? <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span> : '🖼️'} {growthGeneratingImage === `instagram_story-0-${j}` ? 'Generating...' : 'Generate Image'}
+                                                                {isImageGenerating(`instagram_story-0-${j}`) ? <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span> : '🖼️'} {isImageGenerating(`instagram_story-0-${j}`) ? 'Generating...' : 'Generate Image'}
                                                             </button>
                                                             {s.imageUrl && (
                                                                 <button
@@ -5780,10 +5885,10 @@ export default function SuperAdminDashboard() {
                                                          </button>
                                                          <button
                                                              onClick={() => handleGenerateImage('twitter', i)}
-                                                             disabled={growthGeneratingImage === `twitter-${i}`}
+                                                             disabled={isImageGenerating(`twitter-${i}`)}
                                                              className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-blue-500 cursor-pointer transition-all disabled:opacity-50 flex items-center gap-1"
                                                          >
-                                                             {growthGeneratingImage === `twitter-${i}` ? <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span> : '🖼️'} Gen Image
+                                                             {isImageGenerating(`twitter-${i}`) ? <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span> : '🖼️'} Gen Image
                                                          </button>
                                                          <button
                                                              onClick={() => handleCopyContent(post.tweets?.join('\n\n---\n\n') || '', `tw-${i}`)}
@@ -5863,10 +5968,10 @@ export default function SuperAdminDashboard() {
                                                          </button>
                                                          <button
                                                              onClick={() => handleGenerateImage('reddit', i)}
-                                                             disabled={growthGeneratingImage === `reddit-${i}`}
+                                                             disabled={isImageGenerating(`reddit-${i}`)}
                                                              className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[var(--sys-bg)] text-[var(--sys-text-muted)] hover:text-orange-500 cursor-pointer transition-all disabled:opacity-50 flex items-center gap-1"
                                                          >
-                                                             {growthGeneratingImage === `reddit-${i}` ? <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span> : '🖼️'} Gen Image
+                                                             {isImageGenerating(`reddit-${i}`) ? <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span> : '🖼️'} Gen Image
                                                          </button>
                                                          <button
                                                              onClick={() => handleCopyContent(post.title + '\n\n' + post.body, `rd-${i}`)}
@@ -6102,6 +6207,29 @@ export default function SuperAdminDashboard() {
                                     }
                                 }}
                             />
+                        </div>
+                    </div>
+                )}
+
+                {/* ── HIGH TRAFFIC WARNING MODAL ── */}
+                {showTrafficModal && (
+                    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                        <div className="bg-[var(--sys-surface)] border border-[var(--sys-border)] max-w-md w-full p-8 rounded-3xl shadow-2xl text-center transform animate-in fade-in zoom-in duration-300 relative">
+                            <div className="size-20 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                                <span className="material-symbols-outlined text-4xl text-amber-500 animate-pulse">traffic</span>
+                            </div>
+                            <h3 className="text-xl font-bold text-[var(--sys-text)] mb-3">High Traffic Detected</h3>
+                            <p className="text-[var(--sys-text-muted)] text-sm leading-relaxed mb-6">
+                                modal is experiencing heavy traffic that's why the generation is little slow but do not worry we are generating best images for you
+                            </p>
+                            <div className="flex flex-col gap-3">
+                                <button 
+                                    onClick={() => setShowTrafficModal(false)}
+                                    className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-bold text-sm transition-all cursor-pointer border-none shadow-lg shadow-purple-500/20"
+                                >
+                                    Close
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}

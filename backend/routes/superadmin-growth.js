@@ -217,8 +217,34 @@ router.post('/:id/regenerate', async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════
+// Simple concurrency limiter helper
+class ConcurrencyLimiter {
+    constructor(maxConcurrency = 5) {
+        this.maxConcurrency = maxConcurrency;
+        this.activeCount = 0;
+        this.queue = [];
+    }
+
+    async run(task) {
+        if (this.activeCount >= this.maxConcurrency) {
+            await new Promise(resolve => this.queue.push(resolve));
+        }
+        this.activeCount++;
+        try {
+            return await task();
+        } finally {
+            this.activeCount--;
+            if (this.queue.length > 0) {
+                const next = this.queue.shift();
+                next();
+            }
+        }
+    }
+}
+
+const imageLimiter = new ConcurrencyLimiter(5);
+
 // POST /api/superadmin/growth/:id/generate-image — Generate image for post
-// ══════════════════════════════════════════════════════════════
 router.post('/:id/generate-image', async (req, res) => {
     try {
         const { platform, index = 0, slideIndex = null, imageModel = 'gpt-image-2' } = req.body;
@@ -228,19 +254,23 @@ router.post('/:id/generate-image', async (req, res) => {
         let promptText = '';
         let targetObj = null;
         let aspectRatio = '1:1';
+        let updateField = '';
 
         if (platform === 'linkedin' && content.linkedin[index]) {
             targetObj = content.linkedin[index];
             promptText = `Create a professional LinkedIn graphic for the following post: ${targetObj.content}`;
             aspectRatio = '16:9';
+            updateField = `linkedin.${index}.imageUrl`;
         } else if (platform === 'twitter' && content.twitter[index]) {
             targetObj = content.twitter[index];
             promptText = `Create an engaging Twitter graphic for this tweet: ${targetObj.tweets[0]}`;
             aspectRatio = '16:9';
+            updateField = `twitter.${index}.imageUrl`;
         } else if (platform === 'reddit' && content.reddit[index]) {
             targetObj = content.reddit[index];
             promptText = `Create a Reddit post image for title: ${targetObj.title}. Tone: ${targetObj.tone}`;
             aspectRatio = '16:9';
+            updateField = `reddit.${index}.imageUrl`;
         } else if (platform === 'instagram_post') {
             if (slideIndex !== null) {
                 if (content.instagram.post.slides[slideIndex]) {
@@ -248,6 +278,7 @@ router.post('/:id/generate-image', async (req, res) => {
                     const visualDesc = targetObj.visualDescription || 'A clean and professional graphic';
                     const slideText = targetObj.text || '';
                     promptText = `A professional, modern Instagram post graphic depicting the following scene: "${visualDesc}". The graphic MUST feature the following exact text overlay, written clearly, boldly, legibly, and prominently on the image: "${slideText}". Make sure the text is integrated cleanly as a header or overlay banner. The layout should look high-end, clean, aesthetic, and premium. No spelling mistakes in the text.`.trim();
+                    updateField = `instagram.post.slides.${slideIndex}.imageUrl`;
                 } else {
                     return res.status(400).json({ success: false, error: 'Invalid slide index for instagram post' });
                 }
@@ -257,6 +288,7 @@ router.post('/:id/generate-image', async (req, res) => {
                 const firstSlideText = post.slides?.[0]?.text || '';
                 const theme = content.theme || '';
                 promptText = `A highly aesthetic and scroll-stopping Instagram carousel cover graphic. Visual theme context: "${theme}". The cover image MUST display the following main title/hook text clearly, boldly, legibly, and prominently: "${firstSlideText}". Ensure the design is clean, premium, and visually striking, with a modern layout and professional typography. No spelling mistakes.`.trim();
+                updateField = `instagram.post.coverImageUrl`;
             }
             aspectRatio = '4:5';
         } else if (platform === 'instagram_story') {
@@ -265,6 +297,7 @@ router.post('/:id/generate-image', async (req, res) => {
                 const visualDesc = targetObj.visualDescription || 'A clean and professional graphic';
                 const slideText = targetObj.text || '';
                 promptText = `A professional, modern Instagram story graphic depicting the following scene: "${visualDesc}". The graphic MUST feature the following exact text overlay, written clearly, boldly, legibly, and prominently on the image: "${slideText}". Make sure the text is integrated cleanly as a header or overlay banner. The layout should look high-end, clean, aesthetic, and premium. No spelling mistakes in the text.`.trim();
+                updateField = `instagram.story.slides.${slideIndex}.imageUrl`;
             } else {
                 return res.status(400).json({ success: false, error: 'Slide index required for instagram story' });
             }
@@ -273,80 +306,85 @@ router.post('/:id/generate-image', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Invalid platform or index' });
         }
 
-        const aiRouter = getRouter();
+        // Run the generation logic inside our Concurrency Limiter
+        const s3Url = await imageLimiter.run(async () => {
+            const aiRouter = getRouter();
 
-        // Determine the correct provider based on the model name.
-        // The default image provider is Gemini, so OpenAI models (gpt-image-*)
-        // must explicitly request the 'openai' provider to avoid being routed
-        // to Gemini which doesn't recognise gpt-image-* model IDs.
-        const isOpenAIModel = imageModel.startsWith('gpt-') || imageModel.startsWith('dall-e');
-        const providerPreference = isOpenAIModel ? 'openai' : 'gemini';
+            // Determine the correct provider based on the model name.
+            const isOpenAIModel = imageModel.startsWith('gpt-') || imageModel.startsWith('dall-e');
+            const providerPreference = isOpenAIModel ? 'openai' : 'gemini';
 
-        let result;
-        try {
-            result = await aiRouter.generateImage({ 
-                prompt: promptText, 
-                aspectRatio,
-                model: imageModel
-            }, { provider: providerPreference });
-        } catch (err) {
-            console.warn(`[Growth Image Gen] ⚠️ Generation failed with model ${imageModel}: ${err.message}. Trying fallback to gemini...`);
-            if (isOpenAIModel) {
-                result = await aiRouter.generateImage({
-                    prompt: promptText,
-                    aspectRatio,
-                    model: 'gemini-3.1-flash-image-preview'
-                }, { provider: 'gemini' });
-            } else {
-                throw err;
-            }
-        }
-
-        if (!result || !result.imageUrl) throw new Error('Image generation failed to return URL');
-
-        // Decode base64 and upload to S3 (this also stores a copy on local SSD)
-        console.log(`📤 Growth Image: Uploading generated image to S3...`);
-        let s3Url;
-        let logoUrl = '';
-        if (content.brandId) {
-            const brand = await Brand.findById(content.brandId).lean();
-            if (brand && brand.dna?.logo?.url) {
-                logoUrl = brand.dna.logo.url;
-            }
-        }
-
-        if (logoUrl) {
+            let result;
             try {
-                console.log(`📥 Downloading generated image for overlay: ${result.imageUrl.substring(0, 100)}`);
-                const imageBuffer = await fetchImageBuffer(result.imageUrl, { cache: false });
-                const logoBuffer = await fetchImageBuffer(logoUrl).catch(err => {
-                    console.warn(`Failed to fetch brand logo buffer: ${err.message}`);
-                    return null;
-                });
-                
-                if (imageBuffer && logoBuffer) {
-                    console.log(`🎨 Overlaying brand logo watermark on generated image...`);
-                    const finalBuffer = await overlayLogo(imageBuffer, logoBuffer, 'bottom-right', 'medium');
-                    const targetKey = `growth/gen-${Date.now()}.png`;
-                    s3Url = await uploadToS3(finalBuffer, targetKey, 'image/png');
-                } else {
-                    s3Url = await ensureS3Url(result.imageUrl, `growth/gen-${Date.now()}`);
-                }
+                result = await aiRouter.generateImage({ 
+                    prompt: promptText, 
+                    aspectRatio,
+                    model: imageModel
+                }, { provider: providerPreference });
             } catch (err) {
-                console.error(`Error applying watermark logo overlay: ${err.message}`);
-                s3Url = await ensureS3Url(result.imageUrl, `growth/gen-${Date.now()}`);
+                console.warn(`[Growth Image Gen] ⚠️ Generation failed with model ${imageModel}: ${err.message}. Trying fallback to gemini...`);
+                if (isOpenAIModel) {
+                    result = await aiRouter.generateImage({
+                        prompt: promptText,
+                        aspectRatio,
+                        model: 'gemini-3.1-flash-image-preview'
+                    }, { provider: 'gemini' });
+                } else {
+                    throw err;
+                }
             }
-        } else {
-            s3Url = await ensureS3Url(result.imageUrl, `growth/gen-${Date.now()}`);
-        }
 
-        if (platform === 'instagram_post' && slideIndex === null) {
-            content.instagram.post.coverImageUrl = s3Url;
-        } else {
-            targetObj.imageUrl = s3Url;
+            if (!result || !result.imageUrl) throw new Error('Image generation failed to return URL');
+
+            // Decode base64 and upload to S3 (this also stores a copy on local SSD)
+            console.log(`📤 Growth Image: Uploading generated image to S3...`);
+            let logoUrl = '';
+            if (content.brandId) {
+                const brand = await Brand.findById(content.brandId).lean();
+                if (brand && brand.dna?.logo?.url) {
+                    logoUrl = brand.dna.logo.url;
+                }
+            }
+
+            if (logoUrl) {
+                try {
+                    console.log(`📥 Downloading generated image for overlay: ${result.imageUrl.substring(0, 100)}`);
+                    const imageBuffer = await fetchImageBuffer(result.imageUrl, { cache: false });
+                    const logoBuffer = await fetchImageBuffer(logoUrl).catch(err => {
+                        console.warn(`Failed to fetch brand logo buffer: ${err.message}`);
+                        return null;
+                    });
+                    
+                    if (imageBuffer && logoBuffer) {
+                        console.log(`🎨 Overlaying brand logo watermark on generated image...`);
+                        const finalBuffer = await overlayLogo(imageBuffer, logoBuffer, 'bottom-right', 'medium');
+                        const targetKey = `growth/gen-${Date.now()}.png`;
+                        return await uploadToS3(finalBuffer, targetKey, 'image/png');
+                    } else {
+                        return await ensureS3Url(result.imageUrl, `growth/gen-${Date.now()}`);
+                    }
+                } catch (err) {
+                    console.error(`Error applying watermark logo overlay: ${err.message}`);
+                    return await ensureS3Url(result.imageUrl, `growth/gen-${Date.now()}`);
+                }
+            } else {
+                return await ensureS3Url(result.imageUrl, `growth/gen-${Date.now()}`);
+            }
+        });
+
+        // Perform atomic update in DB using $set to prevent versioning / lost update conflicts
+        await GrowthContent.updateOne(
+            { _id: req.params.id },
+            { $set: { [updateField]: s3Url } }
+        );
+
+        // Fetch the updated document, sign URLs, and return
+        const updatedDoc = await GrowthContent.findById(req.params.id);
+        if (!updatedDoc) {
+            return res.status(500).json({ success: false, error: 'Failed to retrieve updated content' });
         }
-        await content.save();
-        const signedContent = await signGrowthContentUrls(content.toObject());
+        
+        const signedContent = await signGrowthContentUrls(updatedDoc.toObject());
         res.json({ success: true, content: signedContent });
     } catch (error) {
         console.error('[Growth Generate Image]', error);
