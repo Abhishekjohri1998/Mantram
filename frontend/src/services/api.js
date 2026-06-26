@@ -1004,17 +1004,37 @@ export const brainstormStudio = {
     // ── Fidato Chat: streaming SSE (POST with ReadableStream) ──
     fidatoChat: async (payload, { onToken, onThinking, onIdeas, onScreenplay, onStrategy, onDeepDive, onCalendar, onSessionId, onDone, onError, onReasoningStep, onCitations } = {}) => {
         const token = localStorage.getItem('mantram_token') || '';
-        const response = await fetch(`${API_BASE}/brainstorm-studio/fidato-chat`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-            body: JSON.stringify(payload),
-        });
+        // Timeout: abort if no response within 45 seconds (prevents infinite loading when all AI providers are down)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 45000);
+
+        let response;
+        try {
+            response = await fetch(`${API_BASE}/brainstorm-studio/fidato-chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                body: JSON.stringify(payload),
+                signal: controller.signal,
+            });
+        } catch (fetchErr) {
+            clearTimeout(timeoutId);
+            if (fetchErr.name === 'AbortError') {
+                onError?.('Request timed out — AI providers may be busy. Please try again.');
+            } else {
+                onError?.(fetchErr.message || 'Network error');
+            }
+            return;
+        }
 
         if (!response.ok) {
+            clearTimeout(timeoutId);
             const err = await response.json().catch(() => ({ error: 'Request failed' }));
             onError?.(err.error || `HTTP ${response.status}`);
             return;
         }
+
+        // We got a response — clear the initial timeout and set a per-read timeout
+        clearTimeout(timeoutId);
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
@@ -1041,23 +1061,44 @@ export const brainstormStudio = {
             } catch { /* ignore malformed SSE */ }
         };
 
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
-            for (const line of lines) {
-                processLine(line);
-            }
-        }
+        // Read timeout: if no data arrives for 30 seconds during streaming, abort
+        let readTimeoutId;
+        const resetReadTimeout = () => {
+            clearTimeout(readTimeoutId);
+            readTimeoutId = setTimeout(() => {
+                try { reader.cancel(); } catch {}
+                onError?.('Response stream timed out — AI may be overloaded. Please try again.');
+            }, 30000);
+        };
 
-        // Flush remaining buffer
-        buffer += decoder.decode();
-        if (buffer.trim()) {
-            const lines = buffer.split('\n');
-            for (const line of lines) {
-                processLine(line);
+        try {
+            resetReadTimeout();
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                resetReadTimeout(); // Got data — reset the read timeout
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+                for (const line of lines) {
+                    processLine(line);
+                }
+            }
+            clearTimeout(readTimeoutId);
+
+            // Flush remaining buffer
+            buffer += decoder.decode();
+            if (buffer.trim()) {
+                const lines = buffer.split('\n');
+                for (const line of lines) {
+                    processLine(line);
+                }
+            }
+        } catch (readErr) {
+            clearTimeout(readTimeoutId);
+            // Don't report if stream was intentionally cancelled
+            if (readErr.name !== 'AbortError') {
+                onError?.(readErr.message || 'Stream read error');
             }
         }
     },

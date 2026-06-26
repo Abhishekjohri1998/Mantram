@@ -40,14 +40,33 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
 function getFastModelOptions() {
   try {
     const aiRouter = getRouter();
-    if (aiRouter.providers.gemini?.isAvailable()) {
+    // Check Laozhang Gemini first — if it's available AND not in cooldown
+    const lzGemini = aiRouter.providers.gemini;
+    if (lzGemini?.isAvailable() && !(lzGemini.cooldownUntil && Date.now() < lzGemini.cooldownUntil)) {
       return { provider: 'gemini', model: 'gemini-2.5-flash' };
     }
-    if (aiRouter.providers.openai?.isAvailable()) {
+    // Native Gemini (direct Google API) — most reliable fallback
+    if (aiRouter.nativeGemini?.isAvailable() && !(aiRouter.nativeGemini.cooldownUntil && Date.now() < aiRouter.nativeGemini.cooldownUntil)) {
+      return { provider: 'native_gemini', model: 'gemini-2.5-flash' };
+    }
+    // OpenAI
+    const openai = aiRouter.providers.openai;
+    if (openai?.isAvailable() && !(openai.cooldownUntil && Date.now() < openai.cooldownUntil)) {
       return { provider: 'openai', model: 'gpt-4o-mini' };
     }
+    // Anthropic
+    const anthropic = aiRouter.providers.anthropic;
+    if (anthropic?.isAvailable() && !(anthropic.cooldownUntil && Date.now() < anthropic.cooldownUntil)) {
+      return { provider: 'anthropic' };
+    }
+    // xAI
+    const xai = aiRouter.providers.xai;
+    if (xai?.isAvailable() && !(xai.cooldownUntil && Date.now() < xai.cooldownUntil)) {
+      return { provider: 'xai' };
+    }
   } catch (e) {}
-  return {};
+  // Fallback: let the router figure it out (it will try native_gemini as last resort)
+  return { provider: 'native_gemini', model: 'gemini-2.5-flash' };
 }
 
 function parseJSON(text) {
