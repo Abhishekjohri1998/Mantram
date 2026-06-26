@@ -38,6 +38,7 @@ import { getPastProjects } from './selfLearning.js';
 import { agentUtils } from '../shared/agentUtils.js';
 import { callMcpTool } from '../../mcp/registry.js';
 import Product from '../../models/Product.js';
+import Cast from '../../models/Cast.js';
 import { inferBrandLanguage, buildLanguageDirective } from '../../utils/brandLanguage.js';
 
 // ── Helper: Parse JSON from any AI response ──
@@ -510,6 +511,17 @@ export async function videoGeneratorNode(state) {
         console.log(`📸 Using image for video gen: ${imageUrl.substring(0, 80)}...`);
     }
 
+    // Fetch cast names to pass for prompt character name sanitization
+    let customCharacterNames = [];
+    if (state.brandId) {
+        try {
+            const casts = await Cast.find({ brandId: state.brandId }).select('name').lean();
+            customCharacterNames = casts.map(c => c.name);
+        } catch (e) {
+            console.warn(`[videoGeneratorNode] Failed to load brand cast names: ${e.message}`);
+        }
+    }
+
     const { requestId, endpoint, statusUrl, resultUrl, provider, _atlasCloudPayload, _muApiPayload, _laozhangVideoUrl } = await submitVideoGeneration({
         model,
         prompt,
@@ -521,6 +533,7 @@ export async function videoGeneratorNode(state) {
         generateAudio: state.routing?.generateAudio !== false,
         aspectRatio: state.routing?.aspectRatio || '16:9',
         referenceImages,
+        customCharacterNames,
     });
 
     return {

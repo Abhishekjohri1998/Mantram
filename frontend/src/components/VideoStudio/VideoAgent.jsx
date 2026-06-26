@@ -53,6 +53,7 @@ async function api(path, opts = {}) {
 // ── Model reference ───────────────────────────────────────────────────────────
 const MODELS = [
     { id: 'seedance-2.0',  name: 'Seedance 2.0', icon: '🎬', tier: 'Pro',     tagline: 'Best overall + fast',        maxDur: 120, color: '#14b8a6' },
+    { id: 'seedance-2.0-mini', name: 'Seedance Mini', icon: '⚡', tier: 'Fast', tagline: 'Lightweight + low cost', maxDur: 15, color: '#10b981' },
     { id: 'kling-3.0',     name: 'Kling 3.0',    icon: '👑', tier: 'Premium', tagline: 'Cinematic + multi-shot',     maxDur: 60,  color: '#f59e0b' },
     { id: 'veo-3.1',       name: 'Veo 3.1',      icon: '🎤', tier: 'Ultra',   tagline: 'Native audio + realistic',   maxDur: 30,  color: '#8b5cf6' },
     { id: 'veo-3.1-fast',  name: 'Veo Fast',     icon: '⚡', tier: 'Premium', tagline: 'Fast Veo + audio',           maxDur: 30,  color: '#6d28d9' },

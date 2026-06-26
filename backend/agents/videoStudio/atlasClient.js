@@ -55,7 +55,19 @@ function authHeaders() {
     return { 'Authorization': `Bearer ${getAtlasApiKey()}`, 'Content-Type': 'application/json' };
 }
 
-function resolveModelName(qualityMode, imageCount) {
+function resolveModelName(qualityMode, imageCount, model = 'seedance-2.0') {
+    if (model === 'seedance-2.0-mini') {
+        if (imageCount > 1) {
+            console.log(`📌 Atlas Mini: ${imageCount} images → reference-to-video`);
+            return `bytedance/seedance-2.0-mini/reference-to-video`;
+        }
+        if (imageCount === 1) {
+            console.log(`📌 Atlas Mini: 1 image → image-to-video`);
+            return `bytedance/seedance-2.0-mini/image-to-video`;
+        }
+        return `bytedance/seedance-2.0-mini/text-to-video`;
+    }
+
     // Per Atlas Cloud docs, the correct model namespace is atlascloud/workflow/seedance-2.0/...
     const tier = qualityMode === 'quality' ? 'seedance-2.0' : 'seedance-2.0-fast';
     if (imageCount > 1) {
@@ -160,9 +172,13 @@ async function ensureAssetCompatible(imageUrl) {
 
 async function uploadMediaToAtlasCDN(imageUrl) {
     try {
-        console.log(`📸 [Atlas CDN] Uploading to Atlas media storage: ${imageUrl.substring(0, 60)}...`);
+        const rawUrl = typeof imageUrl === 'object' && imageUrl ? imageUrl.url : imageUrl;
+        if (!rawUrl || typeof rawUrl !== 'string') {
+            throw new Error(`Invalid imageUrl passed to uploadMediaToAtlasCDN: ${typeof imageUrl}`);
+        }
+        console.log(`📸 [Atlas CDN] Uploading to Atlas media storage: ${rawUrl.substring(0, 60)}...`);
         // Pre-process: ensure format + resolution are compatible before CDN upload
-        const compatibleUrl = await ensureAssetCompatible(imageUrl);
+        const compatibleUrl = await ensureAssetCompatible(rawUrl);
         const imageRes = await fetch(compatibleUrl, fetchOptions({}));
         const arrayBuffer = await imageRes.arrayBuffer();
         const contentType = imageRes.headers.get('content-type') || 'image/jpeg';
@@ -295,11 +311,32 @@ async function submitAtlasCloudPayload(payload) {
     const MAX_ATTEMPTS = 3;
     const atlasModel   = payload.task_type || payload.model || 'atlascloud/workflow/seedance-2.0-fast/text-to-video';
     
+    // Sanitize prompt — context-aware + safety deity/character name bypass
+    const rawPrompt = payload.input?.prompt || '';
+    const imageCountInPayload = (payload.input?.image_urls?.length || 0) + (payload.input?.reference_images?.length || 0) + (payload.input?.images?.length || 0);
+    const customCharacterNames = payload.input?.customCharacterNames || [];
+    
+    const isGemini = payload.model === 'gemini-flash' || payload.model === 'gemini-omni-flash';
+    const providerKey = isGemini ? 'gemini-flash' : 'atlascloud';
+    
+    const { prompt: sanitizedPromptFromSanitizer, warnings: sanitizerWarnings } = sanitizePromptForProvider(
+        rawPrompt,
+        providerKey,
+        imageCountInPayload,
+        { customCharacterNames }
+    );
+    if (sanitizerWarnings.length > 0) {
+        console.warn(`⚠️ [Atlas Sanitizer] ${sanitizerWarnings.join(' | ')}`);
+    }
+    // Also strip explicit words (safety layer on top of fashion sanitizer)
+    const BANNED_PATTERNS = /\b(shoot|shoots|shooting|kill|kills|killing|bomb|bombs|gun|guns|blood|bloody|naked|nude|sex|sexual)\b/gi;
+    const sanitizedPrompt = sanitizedPromptFromSanitizer.replace(BANNED_PATTERNS, 'move');
+
     let atlasPayload;
-    if (payload.model === 'gemini-flash' || payload.model === 'gemini-omni-flash') {
+    if (isGemini) {
         atlasPayload = {
             model: payload.input.model,
-            prompt: payload.input.prompt,
+            prompt: sanitizedPrompt,
             duration: payload.input.duration,
             aspect_ratio: payload.input.aspect_ratio,
             resolution: payload.input.resolution,
@@ -317,17 +354,6 @@ async function submitAtlasCloudPayload(payload) {
         const isHappyHorse = atlasModel.includes('happyhorse');
         const rawRes = payload.input?.resolution || '720p';
         const normalizedRes = isHappyHorse ? rawRes.toUpperCase() : rawRes.toLowerCase();
-
-        // Sanitize prompt — context-aware (fashion vocabulary preserved) + length enforcement
-        const rawPrompt = payload.input?.prompt || '';
-        const imageCountInPayload = (payload.input?.image_urls?.length || 0) + (payload.input?.reference_images?.length || 0);
-        const { prompt: sanitizedPromptFromSanitizer, warnings: sanitizerWarnings } = sanitizePromptForProvider(rawPrompt, 'atlascloud', imageCountInPayload);
-        if (sanitizerWarnings.length > 0) {
-            console.warn(`⚠️ [Atlas Sanitizer] ${sanitizerWarnings.join(' | ')}`);
-        }
-        // Also strip explicit words (safety layer on top of fashion sanitizer)
-        const BANNED_PATTERNS = /\b(shoot|shoots|shooting|kill|kills|killing|bomb|bombs|gun|guns|blood|bloody|naked|nude|sex|sexual)\b/gi;
-        const sanitizedPrompt = sanitizedPromptFromSanitizer.replace(BANNED_PATTERNS, 'move');
 
         atlasPayload = {
             model:           atlasModel,
@@ -448,6 +474,8 @@ export async function submitAtlasCloudVideoGeneration({
     referenceImages = [], qualityMode = 'fast', resolution = '720p',
     imageRole = 'face', // 'face' (default, UGC Pro) | 'product' (Q-Ads — no face registration)
     refAudio = null,    // TTS audio URL for native lip-sync (Seedance 2.0)
+    customCharacterNames = [],
+    model = 'seedance-2.0'
 }) {
     console.log(`🎞️ [Atlas] submitVideoGeneration: refs=${referenceImages.length} | imageUrl=${imageUrl ? 'yes' : 'no'} | quality=${qualityMode}`);
 
@@ -580,7 +608,7 @@ export async function submitAtlasCloudVideoGeneration({
 
     const imageCount     = registeredAssetUris.length + rawFallbackUrls.length + firstFrameAssetUris.length;
     const effectiveCount = (registeredAssetUris.length > 0 || rawFallbackUrls.length > 0) ? Math.max(imageCount, 2) : imageCount;
-    const modelName      = resolveModelName(qualityMode, effectiveCount);
+    const modelName      = resolveModelName(qualityMode, effectiveCount, model);
     const dur            = Math.min(Math.max(parseInt(duration, 10) || 5, 4), 15);
 
     console.log(`🎯 [Atlas] model=${modelName} | dur=${dur}s | assetRefs=${registeredAssetUris.length} | rawFallbacks=${rawFallbackUrls.length} | firstFrame=${firstFrameAssetUris.length}`);
@@ -592,6 +620,7 @@ export async function submitAtlasCloudVideoGeneration({
         duration:       dur,
         resolution:     resolution === '4k' ? '4k' : (resolution === '1080p' ? '1080p' : (resolution === '480p' ? '480p' : '720p')),
         generate_audio: refAudio ? false : (generateAudio !== false),
+        customCharacterNames,
     };
 
     if (refAudio) {
@@ -610,13 +639,13 @@ export async function submitAtlasCloudVideoGeneration({
 
     const payload = { model: 'seedance', task_type: modelName, input: taskInput };
     const taskId  = await submitAtlasCloudPayload(payload);
-    return { taskId, provider: 'atlascloud', model: 'seedance-2.0', _payload: payload, type: 'generation' };
+    return { taskId, provider: 'atlascloud', model, _payload: payload, type: 'generation' };
 }
 
 // ── Public: Image-to-Video ─────────────────────────────────────────────────────
 
 export async function submitAtlasCloudImageToVideo({
-    imageUrl, prompt, duration, aspectRatio, qualityMode = 'fast', referenceImages = [],
+    imageUrl, prompt, duration, aspectRatio, qualityMode = 'fast', referenceImages = [], model = 'seedance-2.0'
 }) {
     if (!imageUrl) throw new Error('imageUrl is required for Image-to-Video');
     console.log(`🖼️→🎬 [Atlas I2V]: imageUrl=${imageUrl.substring(0, 60)}... refs=${referenceImages.length}`);
@@ -626,7 +655,10 @@ export async function submitAtlasCloudImageToVideo({
             const resized = imageUrl.startsWith('data:') ? await resizeToAspectRatio(imageUrl, aspectRatio || '16:9') : imageUrl;
             return await ensureS3Url(resized, 'video-studio/atlascloud');
         })(),
-        ...referenceImages.map(img => ensureS3Url(img, 'video-studio/atlascloud')),
+        ...referenceImages.map(img => {
+            const rawUrl = typeof img === 'object' && img ? img.url : img;
+            return ensureS3Url(rawUrl, 'video-studio/atlascloud');
+        }),
     ]);
     if (!hostedUrl) throw new Error('Failed to host image for I2V generation');
 
@@ -644,7 +676,7 @@ export async function submitAtlasCloudImageToVideo({
     if (!finalPrompt.includes('@image1')) finalPrompt = `@image1 ${finalPrompt}`;
     finalPrompt = truncatePrompt(finalPrompt.replace(/<img>[^<]*<\/img>/g, '').trim());
 
-    const modelName = resolveModelName(qualityMode, 1 + hostedRefs.filter(Boolean).length);
+    const modelName = resolveModelName(qualityMode, 1 + hostedRefs.filter(Boolean).length, model);
     const dur       = Math.min(Math.max(parseInt(duration, 10) || 5, 5), 15);
     console.log(`🎯 [Atlas I2V] model=${modelName} | dur=${dur}s`);
 
@@ -653,19 +685,19 @@ export async function submitAtlasCloudImageToVideo({
         input: { prompt: finalPrompt, image_urls: [hostedUrl, ...hostedRefs.filter(Boolean)], aspect_ratio: aspectRatio || '16:9', duration: dur },
     };
     const taskId = await submitAtlasCloudPayload(payload);
-    return { taskId, provider: 'atlascloud', model: 'seedance-2.0', mode: 'i2v', _payload: payload, type: 'generation' };
+    return { taskId, provider: 'atlascloud', model, mode: 'i2v', _payload: payload, type: 'generation' };
 }
 
 // ── Public: Video Extend ──────────────────────────────────────────────────────
 
-export async function submitAtlasCloudVideoExtend({ parentTaskId, prompt, duration, qualityMode = 'fast' }) {
+export async function submitAtlasCloudVideoExtend({ parentTaskId, prompt, duration, qualityMode = 'fast', model = 'seedance-2.0' }) {
     if (!parentTaskId) throw new Error('parentTaskId is required for Video Extend');
     const dur = Math.min(Math.max(parseInt(duration, 10) || 5, 5), 10);
     console.log(`🔗 [Atlas Extend]: parent=${parentTaskId} dur=${dur}s`);
-    const modelName = resolveModelName(qualityMode, 0);
+    const modelName = resolveModelName(qualityMode, 0, model);
     const payload   = { model: 'seedance', task_type: modelName, input: { prompt: prompt || '', duration: dur, parent_task_id: parentTaskId } };
     const taskId    = await submitAtlasCloudPayload(payload);
-    return { taskId, provider: 'atlascloud', model: 'seedance-2.0', mode: 'extend', _payload: payload, parentTaskId, type: 'generation' };
+    return { taskId, provider: 'atlascloud', model, mode: 'extend', _payload: payload, parentTaskId, type: 'generation' };
 }
 
 // ── Public: HappyHorse 1.0 Video Generation (T2V / I2V / R2V) ────────────────
@@ -675,6 +707,7 @@ export async function submitHappyHorseVideoGeneration({
     referenceImages = [], resolution = '720p',
     refAudio = null, // TTS audio URL for native lip-sync (audio-driven generation)
     model = 'happyhorse-1.0',
+    customCharacterNames = []
 }) {
     console.log(`🐴 [HappyHorse] submitVideoGeneration: refs=${referenceImages.length} | imageUrl=${imageUrl ? 'yes' : 'no'} | refAudio=${refAudio ? 'yes' : 'no'}`);
 
@@ -706,7 +739,8 @@ export async function submitHappyHorseVideoGeneration({
 
     if (referenceImages && referenceImages.length > 0) {
         const uploaded = await Promise.all(referenceImages.map(async img => {
-            const s3Url = await ensureS3Url(img, 'video-studio/happyhorse');
+            const rawUrl = typeof img === 'object' && img ? img.url : img;
+            const s3Url = await ensureS3Url(rawUrl, 'video-studio/happyhorse');
             return s3Url ? await ensureAssetCompatible(s3Url) : null;
         }));
         uploaded.forEach(url => { if (url) s3RefImages.push(url); });
@@ -728,6 +762,7 @@ export async function submitHappyHorseVideoGeneration({
         duration:       dur,
         resolution:     res,
         generate_audio: refAudio ? false : (generateAudio !== false), // Disable native audio when TTS provided
+        customCharacterNames,
     };
 
     // 🎤 Pass TTS audio for native lip-sync (HappyHorse supports audio-driven generation)
@@ -758,6 +793,7 @@ export async function submitHappyHorseVideoGeneration({
 
 export async function submitInfiniteTalkVideoGeneration({
     prompt, imageUrl, videoUrl, refAudio, duration, resolution = '720p',
+    customCharacterNames = []
 }) {
     if (!imageUrl && !videoUrl) throw new Error('InfiniteTalk requires either a portrait image (imageUrl) or a reference video (videoUrl).');
     if (!refAudio) throw new Error('InfiniteTalk requires an audio track (refAudio).');
@@ -770,6 +806,7 @@ export async function submitInfiniteTalkVideoGeneration({
         prompt:         finalPrompt,
         audio_url:      refAudio,
         duration:       Math.min(Math.max(parseInt(duration, 10) || 5, 3), 15),
+        customCharacterNames,
     };
 
     if (videoUrl) {
@@ -792,6 +829,7 @@ export async function submitInfiniteTalkVideoGeneration({
 export async function submitGeminiFlashVideoGeneration({
     prompt, imageUrl, duration, aspectRatio, resolution = '720p',
     referenceImages = [],
+    customCharacterNames = []
 }) {
     // Gemini Omni Flash Image-to-Video supports 1–7 reference images (images[] field)
     // Prompt: up to 20,000 characters
@@ -845,7 +883,8 @@ export async function submitGeminiFlashVideoGeneration({
         console.log(`📸 [Gemini Flash] Uploading ${imagesToUpload.length} image(s) to Atlas CDN in parallel...`);
         const uploads = await Promise.all(imagesToUpload.map(async (img, i) => {
             try {
-                const s3Url = await ensureS3Url(img, 'video-studio/gemini-flash');
+                const rawUrl = typeof img === 'object' && img ? img.url : img;
+                const s3Url = await ensureS3Url(rawUrl, 'video-studio/gemini-flash');
                 if (!s3Url) return null;
                 const cdnUrl = await uploadMediaToAtlasCDN(s3Url);
                 if (cdnUrl) console.log(`  ✅ @image${i + 1}: ${cdnUrl.substring(0, 60)}...`);
@@ -887,6 +926,7 @@ export async function submitGeminiFlashVideoGeneration({
         aspect_ratio: finalRatio,
         resolution: finalRes,
         seed: -1,
+        customCharacterNames,
     };
 
     // Pass all images as `images[]` array — Gemini Omni Flash uses this field for 1–7 refs

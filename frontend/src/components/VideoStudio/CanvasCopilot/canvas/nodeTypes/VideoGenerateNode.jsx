@@ -196,6 +196,7 @@ export default function VideoGenerateNode({ data, selected }) {
                         >
                             <option value="auto">Auto</option>
                             <option value="seedance-2.0">Seedance 2</option>
+                            <option value="seedance-2.0-mini">Seedance 2 Mini</option>
                             <option value="kling-3.0">Kling 3.0</option>
                             <option value="veo-3.1">Veo 3.1</option>
                             <option value="veo-3.1-fast">Veo Fast</option>

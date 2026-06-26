@@ -211,6 +211,7 @@ const TemplateManager = () => {
 
     const VIDEO_MODELS = [
         { value: 'seedance-2.0', label: 'Seedance 2.0', type: 'video' },
+        { value: 'seedance-2.0-mini', label: 'Seedance 2.0 Mini', type: 'video' },
         { value: 'kling-v2-master', label: 'Kling V2 Master', type: 'video' },
         { value: 'wan-2.1', label: 'Wan 2.1', type: 'video' },
         { value: 'luma-ray-2', label: 'Luma Ray 2', type: 'video' },

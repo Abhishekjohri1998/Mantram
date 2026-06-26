@@ -483,9 +483,11 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
                         aspectRatio: params.format,
                         resolution: params.resolution,
                         referenceImages: segmentRefs.slice(0, 6),
+                        customCharacterNames: avatarNames,
                     });
                 } else {
                     genResult = await submitAtlasCloudVideoGeneration({
+                        model: params.model,
                         prompt: segPrompt,
                         imageUrl: segmentFirstFrameUrl,
                         duration: sceneDurations[i],
@@ -495,6 +497,7 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
                         qualityMode,
                         resolution: params.resolution,
                         imageRole: 'mixed',
+                        customCharacterNames: avatarNames,
                     });
                 }
 
@@ -552,9 +555,11 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
                             aspectRatio: params.format,
                             resolution: params.resolution,
                             referenceImages: segmentRefs.slice(0, 6),
+                            customCharacterNames: avatarNames,
                         });
                     } else {
                         retryResult = await submitAtlasCloudVideoGeneration({
+                            model: params.model,
                             prompt: segPrompt,
                             imageUrl: segmentFirstFrameUrl,
                             duration: sceneDurations[i],
@@ -564,6 +569,7 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
                             qualityMode,
                             resolution: params.resolution,
                             imageRole: 'mixed',
+                            customCharacterNames: avatarNames,
                         });
                     }
                     const retryUrl = await _pollSegment(retryResult, jobId, i, actualSegCount);

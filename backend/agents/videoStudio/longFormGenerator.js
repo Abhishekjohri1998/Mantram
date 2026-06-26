@@ -193,6 +193,7 @@ async function runPipeline(jobId, params) {
 
                 if (isSeedance) {
                     genResult = await submitAtlasCloudVideoGeneration({
+                        model: params.model,
                         prompt: scenePrompt,
                         imageUrl: lastFrameUrl,
                         duration: scene.duration,
@@ -248,6 +249,7 @@ async function runPipeline(jobId, params) {
 
                     if (isSeedance) {
                         retryResult = await submitAtlasCloudVideoGeneration({
+                            model: params.model,
                             prompt: scene.visualPrompt || params.prompt,
                             imageUrl: lastFrameUrl,
                             duration: scene.duration,

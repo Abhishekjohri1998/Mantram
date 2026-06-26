@@ -22,6 +22,7 @@ import VideoProject from '../models/VideoProject.js';
 import ClonedVoice from '../models/ClonedVoice.js';
 import Avatar from '../models/Avatar.js';
 import Brand from '../models/Brand.js';
+import Cast from '../models/Cast.js';
 import { protect } from '../middleware/auth.js';
 import { requireCredits, refundCredits } from '../middleware/credits.js';
 import { aiGenerationLimiter } from '../middleware/rateLimiter.js';
@@ -2494,10 +2495,11 @@ router.post('/agent/v2/chat', protect, async (req, res) => {
             generate:     'Video is being generated or is done. Help user download, share, or iterate.',
         };
 
-        const MODEL_IDS = ['seedance-2.0', 'kling-3.0', 'veo-3.1', 'veo-3.1-fast', 'grok-imagine', 'gemini-flash', 'gemini-omni-flash'];
+        const MODEL_IDS = ['seedance-2.0', 'seedance-2.0-mini', 'kling-3.0', 'veo-3.1', 'veo-3.1-fast', 'grok-imagine', 'gemini-flash', 'gemini-omni-flash'];
 
         const MODEL_CONTEXT = `
 - seedance-2.0: Best for most ads. Fast, great image-to-video consistency, supports up to 120s.
+- seedance-2.0-mini: Lightweight, lower-cost video generation. Best for high-volume social media ads and rapid prototyping.
 - kling-3.0: Best cinematic quality, multi-shot scripts, great for brand films. Up to 60s.
 - veo-3.1: Native audio/dialogue generation. Most realistic. Up to 30s.
 - veo-3.1-fast: Same as Veo but faster. Good for quick turnarounds.
@@ -4701,6 +4703,17 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), aiGe
             prebuiltPrompt,
         } = req.body;
 
+        // Retrieve cast names to pass down as custom character names for prompt sanitization
+        let customCharacterNames = [];
+        try {
+            const query = req.user.role === 'superadmin' ? { brandId } : { brandId, userId: req.user._id };
+            const brandCast = await Cast.find(query).lean();
+            customCharacterNames = brandCast.map(c => c.name);
+            console.log(`[UGC Generate] Loaded ${customCharacterNames.length} cast names:`, customCharacterNames);
+        } catch (castErr) {
+            console.error('Failed to retrieve brand cast:', castErr.message);
+        }
+
         console.log(`[UGC Generate] req.body keys: ${Object.keys(req.body).join(', ')}`);
         console.log(`[UGC Generate] avatarUrl: ${avatarUrl ? avatarUrl.substring(0, 60) + '...' : 'MISSING'}`);
         console.log(`[UGC Generate] productImageUrls type: ${typeof bodyProductImgUrls}, value: ${JSON.stringify(bodyProductImgUrls)?.substring(0, 200)}`);
@@ -4748,7 +4761,7 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), aiGe
         console.log(`[UGC Generate] Submitting — ${duration}s, model=${selectedModel}, ${imageUrls.length} images, prompt ${prompt.split(/\s+/).length}w`);
 
         const isLongForm = ((selectedModel === 'gemini-flash' || selectedModel === 'gemini-omni-flash') && duration > 10) ||
-                           ((selectedModel === 'seedance-2.0' || selectedModel === 'seedance-2.0-fast') && duration > 15);
+                           ((selectedModel === 'seedance-2.0' || selectedModel === 'seedance-2.0-fast' || selectedModel === 'seedance-2.0-mini') && duration > 15);
 
         if (isLongForm) {
             console.log(`[UGC Generate] Routing to LONG-FORM generation: duration=${duration}s, model=${selectedModel}`);
@@ -4766,7 +4779,7 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), aiGe
                 status: 'generating',
                 script: prompt,
                 backendPrompt: prompt,
-                input: { images: imageUrls.map(url => ({ url, source: 'existing' })), productData: parsedProduct },
+                input: { images: imageUrls.map(url => ({ url, source: 'existing' })), productData: parsedProduct, avatarNames: customCharacterNames },
                 generation: {
                     provider: 'atlascloud',
                     model: selectedModel,
@@ -4795,6 +4808,7 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), aiGe
                 voiceoverScript: '', // Will run UGC voiceover pipeline post-generation
                 voiceoverLanguage: parsedSettings.language || 'English',
                 bgmPreset: parsedSettings.bgmPreset || req.body.bgmPreset || 'cinematic',
+                avatarNames: customCharacterNames,
             });
 
             // Update project with jobId
@@ -4824,11 +4838,12 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), aiGe
         let genResult;
         let usedProvider;
 
-        if (selectedModel === 'seedance-2.0' || selectedModel === 'seedance-2.0-fast') {
+        if (selectedModel === 'seedance-2.0' || selectedModel === 'seedance-2.0-fast' || selectedModel === 'seedance-2.0-mini') {
             // Atlas Cloud R2V path — ALL images as references (avatar + product)
             const allRefImages = imageUrls.slice(0, 9);
             console.log(`[UGC Generate] Seedance R2V: ${allRefImages.length} reference images`);
             genResult = await submitAtlasCloudVideoGeneration({
+                model: selectedModel,
                 prompt,
                 imageUrl: null,
                 duration,
@@ -4836,6 +4851,7 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), aiGe
                 qualityMode: quality,
                 generateAudio: true,
                 referenceImages: allRefImages,
+                customCharacterNames,
             });
             usedProvider = 'atlascloud';
 
@@ -4854,6 +4870,7 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), aiGe
                 aspectRatio,
                 generateAudio: false,                    // Gemini Flash: no native audio in developer tier
                 referenceImages: allRefImages.slice(1),  // product images as additional refs
+                customCharacterNames,
             });
             genResult = { taskId: result.requestId, _payload: result._atlasCloudPayload };
             usedProvider = result.provider || 'atlascloud';
@@ -4871,6 +4888,7 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), aiGe
                 aspectRatio,
                 generateAudio: true,
                 referenceImages: allRefImages,
+                customCharacterNames,
             });
             genResult = { taskId: result.requestId, _payload: result._atlasCloudPayload };
             usedProvider = result.provider || selectedModel;
@@ -5142,6 +5160,18 @@ router.post('/ugc-pro/qads/build-prompt', protect, async (req, res) => {
 router.post('/ugc-pro/qads/generate', protect, requireCredits('qAdsGenerate'), async (req, res) => {
     try {
         const { brandId, categoryId, productData, settings, avatarUrl, productImageUrls: bodyProductImgUrls, prebuiltPrompt } = req.body;
+
+        // Retrieve cast names to pass down as custom character names for prompt sanitization
+        let customCharacterNames = [];
+        try {
+            const query = req.user.role === 'superadmin' ? { brandId } : { brandId, userId: req.user._id };
+            const brandCast = await Cast.find(query).lean();
+            customCharacterNames = brandCast.map(c => c.name);
+            console.log(`[Q-Ads Generate] Loaded ${customCharacterNames.length} cast names:`, customCharacterNames);
+        } catch (castErr) {
+            console.error('Failed to retrieve brand cast:', castErr.message);
+        }
+
         const parsedProduct = typeof productData === 'string' ? JSON.parse(productData) : (productData || {});
         const parsedSettings = typeof settings === 'string' ? JSON.parse(settings) : (settings || {});
         const parsedProductImgs = typeof bodyProductImgUrls === 'string'
@@ -5197,12 +5227,16 @@ router.post('/ugc-pro/qads/generate', protect, requireCredits('qAdsGenerate'), a
             console.log(`👗 [Q-Ads Generate] Fashion/apparel brand detected — imageRole=fashion-model (garment-safe Asset registration)`);
         }
 
+        const selectedModel = parsedSettings.model || 'seedance-2.0';
+
         const genResult = await submitAtlasCloudVideoGeneration({
+            model: selectedModel,
             prompt,
             imageUrl: imageUrls[0] || null,
             duration, aspectRatio, qualityMode: quality, generateAudio: true,
             referenceImages: [...avatarFaceRefs, ...imageUrls.slice(1)],
             imageRole: resolvedImageRole,
+            customCharacterNames,
         });
 
         // Persist as VideoProject
@@ -5213,9 +5247,10 @@ router.post('/ugc-pro/qads/generate', protect, requireCredits('qAdsGenerate'), a
             input: {
                 brief: `Q-Ads [${categoryId}]: ${parsedProduct.productName || 'product'}`,
                 images: imageUrls.map((u, i) => ({ url: u, source: 'upload', label: i === 0 ? 'avatar' : `product-${i}` })),
+                avatarNames: customCharacterNames,
             },
             generation: {
-                provider: 'atlascloud', model: 'seedance-2.0',
+                provider: 'atlascloud', model: selectedModel,
                 falRequestId: genResult.taskId,
                 taskId: genResult.taskId, requestId: genResult.taskId,
                 duration, aspectRatio, progress: 0, status: 'GENERATING',
@@ -5252,12 +5287,26 @@ router.get('/ugc-pro/qads/status/:requestId', protect, async (req, res) => {
             if (project && !project.generation?.safeModeRetried) {
                 console.log(`🛡️ [Q-Ads Safe Mode] Safety triggered — stripping avatar and resubmitting product-only...`);
 
+                // Retrieve cast names to pass down as custom character names for prompt sanitization during safe mode retry
+                let customCharacterNames = [];
+                if (project.brand) {
+                    try {
+                        const query = req.user.role === 'superadmin' ? { brandId: project.brand } : { brandId: project.brand, userId: req.user._id };
+                        const brandCast = await Cast.find(query).lean();
+                        customCharacterNames = brandCast.map(c => c.name);
+                        console.log(`[Q-Ads Safe Mode] Loaded ${customCharacterNames.length} cast names for retry:`, customCharacterNames);
+                    } catch (castErr) {
+                        console.error('[Q-Ads Status] Failed to retrieve brand cast:', castErr.message);
+                    }
+                }
+
                 // Get original images; drop the first one (avatar)
                 const originalImages = (project.input?.images || []).map(i => i.url).filter(Boolean);
                 const productOnlyImages = originalImages.length > 1 ? originalImages.slice(1) : [];
 
                 try {
                     const retryResult = await submitAtlasCloudVideoGeneration({
+                        model: project.generation?.model || 'seedance-2.0',
                         prompt: project.backendPrompt || project.script,
                         imageUrl: productOnlyImages[0] || null,
                         duration: project.generation?.duration || 5,
@@ -5265,6 +5314,7 @@ router.get('/ugc-pro/qads/status/:requestId', protect, async (req, res) => {
                         qualityMode: 'high',
                         generateAudio: true,
                         referenceImages: productOnlyImages.slice(1),
+                        customCharacterNames,
                     });
 
                     // Update the project with the new task ID
@@ -6087,6 +6137,18 @@ router.post('/ugc-pro/qads/v2/generate-prompts', protect, requireCredits('qAdsPr
 router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGenerate'), async (req, res) => {
     try {
         const { brandId, presetId, variantId, prompt, legend, productImageUrls: bodyProductImgUrls, avatarUrl, settings } = req.body;
+
+        // Retrieve cast names to pass down as custom character names for prompt sanitization
+        let customCharacterNames = [];
+        try {
+            const query = req.user.role === 'superadmin' ? { brandId } : { brandId, userId: req.user._id };
+            const brandCast = await Cast.find(query).lean();
+            customCharacterNames = brandCast.map(c => c.name);
+            console.log(`[Q-Ads V2 Generate] Loaded ${customCharacterNames.length} cast names:`, customCharacterNames);
+        } catch (castErr) {
+            console.error('Failed to retrieve brand cast:', castErr.message);
+        }
+
         const parsedSettings = typeof settings === 'string' ? JSON.parse(settings) : (settings || {});
         const parsedProductImgs = typeof bodyProductImgUrls === 'string'
             ? JSON.parse(bodyProductImgUrls) : (Array.isArray(bodyProductImgUrls) ? bodyProductImgUrls : []);
@@ -6187,6 +6249,7 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
             imageUrl:         null,                     // No starting frame, pure R2V
             referenceImages:  finalReferenceImages,     // Avatar + Product(s) → Asset Library
             imageRole:        resolvedV2ImageRole,
+            customCharacterNames,
         });
 
         // Persist as VideoProject for polling
@@ -6205,6 +6268,7 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
                     brief: req.body.brief || `Q-Ads V2 [${preset?.name || presetId}] ${variantId}`,
                     images: imageUrls.map((u, i) => ({ url: u, source: 'upload', label: `product-${i + 1}` })),
                     avatarUrl: avatarFaceRefs[0] || null, // Save avatarUrl for InfiniteTalk Stage 2
+                    avatarNames: customCharacterNames,
                 },
                 generation: {
                     provider: genResult.provider || 'atlascloud',
@@ -10702,6 +10766,7 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                 });
             } else {
                 genResult = await submitAtlasCloudVideoGeneration({
+                    model,
                     imageUrl: firstFrameUrl || null, // FIX: never use poster as first frame
                     prompt: finalVideoPrompt,
                     duration: duration || 10,
@@ -11043,6 +11108,7 @@ router.post('/storyboard/regenerate-segment', protect, async (req, res) => {
 
         // Submit to Atlas — uses statically imported submitAtlasCloudVideoGeneration
         const genResult = await submitAtlasCloudVideoGeneration({
+            model,
             prompt:          basePrompt,
             imageUrl:        firstFrameUrl || null,
             duration,

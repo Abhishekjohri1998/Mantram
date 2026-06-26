@@ -53,6 +53,7 @@ const HOOKS = [
 const VIDEO_MODELS_UGC = [
     { value: 'seedance-2.0',     label: 'Seedance 2.0',  icon: 'local_movies' },
     { value: 'seedance-2.0-fast',label: 'Seedance Fast', icon: 'bolt' },
+    { value: 'seedance-2.0-mini',label: 'Seedance Mini', icon: 'bolt' },
     { value: 'kling-3.0',        label: 'Kling 3.0',     icon: 'videocam' },
     { value: 'kling-3.0-o',      label: 'Kling Omni ✨',  icon: 'auto_awesome' },
     { value: 'veo-3.1-fast',     label: 'Veo 3.1 Fast',  icon: 'movie' },

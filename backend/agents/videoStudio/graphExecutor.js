@@ -217,6 +217,7 @@ class VideoGenerateHandler extends NodeHandler {
             });
         } else {
             result = await submitAtlasCloudVideoGeneration({
+                model,
                 prompt,
                 imageUrl: inputs.image || null,
                 duration,
@@ -1071,7 +1072,10 @@ class FrameInterpolateHandler extends NodeHandler {
         if (!falKey) throw new Error('BLOCKED: provider (FAL_API_KEY not configured for Frame Interpolation)');
 
         const { ensureS3Url } = await import('./falClient.js');
-        const s3Frames = await Promise.all(frames.map(url => ensureS3Url(url, 'video-studio/references')));
+        const s3Frames = await Promise.all(frames.map(url => {
+            const rawUrl = typeof url === 'object' && url ? url.url : url;
+            return ensureS3Url(rawUrl, 'video-studio/references');
+        }));
 
         console.log(`🎞️ [FrameInterpolateHandler] Interpolating ${s3Frames.length} frames...`);
 

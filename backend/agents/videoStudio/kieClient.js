@@ -19,6 +19,7 @@
 
 import config from '../../config/env.js';
 import { ensureS3Url } from '../../utils/s3.js';
+import { sanitizePromptForProvider } from './promptSanitizer.js';
 
 const KIE_BASE_URL = 'https://api.kie.ai';
 
@@ -56,10 +57,21 @@ export async function submitKieVideoGeneration({ model, prompt, imageUrl, durati
     if (!modelConfig) throw new Error(`Unknown kie.ai model: ${model}`);
 
     const dur = Math.min(Math.max(duration || 5, 4), 15);
-
+    
+    // Sanitize prompt — context-aware + safety deity/character name bypass
+    const imageCountInPayload = imageUrl ? 1 : 0;
+    const { prompt: sanitizedPrompt, warnings: sanitizerWarnings } = sanitizePromptForProvider(
+        prompt,
+        'kie',
+        imageCountInPayload
+    );
+    if (sanitizerWarnings.length > 0) {
+        console.warn(`⚠️ [KIE Sanitizer] ${sanitizerWarnings.join(' | ')}`);
+    }
+ 
     // Build payload
     const payload = {
-        prompt,
+        prompt: sanitizedPrompt,
         model: modelConfig.modelParam,
         aspect_ratio: aspectRatio || '16:9',
     };

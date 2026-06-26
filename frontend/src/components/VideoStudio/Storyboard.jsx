@@ -69,6 +69,7 @@ function getDurationLabel(d) {
 const MODELS = [
     { value: 'seedance-2.0-fast', label: 'Seedance Fast' },
     { value: 'seedance-2.0', label: 'Seedance 2.0' },
+    { value: 'seedance-2.0-mini', label: 'Seedance 2.0 Mini' },
     { value: 'kling-3.0', label: 'Kling 3.0' },
     { value: 'gemini-flash', label: 'Gemini Flash Video' }
 ];
@@ -216,6 +217,7 @@ export default function Storyboard({
         const estimateCostLocal = (modelId, durationSeconds, res, mode = 'fast') => {
             let costPerSec = 0.23;
             if (modelId === 'seedance-2.0-fast') costPerSec = 0.1536;
+            else if (modelId === 'seedance-2.0-mini') costPerSec = 0.08;
             else if (modelId === 'seedance-1.0') costPerSec = 0.08;
             else if (modelId === 'happyhorse-1.0' || modelId === 'happyhorse-1.1') costPerSec = 0.15;
             else if (modelId === 'gemini-flash' || modelId === 'gemini-omni-flash') costPerSec = 0.15;
@@ -224,7 +226,7 @@ export default function Storyboard({
             else if (modelId === 'grok-imagine') costPerSec = 0.08;
             
             let resMult = 1.0;
-            const ATLAS_MODELS = ['seedance-2.0', 'seedance-2.0-fast', 'happyhorse-1.0', 'happyhorse-1.1', 'gemini-flash', 'gemini-omni-flash'];
+            const ATLAS_MODELS = ['seedance-2.0', 'seedance-2.0-fast', 'seedance-2.0-mini', 'happyhorse-1.0', 'happyhorse-1.1', 'gemini-flash', 'gemini-omni-flash'];
             if (ATLAS_MODELS.includes(modelId)) {
                 if (res === '480p') resMult = 0.5;
                 else if (res === '720p') resMult = 0.6;

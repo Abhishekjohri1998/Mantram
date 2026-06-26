@@ -5,11 +5,14 @@ import VideoProject from './models/VideoProject.js';
 
 async function check() {
     await mongoose.connect(process.env.MONGODB_URI);
-    const failed = await VideoProject.find({ status: 'failed' }).sort({ createdAt: -1 }).limit(3);
-    for (const f of failed) {
-        console.log("Title:", f.title);
-        console.log("Error:", f.generation?.error || f.error);
-        console.log("---");
+    const targetId = '6a3d1c40e01aaa838a2930ff';
+    console.log("Fetching project:", targetId);
+    const p = await VideoProject.findById(targetId);
+    if (p) {
+        console.log("=== COMPARED SUCCESSFUL PROJECT ===");
+        console.log(JSON.stringify(p, null, 2));
+    } else {
+        console.log("Project not found.");
     }
     process.exit(0);
 }

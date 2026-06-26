@@ -3,6 +3,7 @@ import { Upload } from "@aws-sdk/lib-storage";
 import config from "../../config/env.js";
 import { ensureS3Url } from '../../utils/s3.js';
 import { fetchOptions } from '../../utils/network.js';
+import { sanitizePromptForProvider } from './promptSanitizer.js';
 
 const LAOZHANG_BASE_URL = process.env.LAOZHANG_BASE_URL || 'https://api.laozhang.ai/v1';
 
@@ -89,6 +90,18 @@ export async function submitLaozhangVideoGeneration({
             }
         }
     } catch { /* normal string */ }
+
+    // Sanitize prompt — context-aware + safety deity/character name bypass
+    const imageCountInPayload = (imageUrl ? 1 : 0) + (referenceImages?.length || 0);
+    const { prompt: sanitizedPrompt, warnings: sanitizerWarnings } = sanitizePromptForProvider(
+        finalPromptText,
+        'laozhang',
+        imageCountInPayload
+    );
+    if (sanitizerWarnings.length > 0) {
+        console.warn(`⚠️ [LaoZhang Sanitizer] ${sanitizerWarnings.join(' | ')}`);
+    }
+    finalPromptText = sanitizedPrompt;
 
     // Build message content for multimodal models
     // Seedance 2.0 and Veo often support multiple image inputs

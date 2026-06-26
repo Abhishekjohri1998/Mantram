@@ -5017,7 +5017,7 @@ router.get('/model-status', protect, async (req, res) => {
         // Add defaults for models without recent data
         const defaultModels = [
             'nanobanana-2', 'nanobanana-pro', 'flux-pro-v1.1', 'flux-2-pro', 'gpt-image-2', 'grok-imagen', 'seedream-5', 'ideogram', 'gpt-image-1', 'recraft-v4',
-            'seedance-2.0', 'kling-v2-master', 'wan-2.1', 'luma-ray-2', 'happyhorse-1.0', 'happyhorse-1.1', 'gemini-image', 'kling-3.0', 'veo-3.1', 'gemini-flash'
+            'seedance-2.0', 'seedance-2.0-mini', 'kling-v2-master', 'wan-2.1', 'luma-ray-2', 'happyhorse-1.0', 'happyhorse-1.1', 'gemini-image', 'kling-3.0', 'veo-3.1', 'gemini-flash'
         ];
         defaultModels.forEach(m => {
             if (!statuses[m]) {

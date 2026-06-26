@@ -416,6 +416,7 @@ export const ANIMATE_MODELS = {
     'happyhorse-1.1': { name: 'HappyHorse 1.1', icon: '🐴', dur: [3, 15], ratios: ['16:9', '9:16', '1:1', '4:3', '3:4'], firstFrame: true, refImages: true, nativeAudio: false, desc: 'Premium HappyHorse 1.1 cinematic motion' },
     'grok-imagine': { name: 'Grok Imagine', icon: '🤖', dur: [1, 15], ratios: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'], firstFrame: true, refImages: false, nativeAudio: true, desc: 'Fast, affordable, image-to-video' },
     'seedance-2.0': { name: 'Seedance 2.0', icon: '🎞️', dur: [4, 15], ratios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'], firstFrame: true, refImages: true, nativeAudio: true, desc: 'Cinematic, camera control' },
+    'seedance-2.0-mini': { name: 'Seedance 2.0 Mini', icon: '⚡', dur: [5, 15], ratios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'], firstFrame: true, refImages: true, nativeAudio: true, desc: 'ByteDance Seedance 2.0 Mini' },
     'kling-3.0': { name: 'Kling 3.0', icon: '🖥️', dur: [3, 15], ratios: ['16:9', '9:16', '1:1'], firstFrame: true, refImages: false, nativeAudio: true, desc: 'Best motion & physics' },
     'veo-3.1': { name: 'Veo 3.1', icon: '🎬', dur: [4, 8], ratios: ['16:9', '9:16'], firstFrame: true, refImages: true, nativeAudio: true, desc: 'Premium cinematic quality' },
     'seedance-1.0': { name: 'Seedance 1.0', icon: '🌱', dur: [5, 10], ratios: ['16:9', '9:16', '1:1', '4:3', '3:4'], firstFrame: true, refImages: false, nativeAudio: false, desc: 'Fast & affordable' },

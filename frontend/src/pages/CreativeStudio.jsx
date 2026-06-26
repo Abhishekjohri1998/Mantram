@@ -677,6 +677,7 @@ export default function CreativeStudio() {
         'gemini-flash': { name: 'Gemini Flash Video', icon: 'flash_on', dur: [4, 10], ratios: ['16:9', '9:16'], firstFrame: true, refImages: true, nativeAudio: false, desc: 'Google Gemini Flash Video' },
         'grok-imagine': { name: 'Grok Imagine', icon: 'memory', dur: [5, 5], ratios: ['16:9', '1:1', '9:16'], firstFrame: true, refImages: false, nativeAudio: false, desc: 'Fast, affordable, image-to-video' },
         'seedance-2.0': { name: 'Seedance 2.0', icon: 'switch_video', dur: [5, 15], ratios: ['16:9', '9:16'], firstFrame: true, refImages: true, nativeAudio: false, desc: 'Cinematic, camera control' },
+        'seedance-2.0-mini': { name: 'Seedance 2.0 Mini', icon: 'flash_on', dur: [5, 15], ratios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'], firstFrame: true, refImages: true, nativeAudio: true, desc: 'ByteDance Seedance 2.0 Mini' },
         'kling-3.0': { name: 'Kling 3.0', icon: 'slow_motion_video', dur: [5, 10], ratios: ['16:9', '9:16', '1:1'], firstFrame: true, refImages: false, nativeAudio: false, desc: 'Best motion & physics' },
         'veo-3.1': { name: 'Veo 3.1', icon: 'movie_filter', dur: [5, 10], ratios: ['16:9'], firstFrame: true, refImages: false, nativeAudio: true, desc: 'Premium cinematic quality' },
         'seedance-1.0': { name: 'Seedance 1.0', icon: 'animation', dur: [5, 10], ratios: ['16:9', '9:16', '1:1', '4:3', '3:4'], firstFrame: true, refImages: false, nativeAudio: false, desc: 'Fast & affordable' },

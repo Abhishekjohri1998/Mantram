@@ -34,6 +34,7 @@ const RESOLUTIONS = ['480p', '720p', '1080p', '4k']
 const MODELS = [
     { value: 'seedance-2.0', label: 'Seedance 2.0' },
     { value: 'seedance-2.0-fast', label: 'Seedance 2 Fast' },
+    { value: 'seedance-2.0-mini', label: 'Seedance 2 Mini' },
     { value: 'gemini-flash', label: 'Gemini Flash Video' }
 ]
 

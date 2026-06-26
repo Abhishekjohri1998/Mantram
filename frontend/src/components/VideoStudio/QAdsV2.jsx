@@ -29,6 +29,7 @@ const RES = [
 const VIDEO_MODELS = [
     {value:'seedance-2.0',label:'Seedance 2.0',msIcon:'local_movies'},
     {value:'seedance-2.0-fast',label:'Seedance 2.0 Fast',msIcon:'bolt'},
+    {value:'seedance-2.0-mini',label:'Seedance 2.0 Mini',msIcon:'bolt'},
     {value:'happyhorse-1.0',label:'HappyHorse 1.0',msIcon:'pets'},
     {value:'happyhorse-1.1',label:'HappyHorse 1.1',msIcon:'pets'},
     {value:'gemini-flash',label:'Gemini Flash Video',msIcon:'flash_on'},
@@ -724,6 +725,7 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
         
         let costPerSec = 0.23;
         if (m === 'seedance-2.0-fast') costPerSec = 0.1536;
+        else if (m === 'seedance-2.0-mini') costPerSec = 0.08;
         else if (m === 'seedance-1.0') costPerSec = 0.08;
         else if (m === 'happyhorse-1.0' || m === 'happyhorse-1.1') costPerSec = 0.15;
         else if (m === 'gemini-flash' || m === 'gemini-omni-flash') costPerSec = 0.15;
@@ -732,7 +734,7 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
         else if (m === 'grok-imagine') costPerSec = 0.08;
         
         let resMult = 1.0;
-        const ATLAS_MODELS = ['seedance-2.0', 'seedance-2.0-fast', 'happyhorse-1.0', 'happyhorse-1.1', 'gemini-flash', 'gemini-omni-flash'];
+        const ATLAS_MODELS = ['seedance-2.0', 'seedance-2.0-fast', 'seedance-2.0-mini', 'happyhorse-1.0', 'happyhorse-1.1', 'gemini-flash', 'gemini-omni-flash'];
         if (ATLAS_MODELS.includes(m)) {
             if (r === '480p') resMult = 0.5;
             else if (r === '720p') resMult = 0.6;

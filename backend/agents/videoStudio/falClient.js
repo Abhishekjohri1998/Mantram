@@ -11,6 +11,7 @@ import { isLaozhangAvailable, submitLaozhangVideoGeneration, getLaozhangVideoSta
 import { getSetting } from '../../models/SystemSettings.js';
 import { getActiveProvider } from '../../ai/providerRouting.js';
 import { fetchOptions } from '../../utils/network.js';
+import { sanitizePromptForProvider } from './promptSanitizer.js';
 
 const FAL_BASE_URL = 'https://queue.fal.run';
 const GROK_BASE_URL = 'https://api.x.ai/v1';
@@ -28,7 +29,7 @@ const MODEL_ENDPOINTS = {
 
 export const MODEL_AVAILABLE = {
     'kling-3.0-o': true, 'kling-3.0': true, 'veo-3.1': true, 'veo-3.1-fast': true,
-    'seedance-1.0': true, 'seedance-2.0': true, 'seedance-2.0-fast': true, 'grok-imagine': true,
+    'seedance-1.0': true, 'seedance-2.0': true, 'seedance-2.0-fast': true, 'seedance-2.0-mini': true, 'grok-imagine': true,
     'hunyuan': true, 'sora-2': true, 'happyhorse-1.0': true, 'happyhorse-1.1': true, 'gemini-flash': true,
     'gemini-omni-flash': true,
 };
@@ -49,6 +50,7 @@ export const COST_PER_SECOND = {
     // Seedance 2.0 Pro: typically ~1.5x fast.
     'seedance-2.0': { fast: 0.23, quality: 0.35 },
     'seedance-2.0-fast': { fast: 0.1536, quality: 0.1536 },
+    'seedance-2.0-mini': { fast: 0.08, quality: 0.08 },
     'grok-imagine': { fast: 0.08, quality: 0.08 },
     'hunyuan': { fast: 0.03, quality: 0.05 },
     'sora-2': { fast: 0.10, quality: 0.15 },
@@ -67,6 +69,7 @@ const DURATION_LIMITS = {
     'seedance-1.0': { min: 5, max: 10 },
     'seedance-2.0': { min: 5, max: 15 },
     'seedance-2.0-fast': { min: 5, max: 15 },
+    'seedance-2.0-mini': { min: 4, max: 15 },
     'grok-imagine': { min: 1, max: 15 },
     'hunyuan': { min: 3, max: 10 },
     'sora-2': { min: 5, max: 15 },
@@ -134,6 +137,16 @@ export const MODEL_CAPABILITIES = {
         resolutions: ['720p', '1080p', '4k'], aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
         features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: true, multiShot: true, nativeAudio: true, voiceIds: false, cameraControl: true },
         maxReferenceImages: 3, costPerSecond: COST_PER_SECOND['seedance-2.0-fast'], recommended: false,
+        maxPromptLength: 200000,
+    },
+    'seedance-2.0-mini': {
+        id: 'seedance-2.0-mini', name: 'Seedance 2.0 Mini', icon: '⚡', provider: 'atlascloud',
+        description: 'ByteDance Seedance 2.0 Mini — lightweight, low-cost video generation',
+        bestFor: 'High-volume social media ads, fast prototyping, rapid iterations',
+        duration: { min: 4, max: 15, native: 5, step: 1 },
+        resolutions: ['480p', '720p'], aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
+        features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: false, multiShot: true, nativeAudio: true, voiceIds: false, cameraControl: true },
+        maxReferenceImages: 9, costPerSecond: COST_PER_SECOND['seedance-2.0-mini'], recommended: true,
         maxPromptLength: 200000,
     },
     'grok-imagine': {
@@ -340,8 +353,8 @@ function buildPayload(model, { prompt, imageUrl, duration, resolution, mode, sho
 /**
  * Robust cascading poll for seedance-2.0
  */
-async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, generateAudio, mode, referenceImages, refAudio, refVideo }) {
-    if (isLaozhangAvailable()) {
+async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, generateAudio, mode, referenceImages, refAudio, refVideo, customCharacterNames = [], model = 'seedance-2.0' }) {
+    if (isLaozhangAvailable() && model !== 'seedance-2.0-mini') {
         try {
             const r = await submitLaozhangVideoGeneration({
                 model: 'seedance-2.0', prompt, imageUrl,
@@ -361,10 +374,11 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
     // Step 2: Try Atlas Cloud (supports image_url for I2V) BEFORE switching models
     try {
         const atlasResult = await submitAtlasCloudVideoGeneration({
+            model,
             prompt, imageUrl: imageUrl || null, duration,
             aspectRatio: aspectRatio || '16:9',
             generateAudio, referenceImages: referenceImages || [], qualityMode: mode || 'fast',
-            refAudio, refVideo,
+            refAudio, refVideo, customCharacterNames,
         });
         if (atlasResult?.taskId) {
             console.log('✅ [Cascade] Step 2 done: Atlas Cloud (seedance)');
@@ -413,41 +427,31 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
     throw new Error('All video providers exhausted: MuAPI, Atlas Cloud, Kie.ai, and LaoZhang are all unavailable or out of credits. Please try again in 30 minutes.');
 }
 
-export async function submitVideoGeneration({ model, prompt, imageUrl, duration, resolution, mode, shots, generateAudio, aspectRatio, referenceImages, refAudio, refVideo, imageRole }) {
+export async function submitVideoGeneration({ model, prompt, imageUrl, duration, resolution, mode, shots, generateAudio, aspectRatio, referenceImages, refAudio, refVideo, imageRole, customCharacterNames = [] }) {
     if (!MODEL_AVAILABLE[model]) throw new Error(`Model '${model}' is not available.`);
-
-    // Enforce provider-specific prompt length limits
-    let safePrompt = truncatePrompt(prompt, model);
-
-    // NOTE: Watermark avoidance for Atlas Cloud is handled via the payload `watermark: false` field.
-    // Appending "(no watermark, clean background, high quality, 4k)" to the prompt is NOT needed
-    // for Atlas and causes Atlas NLP to parse it as template syntax, contributing to rejections.
 
     const [s3ImageUrl, s3RefAudio, s3RefVideo, ...s3ReferenceImages] = await Promise.all([
         ensureS3Url(imageUrl, 'video-studio/generations'),
         ensureS3Url(refAudio, 'video-studio/references'),
         ensureS3Url(refVideo, 'video-studio/references'),
-        ...(referenceImages || []).map(img => ensureS3Url(img, 'video-studio/references'))
+        ...(referenceImages || []).map(img => {
+            const rawUrl = typeof img === 'object' && img ? img.url : img;
+            return ensureS3Url(rawUrl, 'video-studio/references');
+        })
     ]);
 
-    // 🛡️ UNIVERSAL @IMAGE TAG SANITIZER
-    // Count total images that will actually be sent (firstFrame + refs)
+    // 🛡️ CENTRALIZED @IMAGE TAG AND SAFETY / DEITY SANITIZER
     const totalImageCount = (s3ImageUrl ? 1 : 0) + s3ReferenceImages.filter(Boolean).length;
-    if (totalImageCount > 0) {
-        safePrompt = safePrompt.replace(/@image(\d+)/gi, (match, p1) => {
-            const idx = parseInt(p1, 10);
-            if (idx > totalImageCount) {
-                console.warn(`🛡️ [Universal] Stripping phantom ${match} from prompt (only ${totalImageCount} images available)`);
-                return '';
-            }
-            return match;
-        }).replace(/\s{2,}/g, ' ').trim();
-    } else {
-        // No images at all — strip ALL @image tags
-        const hadTags = /@image\d+/i.test(safePrompt);
-        safePrompt = safePrompt.replace(/@image\d+/gi, '').replace(/\(\s*Visual reference:\s*\)/g, '').replace(/\s{2,}/g, ' ').trim();
-        if (hadTags) console.warn(`🛡️ [Universal] Stripped all @image tags from T2V prompt (0 images provided)`);
+    const { prompt: sanitizedPrompt, warnings: sanitizerWarnings } = sanitizePromptForProvider(
+        prompt,
+        model,
+        totalImageCount,
+        { customCharacterNames }
+    );
+    if (sanitizerWarnings.length > 0) {
+        console.warn(`⚠️ [Universal Video Sanitizer] ${sanitizerWarnings.join(' | ')}`);
     }
+    let safePrompt = sanitizedPrompt;
 
     let activeProvider = null;
     try {
@@ -455,7 +459,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     } catch (e) {
         console.warn('⚠️ Could not read video_provider from cache:', e.message);
     }
-    if (model === 'seedance-2.0' || model === 'seedance-2.0-fast') {
+    if (model === 'seedance-2.0' || model === 'seedance-2.0-fast' || model === 'seedance-2.0-mini') {
         const seedanceMode = model === 'seedance-2.0-fast' ? 'fast' : (mode || 'quality');
         const hasRealFaceRefs = s3ReferenceImages.filter(Boolean).length > 0;
         
@@ -465,6 +469,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
             console.log(`👤 [Seedance 2.0] ${s3ReferenceImages.length} reference image(s) detected → forcing Atlas Cloud reference-to-video`);
             try {
                 const result = await submitAtlasCloudVideoGeneration({
+                    model,
                     prompt: safePrompt, imageUrl: s3ImageUrl, duration, resolution,
                     aspectRatio: aspectRatio || '16:9', generateAudio,
                     referenceImages: s3ReferenceImages.filter(Boolean), qualityMode: seedanceMode,
@@ -491,6 +496,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                     aspectRatio: aspectRatio || '16:9', qualityMode: seedanceMode,
                     generateAudio, referenceImages: s3ReferenceImages,
                     refAudio: s3RefAudio, refVideo: s3RefVideo,
+                    customCharacterNames,
                 });
                 return {
                     requestId: result.taskId, endpoint: 'muapi-seedance-2.0',
@@ -499,10 +505,12 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                 };
             } else if (provider === 'atlascloud' || provider === 'piapi') {
                 const result = await submitAtlasCloudVideoGeneration({
+                    model,
                     prompt: safePrompt, imageUrl: s3ImageUrl, duration, resolution,
                     aspectRatio: aspectRatio || '16:9', generateAudio,
                     referenceImages: s3ReferenceImages, qualityMode: seedanceMode,
                     refAudio: s3RefAudio, refVideo: s3RefVideo, imageRole,
+                    customCharacterNames,
                 });
                 return {
                     requestId: result.taskId, endpoint: 'atlascloud-seedance-2.0',
@@ -532,6 +540,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                 aspectRatio: aspectRatio || '16:9', generateAudio, mode: seedanceMode,
                 referenceImages: s3ReferenceImages, 
                 refAudio: s3RefAudio, refVideo: s3RefVideo,
+                model,
             });
             return {
                 requestId: cascade.taskId || `lz-${Date.now()}`,
@@ -554,6 +563,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                 resolution,
                 aspectRatio: aspectRatio || '16:9',
                 referenceImages: s3ReferenceImages.filter(Boolean),
+                customCharacterNames,
             });
             return {
                 requestId: result.requestId,
@@ -613,6 +623,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                 resolution: resolution || '720p',
                 refAudio: s3RefAudio || null, // Pass TTS audio for lip-sync
                 model: model,
+                customCharacterNames,
             });
             return {
                 requestId: result.taskId,
@@ -639,6 +650,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                 aspectRatio: aspectRatio || '16:9',
                 resolution: resolution || '720p',
                 referenceImages: s3ReferenceImages.filter(Boolean),
+                customCharacterNames,
             });
             return {
                 requestId: result.taskId,
@@ -750,11 +762,14 @@ async function fetchFalResult(apiKey, resultUrl) {
  * Poll:   GET  /v1/videos/{request_id}   → status: pending | done | expired | failed
  * Result: data.video.url
  */
-export async function submitGrokVideoGeneration({ prompt, imageUrl, duration = 5, resolution = '720p', aspectRatio = '16:9', referenceImages = [] }) {
+export async function submitGrokVideoGeneration({ prompt, imageUrl, duration = 5, resolution = '720p', aspectRatio = '16:9', referenceImages = [], customCharacterNames = [] }) {
     const apiKey = getGrokApiKey();
+    const totalImageCount = (imageUrl ? 1 : 0) + (referenceImages?.length || 0);
+    const { prompt: sanitizedPrompt } = sanitizePromptForProvider(prompt, 'grok-imagine', totalImageCount, { customCharacterNames });
+
     const payload = {
         model: 'grok-imagine-video',
-        prompt: truncatePrompt(prompt, 'grok-imagine'),
+        prompt: sanitizedPrompt,
         duration: Math.min(Math.max(duration || 5, 1), 15),
         aspect_ratio: aspectRatio || '16:9',
         resolution: resolution === '1080p' ? '1080p' : resolution === '480p' ? '480p' : '720p',

@@ -152,3 +152,17 @@
 - **Learnings**:
   - Downstream agents must never assume that LLM calls returning raw strings will succeed. If the underlying provider is rate-limited or out of credit, the agent helper returns a structured error object. Callers must validate the type and error keys before executing string manipulations.
   - Designing a parallel direct API client alongside a proxy client allows seamless failover fallback routing, keeping client studios functional even during billing or proxy outages.
+
+### Video Generation Prompt Sanitization & Safety Bypass (Sprint 9)
+- **Feature**: Banned Deity name substitution and dynamic proper name-to-role dynamic mapping.
+- **Goal**: Prevent safety policy violations on AI video models (Seedance, Kling, Veo, Grok, Gemini) by sanitizing prompts pre-flight.
+- **Workflow**:
+  - `promptSanitizer.js` intercepts video prompts pre-flight and maps sensitive deities (e.g. Shiva, Ganesha, Jesus, Sai Baba) to safe visual/physical descriptions.
+  - Proper names (common names and custom cast names) are scanned and dynamically replaced with generic roles (`"the presenter"`, `"the co-presenter"`, etc.) in order of appearance in the prompt.
+  - Redundant prefix contexts (e.g. `"presenter the presenter"`) and phantom `@image` tags (referencing images not provided in the payload) are cleaned up.
+  - Express routes `/ugc-pro/generate`, `/ugc-pro/qads/generate`, and `/ugc-pro/qads/v2/generate-video` fetch active cast names from MongoDB `Cast` model and feed them as `customCharacterNames` into the client functions.
+  - Scoping is preserved for superadmins (bypassing the `userId` filter) to maintain administrative control.
+- **Learnings / Gotchas**:
+  - Sanitization must run *only* for video-generation prompts (not image or story generation prompts) and must preserve `@ImageN` tag formatting expected by providers for face/product locking.
+  - Handling safe-mode retries on status routes requires fetching and sanitizing retry prompts with the same context to ensure they don't trigger subsequent blocks.
+

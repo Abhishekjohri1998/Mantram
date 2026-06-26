@@ -111,6 +111,7 @@ export async function submitMuApiVideoGeneration({
     qualityMode = 'fast',
     generateAudio = true,
     referenceImages = [],
+    customCharacterNames = []
 }) {
     if (!prompt?.trim()) throw new Error('Prompt is required for MuAPI Seedance 2.0');
 
@@ -158,7 +159,7 @@ export async function submitMuApiVideoGeneration({
         //  - Strips @imageN tags where N > actual image count (prevents 400 errors)
         //  - Hard-enforces 3,800-char limit (MuAPI hard limit is 4,000; using 3,800 for safety)
         const { prompt: sanitizedPrompt, warnings: sanitizerWarnings } = sanitizePromptForProvider(
-            finalPromptText, 'muapi', imagesList.length
+            finalPromptText, 'muapi', imagesList.length, { customCharacterNames }
         );
         if (sanitizerWarnings.length > 0) {
             console.warn(`⚠️ [MuAPI Sanitizer] ${sanitizerWarnings.join(' | ')}`);
@@ -182,7 +183,7 @@ export async function submitMuApiVideoGeneration({
         payload.prompt = finalPrompt;
     } else {
         // TEXT-TO-VIDEO: strip all @image tags and sanitize fashion vocabulary
-        const { prompt: cleanT2V } = sanitizePromptForProvider(prompt.trim(), 'muapi', 0);
+        const { prompt: cleanT2V } = sanitizePromptForProvider(prompt.trim(), 'muapi', 0, { customCharacterNames });
         payload.prompt = cleanT2V;
         console.log(`📝 [MuAPI] T2V Clean Prompt (${cleanT2V.length} chars): ${cleanT2V.substring(0, 120)}...`);
     }
