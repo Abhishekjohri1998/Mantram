@@ -24,8 +24,8 @@ const connectDB = async (attempt = 1) => {
 
     try {
         connectionPromise = mongoose.connect(config.mongoUri, {
-            maxPoolSize: 3,                    // Low pool — most ops are sequential, not concurrent
-            minPoolSize: 0,                    // No idle connections — create on demand
+            maxPoolSize: process.env.NODE_ENV === 'test' ? 50 : 15,
+            minPoolSize: 1,                    // Keep 1 connection warm to avoid handshake overhead
             serverSelectionTimeoutMS: 5000,    // 5s to pick a server
             socketTimeoutMS: 45000,            // 45s socket timeout
             connectTimeoutMS: 30000,           // 30s initial connect

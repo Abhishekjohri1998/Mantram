@@ -81,6 +81,30 @@ router.get('/public/homepage', async (req, res) => {
     }
 });
 
+
+const templatesCache = new Map();
+const TEMPLATES_CACHE_TTL = 30 * 1000; // 30 seconds
+
+const clearUserTemplatesCache = (userId) => {
+    if (!userId) return;
+    const prefix = `${userId.toString()}_`;
+    for (const key of templatesCache.keys()) {
+        if (key.startsWith(prefix)) {
+            templatesCache.delete(key);
+        }
+    }
+};
+
+// Periodic cache eviction (every 10 minutes)
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of templatesCache) {
+        if (now - entry.timestamp > TEMPLATES_CACHE_TTL) {
+            templatesCache.delete(key);
+        }
+    }
+}, 10 * 60 * 1000).unref();
+
 // ══════════════════════════════════════════════════════════════════════════════
 // GET /api/templates
 // User-facing browse — published only, prompt fields excluded
@@ -89,70 +113,87 @@ router.get('/public/homepage', async (req, res) => {
 router.get('/', protect, async (req, res) => {
     try {
         const { limit = 50, page = 1, categoryId, studioOrigin, studioSection, brandId, search } = req.query;
-        const baseFilter = {
-            isActive: true,
-            isPublished: true,
-            $or: [
-                { userCreated: { $ne: true } },
-                { createdBy: req.user._id },
-                { isFeatured: true }
-            ]
-        };
-
-        if (categoryId) baseFilter.categoryId = categoryId;
-        if (studioOrigin) baseFilter.studioOrigin = studioOrigin;
-        if (studioSection) baseFilter.studioSection = studioSection;
-
-        if (search) {
-            baseFilter.$or = [
-                { name: { $regex: search, $options: 'i' } },
-                { description: { $regex: search, $options: 'i' } },
-                { tags: { $regex: search, $options: 'i' } }
-            ];
+        const cacheKey = `${req.user._id.toString()}_${JSON.stringify({ limit, page, categoryId, studioOrigin, studioSection, brandId, search })}`;
+        const now = Date.now();
+        
+        let cachedEntry = templatesCache.get(cacheKey);
+        if (cachedEntry && (now - cachedEntry.timestamp < TEMPLATES_CACHE_TTL)) {
+            const data = await cachedEntry.promise;
+            return res.json(data);
         }
 
-        let templates;
+        const fetchPromise = (async () => {
+            const baseFilter = {
+                isActive: true,
+                isPublished: true,
+                $or: [
+                    { userCreated: { $ne: true } },
+                    { createdBy: req.user._id },
+                    { isFeatured: true }
+                ]
+            };
 
-        if (brandId) {
-            // Step 9: when brandId present, brand-aware templates returned first
-            const [brandAware, general] = await Promise.all([
-                Template.find({ ...baseFilter, promptTemplate: { $regex: '\\{brand\\}|\\{product\\}', $options: 'i' } })
-                    .select('-savedPrompt -promptTemplate -generationParams')
-                    .sort({ isFeatured: -1, usageCount: -1, createdAt: -1 })
-                    .limit(parseInt(limit))
-                    .populate('categoryId', 'name color iconEmoji')
-                    .lean(),
-                Template.find({
-                    ...baseFilter,
-                    $or: [
-                        { promptTemplate: { $not: /\{brand\}|\{product\}/i } },
-                        { promptTemplate: { $exists: false } },
-                        { promptTemplate: '' },
-                    ],
-                })
+            if (categoryId) baseFilter.categoryId = categoryId;
+            if (studioOrigin) baseFilter.studioOrigin = studioOrigin;
+            if (studioSection) baseFilter.studioSection = studioSection;
+
+            if (search) {
+                baseFilter.$or = [
+                    { name: { $regex: search, $options: 'i' } },
+                    { description: { $regex: search, $options: 'i' } },
+                    { tags: { $regex: search, $options: 'i' } }
+                ];
+            }
+
+            let templates;
+
+            if (brandId) {
+                // Step 9: when brandId present, brand-aware templates returned first
+                const [brandAware, general] = await Promise.all([
+                    Template.find({ ...baseFilter, promptTemplate: { $regex: '\\{brand\\}|\\{product\\}', $options: 'i' } })
+                        .select('-savedPrompt -promptTemplate -generationParams')
+                        .sort({ isFeatured: -1, usageCount: -1, createdAt: -1 })
+                        .limit(parseInt(limit))
+                        .populate('categoryId', 'name color iconEmoji')
+                        .lean(),
+                    Template.find({
+                        ...baseFilter,
+                        $or: [
+                            { promptTemplate: { $not: /\{brand\}|\{product\}/i } },
+                            { promptTemplate: { $exists: false } },
+                            { promptTemplate: '' },
+                        ],
+                    })
+                        .select('-savedPrompt -promptTemplate -generationParams')
+                        .sort({ isFeatured: -1, usageCount: -1, createdAt: -1 })
+                        .skip((parseInt(page) - 1) * parseInt(limit))
+                        .limit(parseInt(limit))
+                        .populate('categoryId', 'name color iconEmoji')
+                        .lean(),
+                ]);
+                templates = [
+                    ...brandAware.map(t => ({ ...t, isBrandAware: true })),
+                    ...general.map(t => ({ ...t, isBrandAware: false })),
+                ];
+            } else {
+                templates = (await Template.find(baseFilter)
                     .select('-savedPrompt -promptTemplate -generationParams')
                     .sort({ isFeatured: -1, usageCount: -1, createdAt: -1 })
                     .skip((parseInt(page) - 1) * parseInt(limit))
                     .limit(parseInt(limit))
                     .populate('categoryId', 'name color iconEmoji')
-                    .lean(),
-            ]);
-            templates = [
-                ...brandAware.map(t => ({ ...t, isBrandAware: true })),
-                ...general.map(t => ({ ...t, isBrandAware: false })),
-            ];
-        } else {
-            templates = (await Template.find(baseFilter)
-                .select('-savedPrompt -promptTemplate -generationParams')
-                .sort({ isFeatured: -1, usageCount: -1, createdAt: -1 })
-                .skip((parseInt(page) - 1) * parseInt(limit))
-                .limit(parseInt(limit))
-                .populate('categoryId', 'name color iconEmoji')
-                .lean()).map(t => ({ ...t, isBrandAware: false }));
-        }
+                    .lean()).map(t => ({ ...t, isBrandAware: false }));
+            }
 
-        const signedTemplates = await Promise.all(templates.map(t => signTemplate(t)));
-        res.json({ success: true, templates: signedTemplates });
+            const signedTemplates = await Promise.all(templates.map(t => signTemplate(t)));
+            return { success: true, templates: signedTemplates };
+        })();
+
+        // Store the in-flight promise immediately so concurrent requests inherit it
+        templatesCache.set(cacheKey, { promise: fetchPromise, timestamp: now });
+
+        const responseData = await fetchPromise;
+        res.json(responseData);
     } catch (error) {
         console.error('GET /api/templates error:', error);
         res.status(500).json({ success: false, error: error.message });
@@ -440,6 +481,7 @@ The promptFormula is the MOST IMPORTANT field. It will be used directly as an im
         });
 
         await template.save();
+        clearUserTemplatesCache(req.user._id);
         console.log(`[TemplateCreate] Created template "${template.name}" (${template._id}) in ${Date.now() - start}ms`);
 
         const signedTemplate = await signTemplate(template);
@@ -748,6 +790,7 @@ router.delete('/:id', protect, async (req, res) => {
 
         template.isActive = false;
         await template.save();
+        clearUserTemplatesCache(req.user._id);
 
         res.json({ success: true, message: 'Template deleted' });
     } catch (error) {
