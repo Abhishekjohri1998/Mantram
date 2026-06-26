@@ -15,25 +15,70 @@
 import { PRODUCT_CATEGORIES } from './productTaxonomy.js';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
+const ATLAS_CHAT_URL = (process.env.ATLASCLOUD_BASE_URL || 'https://api.atlascloud.ai/v1') + '/chat/completions';
 const CLAUDE_MODEL = 'claude-sonnet-4-6';
+const ATLAS_CLAUDE_MODEL = 'anthropic/claude-sonnet-4.6';
 const SUPPORTED_CATEGORIES = Object.keys(PRODUCT_CATEGORIES);
 
 /**
  * Low-level Claude call with vision support.
+ * Uses Atlas Cloud (OpenAI-compatible) as primary, direct Anthropic as fallback.
  * imageData: full S3/CDN URL (preferred) or data: base64 string.
  */
 async function callClaudeVision(imageData, userText, maxTokens = 512) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
+    const atlasKey = process.env.ATLASCLOUD_API_KEY;
+    const anthropicKey = process.env.ANTHROPIC_API_KEY;
+    if (!atlasKey && !anthropicKey) throw new Error('No AI API key set (ATLASCLOUD_API_KEY or ANTHROPIC_API_KEY)');
 
-    // Build image source block
+    const useAtlas = !!atlasKey;
+
+    if (useAtlas) {
+        // Atlas Cloud — OpenAI-compatible multimodal format
+        let imageUrl;
+        if (imageData.startsWith('data:')) {
+            imageUrl = imageData; // data: URI works directly in OpenAI format
+        } else {
+            imageUrl = imageData; // HTTP URL
+        }
+
+        const body = {
+            model: ATLAS_CLAUDE_MODEL,
+            max_tokens: maxTokens,
+            messages: [{
+                role: 'user',
+                content: [
+                    { type: 'image_url', image_url: { url: imageUrl } },
+                    { type: 'text', text: userText },
+                ],
+            }],
+        };
+
+        const response = await fetch(ATLAS_CHAT_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${atlasKey}`,
+            },
+            body: JSON.stringify(body),
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(`Atlas Claude API Error [${response.status}]: ${errData.error?.message || response.statusText}`);
+        }
+
+        const data = await response.json();
+        const rawText = (data.choices?.[0]?.message?.content || '').trim();
+        return rawText.replace(/```(?:json)?\n?/g, '').replace(/```/g, '').trim();
+    }
+
+    // Fallback: Direct Anthropic API (native format)
     let imageBlock;
     if (imageData.startsWith('data:')) {
         const [meta, b64] = imageData.split(',');
         const mediaType = meta.replace('data:', '').replace(';base64', '');
         imageBlock = { type: 'image', source: { type: 'base64', media_type: mediaType, data: b64 } };
     } else {
-        // HTTP/HTTPS URL — Claude vision supports direct URL references
         imageBlock = { type: 'image', source: { type: 'url', url: imageData } };
     }
 
@@ -50,7 +95,7 @@ async function callClaudeVision(imageData, userText, maxTokens = 512) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'x-api-key': apiKey,
+            'x-api-key': anthropicKey,
             'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify(body),

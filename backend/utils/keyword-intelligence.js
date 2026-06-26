@@ -184,22 +184,23 @@ Analyze 25-35 keywords total. Be precise with volume estimates — use your know
  * Best at: "Should this brand target this keyword?" decisions.
  */
 async function strategistAgent(brandContext, industry, allSignals) {
-  // Try Claude first
+  // Try Claude first — Atlas Cloud primary, direct Anthropic fallback
+  const atlasKey = process.env.ATLASCLOUD_API_KEY;
   const claudeKey = process.env.CLAUDE_API_KEY || process.env.ANTHROPIC_API_KEY;
-  if (claudeKey) {
+  if (atlasKey || claudeKey) {
     try {
-      const resp = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': claudeKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: 'claude-3-opus-20240229', max_tokens: 1024,
-          messages: [{
-            role: 'user',
-            content: `You are a STRATEGIC CMO ADVISOR. You don't just find keywords — you decide which ones THIS brand should actually invest in.
+      const useAtlas = !!atlasKey;
+      const resp = await fetch(
+        useAtlas ? `${process.env.ATLASCLOUD_BASE_URL || 'https://api.atlascloud.ai/v1'}/chat/completions` : 'https://api.anthropic.com/v1/messages',
+        {
+          method: 'POST',
+          headers: useAtlas
+            ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${atlasKey}` }
+            : { 'Content-Type': 'application/json', 'x-api-key': claudeKey, 'anthropic-version': '2023-06-01' },
+          body: JSON.stringify(useAtlas
+            ? {
+                model: 'anthropic/claude-opus-4.1-20250805', max_tokens: 1024,
+                messages: [{ role: 'user', content: `You are a STRATEGIC CMO ADVISOR. You don't just find keywords — you decide which ones THIS brand should actually invest in.
 
 ${brandContext}
 
@@ -231,19 +232,57 @@ Respond in JSON:
   "thirtyDayPlan": [
     { "week": 1, "focus": "Theme", "keywords": ["kw1", "kw2"], "content": "What to create", "expectedImpact": "Impact" }
   ]
-}`
-          }],
-        }),
-        signal: AbortSignal.timeout(AGENT_TIMEOUT),
-      });
+}` }],
+                temperature: 0.4,
+              }
+            : {
+                model: 'claude-3-opus-20240229', max_tokens: 1024,
+                messages: [{ role: 'user', content: `You are a STRATEGIC CMO ADVISOR. You don't just find keywords — you decide which ones THIS brand should actually invest in.
+
+${brandContext}
+
+Here is verified keyword intelligence from multiple data sources:
+${allSignals}
+
+Your job:
+1. CHALLENGE the data — which keywords look good on paper but are wrong for THIS brand?
+2. Find STRATEGIC GEMS — low-volume keywords with high intent that competitors ignore
+3. Identify CROSS-LANGUAGE opportunities (especially vernacular — Hindi, Tamil, regional queries)
+4. Build a 30-day CONTENT PRIORITY based on impact vs effort
+5. Estimate BUSINESS ROI — which keywords will drive revenue, not just traffic?
+
+Respond in JSON:
+{
+  "strategicVerdict": "2-3 paragraph strategic analysis — act like a CMO billing $500/hour",
+  "mustTarget": [
+    { "keyword": "kw", "volume": 1000, "why": "Strategic reason specific to THIS brand", "roi": "Expected business outcome", "priority": 1 }
+  ],
+  "avoid": [
+    { "keyword": "kw", "volume": 5000, "why": "Why this keyword is a trap for THIS brand despite looking good" }
+  ],
+  "hiddenGems": [
+    { "keyword": "kw", "volume": 200, "why": "Why low volume but high value", "competitorBlindSpot": true }
+  ],
+  "vernacularOpportunities": [
+    { "keyword": "kw in local language", "language": "Hindi/Tamil/etc", "volume": 500, "competition": "none|low", "opportunity": "Why this is untapped" }
+  ],
+  "thirtyDayPlan": [
+    { "week": 1, "focus": "Theme", "keywords": ["kw1", "kw2"], "content": "What to create", "expectedImpact": "Impact" }
+  ]
+}` }],
+              }
+          ),
+          signal: AbortSignal.timeout(AGENT_TIMEOUT),
+        }
+      );
       const data = await resp.json();
-      const text = data.content?.[0]?.text || '';
+      const text = useAtlas ? (data.choices?.[0]?.message?.content || '') : (data.content?.[0]?.text || '');
       return {
         agent: 'strategist',
         model: 'claude',
         success: true,
         data: safeParseJSON(text),
-        tokens: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0),
+        tokens: useAtlas ? (data.usage?.total_tokens || 0) : ((data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0)),
       };
     } catch (e) {
       console.warn('Claude strategist failed, falling back to GPT:', e.message);

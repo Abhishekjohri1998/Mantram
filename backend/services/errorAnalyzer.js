@@ -12,7 +12,10 @@ import path from 'path';
 import { execSync } from 'child_process';
 import { extractStackFiles } from './errorClassifier.js';
 
-const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
+// Atlas Cloud (primary) or direct Anthropic (fallback) for Claude API calls
+const CLAUDE_API_URL = (process.env.ATLASCLOUD_API_KEY)
+    ? (process.env.ATLASCLOUD_BASE_URL || 'https://api.atlascloud.ai/v1') + '/chat/completions'
+    : 'https://api.anthropic.com/v1/messages';
 
 // ── Files that must NEVER be modified ─────────────────────────────────────
 const BLOCKED_FILE_PATTERNS = [

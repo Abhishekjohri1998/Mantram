@@ -16,8 +16,54 @@ export class OpenAIProvider extends BaseProvider {
         this.lzBaseUrl = config.laozhangBaseUrl || 'https://api.laozhang.ai/v1';
     }
 
+    /**
+     * Map model names for proxy providers (Atlas Cloud, Laozhang).
+     * Atlas Cloud requires namespaced model IDs (e.g. 'google/gemini-2.5-pro')
+     * while the codebase uses bare names (e.g. 'gemini-2.5-pro', 'claude-sonnet-4-6').
+     */
+    _mapModelForProvider(modelId) {
+        // Only apply mapping when routed through Atlas Cloud
+        const isAtlas = this.baseUrl?.includes('atlascloud.ai');
+        if (!isAtlas) return modelId;
+
+        // Already namespaced — no mapping needed
+        if (modelId.includes('/')) return modelId;
+
+        // ── Atlas Cloud model name mappings ──
+        // These were verified via live API tests on 2026-06-27
+
+        // Anthropic/Claude — Atlas uses dot notation (4.6) instead of dash (4-6)
+        const claudeMap = {
+            'claude-sonnet-4-6':            'anthropic/claude-sonnet-4.6',
+            'claude-sonnet-4-20250514':     'anthropic/claude-sonnet-4-20250514', // doesn't work but kept for reference
+            'claude-haiku-4-20250514':      'anthropic/claude-haiku-4.5-20251001', // Map to closest working model
+            'claude-haiku-4.5-20251001':    'anthropic/claude-haiku-4.5-20251001',
+            'claude-sonnet-4.5-20250929':   'anthropic/claude-sonnet-4.5-20250929',
+            'claude-opus-4-20250514':       'anthropic/claude-opus-4.1-20250805', // Map to closest working model
+            'claude-opus-4.1-20250805':     'anthropic/claude-opus-4.1-20250805',
+            'claude-3-opus-20240229':       'anthropic/claude-opus-4.1-20250805', // Legacy → latest working
+            'claude-3-5-haiku-20241022':    'anthropic/claude-haiku-4.5-20251001',
+        };
+        if (claudeMap[modelId]) return claudeMap[modelId];
+
+        // Google/Gemini — prefix with 'google/'
+        if (modelId.startsWith('gemini-')) return `google/${modelId}`;
+
+        // DeepSeek
+        if (modelId === 'deepseek-chat') return 'deepseek-ai/DeepSeek-V3-0324';
+        if (modelId.startsWith('deepseek-')) return `deepseek-ai/${modelId}`;
+
+        // OpenAI — prefix with 'openai/' for models that need it
+        if (modelId.startsWith('gpt-4.1')) return `openai/${modelId}`;
+
+        // Default — return as-is (Laozhang/OpenAI native doesn't need mapping)
+        return modelId;
+    }
+
     async generateText({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 2048, model, imageParts }) {
-        const modelId = model || this.config.defaultModel || 'gpt-4o-mini';
+        const rawModelId = model || this.config.defaultModel || 'gpt-4o-mini';
+        // Atlas Cloud uses namespaced model IDs — map native names when routed through Atlas
+        const modelId = this._mapModelForProvider(rawModelId);
 
         // Build message content — supports vision (imageParts = array of { inlineData: { data, mimeType } } or URL strings)
         let userContent = userPrompt;

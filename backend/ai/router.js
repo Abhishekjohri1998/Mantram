@@ -41,7 +41,17 @@ class ModelRouter {
         }
 
         // Register all providers — they self-check if API key exists
-        if (providerConfigs.laozhang?.apiKey) {
+        // ── Gemini: Atlas Cloud primary → Laozhang fallback → Native Gemini ──
+        if (providerConfigs.atlascloud?.apiKey) {
+            console.log('🔄 Routing Gemini through Atlas Cloud (OpenAI format)');
+            const geminiAtlasProvider = new OpenAIProvider({
+                apiKey: providerConfigs.atlascloud.apiKey,
+                defaultModel: 'google/' + (config.ai.defaultGeminiModel || 'gemini-2.5-pro'),
+            });
+            geminiAtlasProvider.name = 'gemini';
+            geminiAtlasProvider.baseUrl = providerConfigs.atlascloud.baseUrl;
+            this.providers.gemini = geminiAtlasProvider;
+        } else if (providerConfigs.laozhang?.apiKey) {
             console.log('🔄 Routing Gemini through Laozhang (OpenAI format)');
             const geminiLzProvider = new OpenAIProvider({
                 apiKey: providerConfigs.laozhang.apiKey,
@@ -79,13 +89,43 @@ class ModelRouter {
             xaiProvider.baseUrl = 'https://api.x.ai/v1';
             this.providers.xai = xaiProvider;
         }
-        this.providers.anthropic = new AnthropicProvider({
-            apiKey: providerConfigs.anthropic?.apiKey,
-            defaultModel: config.ai.defaultAnthropicModel || 'claude-sonnet-4-6',
-        });
 
-        // DeepSeek via Laozhang — ultra-reliable last-resort (cheapest, always available)
-        if (providerConfigs.laozhang?.apiKey) {
+        // ── Anthropic/Claude: Atlas Cloud primary → Direct Anthropic fallback ──
+        if (providerConfigs.atlascloud?.apiKey) {
+            console.log('🔄 Routing Anthropic/Claude through Atlas Cloud (OpenAI format)');
+            const claudeAtlasProvider = new OpenAIProvider({
+                apiKey: providerConfigs.atlascloud.apiKey,
+                // Atlas Cloud uses its own naming: 'anthropic/claude-sonnet-4.6' (not 'claude-sonnet-4-6')
+                defaultModel: 'anthropic/claude-sonnet-4.6',
+            });
+            claudeAtlasProvider.name = 'anthropic';
+            claudeAtlasProvider.baseUrl = providerConfigs.atlascloud.baseUrl;
+            this.providers.anthropic = claudeAtlasProvider;
+
+            // Keep native Anthropic as a separate fallback provider
+            if (providerConfigs.anthropic?.apiKey) {
+                this.nativeAnthropic = new AnthropicProvider({
+                    apiKey: providerConfigs.anthropic.apiKey,
+                    defaultModel: config.ai.defaultAnthropicModel || 'claude-sonnet-4-6',
+                });
+            }
+        } else {
+            this.providers.anthropic = new AnthropicProvider({
+                apiKey: providerConfigs.anthropic?.apiKey,
+                defaultModel: config.ai.defaultAnthropicModel || 'claude-sonnet-4-6',
+            });
+        }
+
+        // ── DeepSeek: Atlas Cloud primary → Laozhang fallback ──
+        if (providerConfigs.atlascloud?.apiKey) {
+            const deepseekProvider = new OpenAIProvider({
+                apiKey: providerConfigs.atlascloud.apiKey,
+                defaultModel: 'deepseek-ai/DeepSeek-V3-0324',
+            });
+            deepseekProvider.name = 'deepseek';
+            deepseekProvider.baseUrl = providerConfigs.atlascloud.baseUrl;
+            this.providers.deepseek = deepseekProvider;
+        } else if (providerConfigs.laozhang?.apiKey) {
             const deepseekProvider = new OpenAIProvider({
                 apiKey: providerConfigs.laozhang.apiKey,
                 defaultModel: 'deepseek-chat',
@@ -133,12 +173,21 @@ class ModelRouter {
         for (const name of priority) {
             let p = this.providers[name];
 
-            // Special fallback logic for gemini: if the primary routed Gemini (e.g. Laozhang)
+            // Special fallback logic for gemini: if the primary routed Gemini (e.g. Atlas Cloud/Laozhang)
             // is not available, in cooldown, or circuit-broken, fall back to nativeGemini.
             if (name === 'gemini' && (!p || !p.isAvailable() || (p.cooldownUntil && Date.now() < p.cooldownUntil) || this._isProviderThrottled('gemini'))) {
                 if (this.nativeGemini && this.nativeGemini.isAvailable() && !(this.nativeGemini.cooldownUntil && Date.now() < this.nativeGemini.cooldownUntil)) {
                     console.log('🔄 Primary Gemini is unavailable, throttled, or in cooldown. Routing to native Gemini.');
                     return this.nativeGemini;
+                }
+            }
+
+            // Special fallback logic for anthropic: if Atlas Cloud Claude is unavailable/throttled,
+            // fall back to native Anthropic API (direct, more expensive but reliable).
+            if (name === 'anthropic' && (!p || !p.isAvailable() || (p.cooldownUntil && Date.now() < p.cooldownUntil) || this._isProviderThrottled('anthropic'))) {
+                if (this.nativeAnthropic && this.nativeAnthropic.isAvailable() && !(this.nativeAnthropic.cooldownUntil && Date.now() < this.nativeAnthropic.cooldownUntil)) {
+                    console.log('🔄 Primary Anthropic (Atlas Cloud) is unavailable, throttled, or in cooldown. Routing to native Anthropic.');
+                    return this.nativeAnthropic;
                 }
             }
 

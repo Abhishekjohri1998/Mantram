@@ -60,6 +60,10 @@ export default {
                 apiKey: process.env.LAOZHANG_API_KEY,
                 baseUrl: process.env.LAOZHANG_BASE_URL || 'https://api.laozhang.ai/v1',
             },
+            atlascloud: {
+                apiKey: process.env.ATLASCLOUD_API_KEY,
+                baseUrl: process.env.ATLASCLOUD_BASE_URL || 'https://api.atlascloud.ai/v1',
+            },
         },
     },
 

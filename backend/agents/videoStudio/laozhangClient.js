@@ -7,6 +7,17 @@ import { sanitizePromptForProvider } from './promptSanitizer.js';
 
 const LAOZHANG_BASE_URL = process.env.LAOZHANG_BASE_URL || 'https://api.laozhang.ai/v1';
 
+// Atlas Cloud — primary provider for GPT Image 2 (cheaper, confirmed compatible)
+const ATLAS_IMAGE_BASE_URL = 'https://api.atlascloud.ai/v1';
+
+function getAtlasImageApiKey() {
+    return process.env.ATLASCLOUD_API_KEY || '';
+}
+
+function isAtlasImageAvailable() {
+    return !!process.env.ATLASCLOUD_API_KEY;
+}
+
 // Per-model timeout (ms). Heavy models can be slow but sora_video2 hangs indefinitely.
 const MODEL_TIMEOUTS = {
     'seedance-2.0':   90_000,
@@ -219,73 +230,123 @@ function getImageTimeout(model) {
     return IMAGE_MODEL_TIMEOUTS[model] || IMAGE_MODEL_TIMEOUTS.default;
 }
 
-export async function laozhangImageGenerate(prompt, { model = 'gemini-3.1-flash-image-preview', size = '1024x1024' } = {}) {
+// ── Atlas Cloud Image Generation (primary for gpt-image-2) ───────────────────
+// Atlas Cloud confirmed compatible: /v1/images/generations with b64_json for gpt-image-2
+// Falls back to Laozhang if Atlas fails.
+
+async function _atlasImageGenerate(prompt, { model = 'gpt-image-2', size = '1024x1024' } = {}) {
+    const atlasKey = getAtlasImageApiKey();
+    if (!atlasKey) throw new Error('ATLASCLOUD_API_KEY not set');
+    const timeoutMs = getImageTimeout(model);
+    
+    const arInstruction = size !== '1024x1024' ? `\n\n[CRITICAL REQUIREMENT: Generate this exact aspect ratio/size: ${size}]` : '';
+    const finalPrompt = prompt + arInstruction;
+
+    console.log(`🖼️  [Atlas] Image generation: ${model}, size=${size}, timeout=${timeoutMs/1000}s`);
+    console.log(`   📝 prompt (first 200): ${prompt?.substring(0, 200)}...`);
+
+    const response = await fetch(`${ATLAS_IMAGE_BASE_URL}/images/generations`, fetchOptions({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${atlasKey}` },
+        body: JSON.stringify({ model, prompt: finalPrompt, n: 1, size, response_format: 'b64_json' }),
+        signal: AbortSignal.timeout(timeoutMs),
+    }));
+
+    if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Atlas image failed (${response.status}): ${errText.substring(0, 300)}`);
+    }
+
+    const data = await response.json();
+    const imgData = data.data?.[0];
+    const b64 = imgData?.b64_json || '';
+    const imageUrl = imgData?.url || '';
+    if (!b64 && !imageUrl) throw new Error('Atlas returned empty image response');
+
+    const rawData = b64 ? `data:image/png;base64,${b64}` : imageUrl;
+    const finalUrl = await ensureS3Url(rawData, 'studio/atlas-image');
+
+    console.log(`✅ [Atlas] Image generated via ${model} (b64_json → S3): ${(finalUrl || '').substring(0, 80)}`);
+    return { imageUrl: finalUrl, model, provider: 'atlascloud' };
+}
+
+// ── Laozhang-only image generation (for non-GPT models like Gemini Flash Image) ──
+
+async function _laozhangOnlyImageGenerate(prompt, { model, size, finalPrompt }) {
+    const apiKey = getApiKey();
+    const timeoutMs = getImageTimeout(model);
+
+    let response;
+    let tryB64 = true;
+    
     try {
-        const apiKey = getApiKey();
-        const timeoutMs = getImageTimeout(model);
-        console.log(`🖼️  [LaoZhang] Image generation: ${model}, size=${size}, timeout=${timeoutMs/1000}s`);
-
-        // LaoZhang's OpenAI-compatible /generations endpoint silently drops non-square sizes that standard OpenAI image models wouldn't accept.
-        // To ensure NanoBanana 2 (Gemini-3.1) respects custom boundaries like 1080x1350 or 100x900, we must force it in prompt.
-        const arInstruction = size !== '1024x1024' ? `\n\n[CRITICAL REQUIREMENT: Generate this exact aspect ratio/size: ${size}]` : '';
-        const finalPrompt = prompt + arInstruction;
-
-        console.log(`   📝 prompt (first 200): ${prompt?.substring(0, 200)}...`);
-
-        let response;
-        let tryB64 = true;
-        
-        try {
-            response = await fetch(`${LAOZHANG_BASE_URL}/images/generations`, fetchOptions({
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-                // Use b64_json (not url) — LaoZhang CDN URLs expire within seconds.
-                // ensureS3Url can't reliably mirror them. b64_json gives raw data → direct S3 upload.
-                body: JSON.stringify({ model, prompt: finalPrompt, n: 1, size, response_format: 'b64_json' }),
-                signal: AbortSignal.timeout(timeoutMs),
-            }));
-            if (!response.ok) {
-                tryB64 = false;
-            }
-        } catch (err) {
-            tryB64 = false;
-        }
-
-        if (!tryB64) {
-            console.log(`⚠️  [LaoZhang] b64_json image generation failed or unsupported, retrying with response_format='url'...`);
-            response = await fetch(`${LAOZHANG_BASE_URL}/images/generations`, fetchOptions({
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-                body: JSON.stringify({ model, prompt: finalPrompt, n: 1, size, response_format: 'url' }),
-                signal: AbortSignal.timeout(timeoutMs),
-            }));
-        }
-
-        if (!response.ok) {
-            const errText = await response.text();
-            console.error(`❌ [LaoZhang] Image failed (${response.status}):`, errText);
-            throw new Error(`LaoZhang image failed (${response.status}): ${errText}`);
-        }
-
-        const data = await response.json();
-        const imgData = data.data?.[0];
-        const b64 = imgData?.b64_json || '';
-        const imageUrl = imgData?.url || ''; // fallback if API ignores b64_json request
-        if (!b64 && !imageUrl) throw new Error('LaoZhang returned empty image response');
-        // Prefer base64 (stable) over URL (ephemeral CDN)
-        const rawData = b64 ? `data:image/png;base64,${b64}` : imageUrl;
-        
-        // Upload to S3 — base64 → direct upload (no CDN expiry risk)
-        const finalUrl = await ensureS3Url(rawData, 'studio/laozhang');
-        
-        if (finalUrl.includes('laozhang.ai/fileSystem/')) {
-            throw new Error('LaoZhang image hosting system returned an error. File upload and download system is not enabled.');
-        }
-
-        console.log(`✅ [LaoZhang] Image generated via ${model} (b64_json → S3): ${(finalUrl || '').substring(0, 80)}`);
-        return { imageUrl: finalUrl, model, provider: 'laozhang' };
+        response = await fetch(`${LAOZHANG_BASE_URL}/images/generations`, fetchOptions({
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+            body: JSON.stringify({ model, prompt: finalPrompt, n: 1, size, response_format: 'b64_json' }),
+            signal: AbortSignal.timeout(timeoutMs),
+        }));
+        if (!response.ok) tryB64 = false;
     } catch (err) {
-        console.warn(`[LaoZhang Image Gen] ⚠️ Generation failed: ${err.message}. Trying direct Gemini/Vertex fallback...`);
+        tryB64 = false;
+    }
+
+    if (!tryB64) {
+        console.log(`⚠️  [LaoZhang] b64_json failed, retrying with response_format='url'...`);
+        response = await fetch(`${LAOZHANG_BASE_URL}/images/generations`, fetchOptions({
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+            body: JSON.stringify({ model, prompt: finalPrompt, n: 1, size, response_format: 'url' }),
+            signal: AbortSignal.timeout(timeoutMs),
+        }));
+    }
+
+    if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`LaoZhang image failed (${response.status}): ${errText}`);
+    }
+
+    const data = await response.json();
+    const imgData = data.data?.[0];
+    const b64 = imgData?.b64_json || '';
+    const imageUrl = imgData?.url || '';
+    if (!b64 && !imageUrl) throw new Error('LaoZhang returned empty image response');
+    const rawData = b64 ? `data:image/png;base64,${b64}` : imageUrl;
+    
+    const finalUrl = await ensureS3Url(rawData, 'studio/laozhang');
+    if (finalUrl.includes('laozhang.ai/fileSystem/')) {
+        throw new Error('LaoZhang image hosting system returned an error.');
+    }
+    return { imageUrl: finalUrl, model, provider: 'laozhang' };
+}
+
+export async function laozhangImageGenerate(prompt, { model = 'gemini-3.1-flash-image-preview', size = '1024x1024' } = {}) {
+    const timeoutMs = getImageTimeout(model);
+    console.log(`🖼️  [ImageGen] model=${model}, size=${size}, timeout=${timeoutMs/1000}s`);
+
+    const arInstruction = size !== '1024x1024' ? `\n\n[CRITICAL REQUIREMENT: Generate this exact aspect ratio/size: ${size}]` : '';
+    const finalPrompt = prompt + arInstruction;
+    console.log(`   📝 prompt (first 200): ${prompt?.substring(0, 200)}...`);
+
+    // ── Strategy: Atlas primary for gpt-image-2, Laozhang for everything else ──
+    const useAtlasPrimary = model === 'gpt-image-2' && isAtlasImageAvailable();
+
+    if (useAtlasPrimary) {
+        try {
+            return await _atlasImageGenerate(prompt, { model, size });
+        } catch (atlasErr) {
+            console.warn(`⚠️ [Atlas Image] Primary failed: ${atlasErr.message}. Falling back to LaoZhang...`);
+            // Fall through to Laozhang
+        }
+    }
+
+    // ── Laozhang path (primary for non-GPT models, fallback for GPT Image 2) ──
+    try {
+        const result = await _laozhangOnlyImageGenerate(prompt, { model, size, finalPrompt });
+        console.log(`✅ [LaoZhang] Image generated via ${model}: ${(result.imageUrl || '').substring(0, 80)}`);
+        return result;
+    } catch (err) {
+        console.warn(`[Image Gen] ⚠️ LaoZhang failed: ${err.message}. Trying direct Gemini/Vertex fallback...`);
         try {
             const { generateImageWithVertex } = await import('../../services/vertexImage.js');
             // Check if key is available
@@ -323,11 +384,11 @@ export async function laozhangImageGenerate(prompt, { model = 'gemini-3.1-flash-
             if (!fallbackImageUrl) throw new Error('Gemini fallback returned no image in response');
             
             const finalUrl = await ensureS3Url(fallbackImageUrl, 'studio/gemini-fallback');
-            console.log(`✅ [LaoZhang Image Gen] Fallback succeeded (S3): ${finalUrl.substring(0, 80)}...`);
+            console.log(`✅ [Image Gen] Vertex fallback succeeded (S3): ${finalUrl.substring(0, 80)}...`);
             return { imageUrl: finalUrl, model: activeModel, provider: 'gemini' };
         } catch (fallbackErr) {
-            console.error(`[LaoZhang Image Gen] ❌ Direct Gemini fallback failed: ${fallbackErr.message}`);
-            throw err; // throw original LaoZhang error
+            console.error(`[Image Gen] ❌ Direct Gemini fallback failed: ${fallbackErr.message}`);
+            throw err; // throw original error
         }
     }
 }
@@ -339,7 +400,6 @@ export async function laozhangImageGenerate(prompt, { model = 'gemini-3.1-flash-
 // ══════════════════════════════════════════════════════════════════════════════
 
 export async function laozhangGptImageWithRefs(prompt, imageUrls = [], { model = 'gpt-image-2', size = '1344x768' } = {}) {
-    const apiKey = getApiKey();
     const timeoutMs = getImageTimeout(model);
 
     if (!imageUrls || imageUrls.length === 0) {
@@ -407,38 +467,58 @@ export async function laozhangGptImageWithRefs(prompt, imageUrls = [], { model =
 
     console.log(`🎨 [GPT-Image-2+Refs] Calling /images/edits — model=${model}, size=${size}, ref=${Math.round(refBuffer.length/1024)}KB`);
 
-    let editResponse;
-    try {
-        editResponse = await fetch(`${LAOZHANG_BASE_URL}/images/edits`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${apiKey}` },
-            body: form,
-            signal: AbortSignal.timeout(timeoutMs),
-        });
-    } catch (e) {
-        console.warn(`   ⚠️ /images/edits failed: ${e.message} — falling back to text-only`);
-        return laozhangImageGenerate(prompt, { model, size });
+    // Try Atlas Cloud first for /images/edits, then Laozhang
+    const providers = [];
+    if (isAtlasImageAvailable()) providers.push({ name: 'Atlas', baseUrl: ATLAS_IMAGE_BASE_URL, key: getAtlasImageApiKey() });
+    providers.push({ name: 'LaoZhang', baseUrl: LAOZHANG_BASE_URL, key: getApiKey() });
+
+    for (const prov of providers) {
+        try {
+            // Clone form for each attempt (form can only be consumed once)
+            const attemptForm = new FormData();
+            attemptForm.set('image', new Blob([refBuffer], { type: refMimeType }), `product_ref.${ext}`);
+            attemptForm.set('prompt', prompt);
+            attemptForm.set('model', model);
+            attemptForm.set('n', '1');
+            attemptForm.set('size', size);
+            attemptForm.set('response_format', 'b64_json');
+
+            console.log(`   🔄 [${prov.name}] Trying /images/edits...`);
+            const editResponse = await fetch(`${prov.baseUrl}/images/edits`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${prov.key}` },
+                body: attemptForm,
+                signal: AbortSignal.timeout(timeoutMs),
+            });
+
+            if (!editResponse.ok) {
+                const errText = await editResponse.text();
+                console.warn(`   ⚠️ [${prov.name}] /images/edits HTTP ${editResponse.status}: ${errText.substring(0, 200)}`);
+                continue; // Try next provider
+            }
+
+            const editData = await editResponse.json();
+            const editImgData = editData.data?.[0];
+            const editB64 = editImgData?.b64_json || '';
+            const editRawUrl = editImgData?.url || '';
+            if (!editB64 && !editRawUrl) {
+                console.warn(`   ⚠️ [${prov.name}] /images/edits returned no image`);
+                continue; // Try next provider
+            }
+
+            const editRaw = editB64 ? `data:image/png;base64,${editB64}` : editRawUrl;
+            const editFinalUrl = await ensureS3Url(editRaw, `studio/${prov.name.toLowerCase()}-edit`);
+            console.log(`✅ [${prov.name}] Image with product ref → S3: ${editFinalUrl.substring(0, 80)}...`);
+            return { imageUrl: editFinalUrl, model, provider: prov.name.toLowerCase() === 'atlas' ? 'atlascloud' : 'laozhang' };
+        } catch (e) {
+            console.warn(`   ⚠️ [${prov.name}] /images/edits failed: ${e.message}`);
+            continue; // Try next provider
+        }
     }
 
-    if (!editResponse.ok) {
-        const errText = await editResponse.text();
-        console.warn(`   ⚠️ /images/edits HTTP ${editResponse.status}: ${errText.substring(0, 200)} — falling back to Gemini multimodal with same ref images`);
-        return laozhangMultimodalImageGenerate(prompt, imageUrls, { model: 'gemini-3.1-flash-image-preview', size });
-    }
-
-    const editData = await editResponse.json();
-    const editImgData = editData.data?.[0];
-    const editB64 = editImgData?.b64_json || '';
-    const editRawUrl = editImgData?.url || '';
-    if (!editB64 && !editRawUrl) {
-        console.warn(`   ⚠️ /images/edits returned no image — falling back to text-only`);
-        return laozhangImageGenerate(prompt, { model, size });
-    }
-
-    const editRaw = editB64 ? `data:image/png;base64,${editB64}` : editRawUrl;
-    const editFinalUrl = await ensureS3Url(editRaw, 'studio/laozhang-edit');
-    console.log(`✅ [GPT-Image-2+Refs] Image with product ref → S3: ${editFinalUrl.substring(0, 80)}...`);
-    return { imageUrl: editFinalUrl, model, provider: 'laozhang' };
+    // All providers failed — fall back to Gemini multimodal
+    console.warn(`   ⚠️ [GPT-Image-2+Refs] All /images/edits providers failed — falling back to Gemini multimodal`);
+    return laozhangMultimodalImageGenerate(prompt, imageUrls, { model: 'gemini-3.1-flash-image-preview', size });
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
