@@ -262,7 +262,9 @@ export const ensureS3Url = async (input, folderOrFilename = 'video-studio/assets
         'storage.googleapis.com',
         // Atlas Cloud / Alibaba Cloud (Seedance/HappyHorse)
         'aliyuncs.com', 'atlascloud.ai', 'alibaba.com',
-        'piapi.ai', 'muapi.ai', 'kling.ai', 'seedance.ai', 'heygen.com', 'modelslab.com'
+        'piapi.ai', 'muapi.ai', 'kling.ai', 'seedance.ai', 'heygen.com', 'modelslab.com',
+        // Free file hosts used by AI providers (temporary/unreliable)
+        'catbox.moe', 'files.catbox.moe', 'litterbox.catbox.moe',
     ];
 
     const isProviderUrl = PROVIDER_DOMAINS.some(domain => normalizedInput.includes(domain));

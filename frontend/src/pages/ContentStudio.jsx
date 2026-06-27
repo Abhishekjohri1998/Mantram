@@ -4163,7 +4163,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                     <div className="mb-6 rounded-2xl overflow-hidden glass-panel border border-[var(--sys-border)] relative w-full flex items-center justify-center bg-[var(--sys-surface)] min-h-[300px]">
                         {inlineVisualUrl ? (
                             <>
-                                <img src={inlineVisualUrl} alt="Generated visual preview" className="w-full h-auto object-cover max-h-[500px]" />
+                                <img src={inlineVisualUrl} alt="Generated visual preview" className="w-full h-auto object-cover max-h-[500px]" onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; e.target.insertAdjacentHTML('afterend', '<div class="flex flex-col items-center justify-center p-8 text-center text-white/40"><span class="material-symbols-outlined text-3xl mb-2">broken_image</span><p class="text-xs">Image failed to load</p></div>'); }} />
                                 <button onClick={onGenerateVisual} disabled={generatingVisualPrompt}
                                         className="absolute top-4 right-4 bg-black/60 hover:bg-black/80 text-white rounded-full p-2 backdrop-blur-md transition-all cursor-pointer shadow-lg disabled:opacity-50">
                                     <span className={`material-symbols-outlined text-sm block ${generatingVisualPrompt ? 'animate-spin' : ''}`}>{generatingVisualPrompt ? 'progress_activity' : 'refresh'}</span>
@@ -4418,7 +4418,7 @@ function ResultView({ result, onRegenerate, onFeedback, onNewContent, generating
                 <div className="mb-6 mt-4 rounded-2xl overflow-hidden glass-panel border border-[var(--sys-border)] relative w-full flex items-center justify-center bg-[var(--sys-surface)] min-h-[300px]">
                     {inlineVisualUrl ? (
                         <>
-                            <img src={inlineVisualUrl} alt="Generated visual preview" className="w-full h-auto object-cover max-h-[500px]" />
+                            <img src={inlineVisualUrl} alt="Generated visual preview" className="w-full h-auto object-cover max-h-[500px]" onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; e.target.insertAdjacentHTML('afterend', '<div class="flex flex-col items-center justify-center p-8 text-center text-white/40"><span class="material-symbols-outlined text-3xl mb-2">broken_image</span><p class="text-xs">Image failed to load</p></div>'); }} />
                             <button onClick={onGenerateVisual} disabled={generatingVisualPrompt}
                                     className="absolute top-4 right-4 bg-black/60 hover:bg-black/80 text-white rounded-full p-2 backdrop-blur-md transition-all cursor-pointer shadow-lg disabled:opacity-50">
                                 <span className={`material-symbols-outlined text-sm block ${generatingVisualPrompt ? 'animate-spin' : ''}`}>{generatingVisualPrompt ? 'progress_activity' : 'refresh'}</span>
