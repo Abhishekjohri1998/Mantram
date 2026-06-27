@@ -829,25 +829,94 @@ export async function generateDailyContent(forceDate = null, brandId = null) {
             .trim();
 
         /**
-         * Fix unescaped control characters ONLY inside JSON string values.
-         * Walks character by character to detect string boundaries so structural
-         * newlines (between keys/values) are left untouched.
+         * Fix unescaped control characters and double quotes ONLY inside JSON string values.
+         * Parses and repairs unescaped text quotes using recursive key/structure lookahead.
          */
         const fixUnescapedInStrings = (raw) => {
             let out = '';
-            let inString = false;
+            let state = 'OUTSIDE'; // OUTSIDE, IN_KEY, IN_VALUE_STRING
             let i = 0;
+
+            const getNextNonWhitespaceChar = (index) => {
+                let j = index;
+                while (j < raw.length) {
+                    const c = raw[j];
+                    if (c !== ' ' && c !== '\t' && c !== '\n' && c !== '\r') {
+                        return c;
+                    }
+                    j++;
+                }
+                return '';
+            };
+
+            const isObjectKey = (startIndex) => {
+                let j = startIndex + 1;
+                while (j < raw.length) {
+                    if (raw[j] === '\\') {
+                        j += 2;
+                        continue;
+                    }
+                    if (raw[j] === '"') {
+                        const nextChar = getNextNonWhitespaceChar(j + 1);
+                        return nextChar === ':';
+                    }
+                    j++;
+                }
+                return false;
+            };
+
+            const isStructuralClose = (index) => {
+                const nextChar = getNextNonWhitespaceChar(index);
+                if (nextChar === '}' || nextChar === ']') return true;
+                if (nextChar === ',') {
+                    let j = index;
+                    while (j < raw.length && raw[j] !== ',') j++;
+                    j++; // skip comma
+                    const postCommaChar = getNextNonWhitespaceChar(j);
+                    if (postCommaChar === '"' || postCommaChar === '{' || postCommaChar === '[') {
+                        return true;
+                    }
+                }
+                return false;
+            };
+
             while (i < raw.length) {
                 const ch = raw[i];
-                if (inString) {
+
+                if (state === 'OUTSIDE') {
+                    if (ch === '"') {
+                        if (isObjectKey(i)) {
+                            state = 'IN_KEY';
+                        } else {
+                            state = 'IN_VALUE_STRING';
+                        }
+                        out += ch;
+                    } else {
+                        out += ch;
+                    }
+                } else if (state === 'IN_KEY') {
                     if (ch === '\\') {
-                        // pass through escape sequence unchanged
                         out += ch + (raw[i + 1] || '');
                         i += 2;
                         continue;
                     } else if (ch === '"') {
-                        inString = false;
+                        state = 'OUTSIDE';
                         out += ch;
+                    } else {
+                        out += ch;
+                    }
+                } else if (state === 'IN_VALUE_STRING') {
+                    if (ch === '\\') {
+                        out += ch + (raw[i + 1] || '');
+                        i += 2;
+                        continue;
+                    } else if (ch === '"') {
+                        if (isStructuralClose(i + 1)) {
+                            state = 'OUTSIDE';
+                            out += ch;
+                        } else {
+                            out += '\\"'; // escape the inner quote
+                        }
                     } else if (ch === '\n') {
                         out += '\\n'; // escape raw newline inside string
                     } else if (ch === '\r') {
@@ -857,9 +926,6 @@ export async function generateDailyContent(forceDate = null, brandId = null) {
                     } else {
                         out += ch;
                     }
-                } else {
-                    if (ch === '"') inString = true;
-                    out += ch;
                 }
                 i++;
             }
