@@ -394,13 +394,8 @@ function parseStoryboardOutput(rawText, targetDuration) {
         // 1. Remove trailing commas before } or ]
         jsonStr = jsonStr.replace(/,\s*([\]}])/g, '$1');
         
-        // 2. Remove unescaped control characters (newlines/tabs inside strings)
-        jsonStr = jsonStr.replace(/[\x00-\x1F\x7F]/g, (ch) => {
-            if (ch === '\n') return '\\n';
-            if (ch === '\r') return '\\r';
-            if (ch === '\t') return '\\t';
-            return '';
-        });
+        // 2. Remove only truly invalid control characters (NOT newlines/tabs — those are valid JSON whitespace)
+        jsonStr = jsonStr.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
 
         // 3. Fix truncated JSON — close unclosed brackets/braces
         let openBraces = 0, openBrackets = 0;
@@ -415,9 +410,34 @@ function parseStoryboardOutput(rawText, targetDuration) {
             if (ch === '[') openBrackets++;
             if (ch === ']') openBrackets--;
         }
+
+        // 4. If truncated mid-string, find the last complete key-value pair and close from there
+        if (inString) {
+            const lastCompleteQuote = jsonStr.lastIndexOf('",');
+            const lastCompleteQuote2 = jsonStr.lastIndexOf('"}');
+            const lastCompleteQuote3 = jsonStr.lastIndexOf('"]');
+            const cutPoint = Math.max(lastCompleteQuote, lastCompleteQuote2, lastCompleteQuote3);
+            if (cutPoint > 0) {
+                jsonStr = jsonStr.substring(0, cutPoint + 1);
+                // Recount braces after truncation
+                openBraces = 0; openBrackets = 0;
+                inString = false; escaped = false;
+                for (const ch of jsonStr) {
+                    if (escaped) { escaped = false; continue; }
+                    if (ch === '\\') { escaped = true; continue; }
+                    if (ch === '"') { inString = !inString; continue; }
+                    if (inString) continue;
+                    if (ch === '{') openBraces++;
+                    if (ch === '}') openBraces--;
+                    if (ch === '[') openBrackets++;
+                    if (ch === ']') openBrackets--;
+                }
+            }
+        }
+
         // Remove trailing comma before closing
         jsonStr = jsonStr.replace(/,\s*$/, '');
-        // Close any unclosed brackets/braces
+        // Close any unclosed brackets/braces (order matters: ] before })
         for (let i = 0; i < openBrackets; i++) jsonStr += ']';
         for (let i = 0; i < openBraces; i++) jsonStr += '}';
         // Clean trailing commas again after closing
@@ -609,6 +629,10 @@ export async function runStoryboardDirector({
 
     console.log(`[Storyboard Director] Calling ${directorModel} with ${imageUrls.length} vision images (${productImageUrls.length} product + ${resolvedAvatarUrls.length} avatar + ${refImageUrls.length} ref)...`);
 
+    // Scale maxTokens with video duration — 300s videos need ~18K tokens, 30s needs ~8K
+    const dynamicMaxTokens = Math.max(8000, Math.ceil(duration / 5) * 300);
+    console.log(`[Storyboard Director] Using maxTokens=${dynamicMaxTokens} for ${duration}s video`);
+
     // 5. Call Agent (multimodal)
     let rawOutput;
     try {
@@ -616,7 +640,7 @@ export async function runStoryboardDirector({
             systemPrompt,
             userPrompt,
             imageUrls,
-            { temperature: 0.7, maxTokens: 8000, returnRaw: true, provider: directorModel }
+            { temperature: 0.7, maxTokens: dynamicMaxTokens, returnRaw: true, provider: directorModel }
         );
         if (!rawOutput || typeof rawOutput !== 'string' || rawOutput.error) {
             throw new Error(rawOutput?.error || 'Empty or invalid response from LLM');
@@ -632,7 +656,7 @@ export async function runStoryboardDirector({
     } catch (parseErr) {
         console.error(`[Storyboard Director] Parse failed, retrying...`);
         const retrySystem = systemPrompt + '\n\nCRITICAL: Your previous output could not be parsed as JSON. Return ONLY raw JSON, zero other text.';
-        rawOutput = await callMultimodalAgent(retrySystem, userPrompt, imageUrls, { temperature: 0.4, maxTokens: 8000, returnRaw: true, provider: directorModel });
+        rawOutput = await callMultimodalAgent(retrySystem, userPrompt, imageUrls, { temperature: 0.4, maxTokens: dynamicMaxTokens, returnRaw: true, provider: directorModel });
         if (!rawOutput || typeof rawOutput !== 'string' || rawOutput.error) {
             throw new Error(`Storyboard Director (${directorModel}) retry failed: ${rawOutput?.error || 'Empty or invalid response'}`);
         }

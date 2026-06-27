@@ -90,31 +90,13 @@ class ModelRouter {
             this.providers.xai = xaiProvider;
         }
 
-        // ── Anthropic/Claude: Atlas Cloud primary → Direct Anthropic fallback ──
-        if (providerConfigs.atlascloud?.apiKey) {
-            console.log('🔄 Routing Anthropic/Claude through Atlas Cloud (OpenAI format)');
-            const claudeAtlasProvider = new OpenAIProvider({
-                apiKey: providerConfigs.atlascloud.apiKey,
-                // Atlas Cloud uses its own naming: 'anthropic/claude-sonnet-4.6' (not 'claude-sonnet-4-6')
-                defaultModel: 'anthropic/claude-sonnet-4.6',
-            });
-            claudeAtlasProvider.name = 'anthropic';
-            claudeAtlasProvider.baseUrl = providerConfigs.atlascloud.baseUrl;
-            this.providers.anthropic = claudeAtlasProvider;
-
-            // Keep native Anthropic as a separate fallback provider
-            if (providerConfigs.anthropic?.apiKey) {
-                this.nativeAnthropic = new AnthropicProvider({
-                    apiKey: providerConfigs.anthropic.apiKey,
-                    defaultModel: config.ai.defaultAnthropicModel || 'claude-sonnet-4-6',
-                });
-            }
-        } else {
-            this.providers.anthropic = new AnthropicProvider({
-                apiKey: providerConfigs.anthropic?.apiKey,
-                defaultModel: config.ai.defaultAnthropicModel || 'claude-sonnet-4-6',
-            });
-        }
+        // ── Anthropic/Claude: Direct native API (no Atlas Cloud proxy) ──
+        // User preference: use Anthropic API directly for reliability + cost savings.
+        // Atlas Cloud proxy was causing timeouts on long storyboard operations.
+        this.providers.anthropic = new AnthropicProvider({
+            apiKey: providerConfigs.anthropic?.apiKey,
+            defaultModel: config.ai.defaultAnthropicModel || 'claude-sonnet-4-6',
+        });
 
         // ── DeepSeek: Atlas Cloud primary → Laozhang fallback ──
         if (providerConfigs.atlascloud?.apiKey) {
@@ -583,8 +565,11 @@ class ModelRouter {
 
     _testConnectionError(error) {
         const msg = error.message?.toLowerCase() || '';
+        // Note: 'timeout' is NOT included here intentionally.
+        // Our internal 'TIMEOUT: Provider X did not respond within Ys' is a deliberate
+        // deadline, not a connection failure. It should NOT trigger cooldown.
+        // TCP-level 'etimedout' IS a real connection error and is matched separately.
         return msg.includes('fetch failed') ||
-               msg.includes('timeout') ||
                msg.includes('connect') ||
                msg.includes('econnrefused') ||
                msg.includes('etimedout') ||
