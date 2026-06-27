@@ -501,7 +501,7 @@ export async function callMultimodalAgent(systemPrompt, userPrompt, imageUrls = 
             maxTokens,
             images: validImages,
             jsonMode: options.jsonMode || false,
-        }, { provider });
+        }, { provider, timeoutMs: options.timeoutMs });
     };
 
     try {

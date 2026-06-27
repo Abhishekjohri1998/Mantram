@@ -308,7 +308,8 @@ class ModelRouter {
         let lastError = null;
 
         // Dynamic timeout: scale up for large token requests (e.g. Growth Engine's 16k tokens)
-        const dynamicTimeout = this._calcTimeout(params.maxTokens);
+        // Check if caller requested a custom timeoutMs override (e.g. Storyboard Director)
+        const dynamicTimeout = preferences.timeoutMs || this._calcTimeout(params.maxTokens);
 
         try {
             const result = await this._withTimeout(provider.generateText(params), provider.name, dynamicTimeout);
