@@ -2086,7 +2086,8 @@ Return ONLY this JSON:
     let result;
 
     // ── Overall timeout: if AI providers are all failing, don't make user wait ──
-    const MCOT_TIMEOUT_MS = 10000; // 10 seconds max for MCoT reasoning (per-call timeout is 12s)
+    // NOTE: gemini-2.5-flash is a "thinking" model that needs 15-25s via Atlas Cloud
+    const MCOT_TIMEOUT_MS = 30000; // 30 seconds max for MCoT reasoning
     console.log('[fidato-chat] MCoT reasoning started, timeout:', MCOT_TIMEOUT_MS, 'ms, fast provider:', JSON.stringify(fastOpts));
     const aiCallPromise = (async () => {
       if (useWebSearch) {
@@ -2120,11 +2121,17 @@ Return ONLY this JSON:
       }
     })();
 
+    // Prevent unhandled rejection if the timeout wins the race and the AI call later fails
+    aiCallPromise.catch(err => {
+      console.warn('[fidato-chat] Orphaned AI call eventually rejected (already timed out):', err.message);
+    });
+
     const timeoutPromise = new Promise((_, reject) =>
       setTimeout(() => reject(new Error('MCoT timeout: AI providers too slow, using deterministic fallback')), MCOT_TIMEOUT_MS)
     );
 
     result = await Promise.race([aiCallPromise, timeoutPromise]);
+    console.log('[fidato-chat] MCoT AI call completed successfully, parsing result...');
 
     const parsed = parseJSON(result);
 
@@ -2642,6 +2649,7 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
 
     // ── STAGE 1: MCoT Reasoning ─────────────────────────────────────────────
     const reasoning = await mcotReason(message, history, sessionState, brandCtx, brand, sseEmit);
+    console.log('[fidato-chat] MCoT reasoning completed, extracting action...');
     const {
       action = 'ask_question',
       fidatoResponse = "Tell me more!",
@@ -2653,6 +2661,7 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
       reasoning: reasoningText = null,
       targetIdea = null,
     } = reasoning;
+    console.log(`[fidato-chat] Action: ${action}, Intent: ${intent}, Response length: ${fidatoResponse?.length || 0}`);
 
     const newSessionState = {
       ...sessionState,
