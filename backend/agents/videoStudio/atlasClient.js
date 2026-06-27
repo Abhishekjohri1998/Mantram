@@ -23,7 +23,10 @@ import { sanitizePromptForProvider } from './promptSanitizer.js';
 
 const ATLAS_INFERENCE_BASE  = 'https://api.atlascloud.ai/api/v1';
 const ATLAS_CONSOLE_BASE    = 'https://console.atlascloud.ai/api/v1';
-const ATLASCLOUD_MAX_PROMPT_LENGTH = 4000;
+// Atlas Cloud supports very long prompts (50k+). We set a practical limit of 10000 chars
+// to avoid timeouts, while preserving full cinematic cut plan context for storyboard videos.
+// (The old 4000-char limit was truncating rich storyboard prompts with 4-section CUT PLAN data)
+const ATLASCLOUD_MAX_PROMPT_LENGTH = 10000;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -984,6 +987,16 @@ export async function getAtlasCloudGenerationStatus(taskId) {
     let result;
     try { result = JSON.parse(rawText); }
     catch { return { status: 'IN_PROGRESS', progress: 30 }; }
+
+    // Handle Atlas Cloud infrastructure errors (redislock, session lock failures).
+    // These are transient — Atlas's internal Redis is busy, not our fault.
+    // Return IN_PROGRESS so the poller retries rather than marking the job FAILED.
+    if (result?.code >= 500 && !result?.data) {
+        const infraMsg = result?.msg || result?.message || 'Atlas infrastructure error';
+        const isRedisLock = infraMsg.includes('redislock') || infraMsg.includes('session lock') || infraMsg.includes('acquire');
+        console.warn(`⚠️ [Atlas] Infrastructure error for ${taskId}: ${infraMsg} — ${isRedisLock ? 'transient redis lock, will retry' : 'server error, will retry'}`);
+        return { status: 'IN_PROGRESS', progress: 20 };
+    }
 
     if (!result?.data) return { status: 'IN_PROGRESS', progress: 30 };
 
