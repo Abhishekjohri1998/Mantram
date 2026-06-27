@@ -101,14 +101,13 @@ GenerationJobSchema.index({ user: 1, createdAt: -1 });
 GenerationJobSchema.index({ user: 1, status: 1 });
 
 // ── Sanitize errorMessage before saving to DB ──
-GenerationJobSchema.pre('save', function (next) {
+GenerationJobSchema.pre('save', function () {
     if (this.isModified('errorMessage') && this.errorMessage) {
         this.errorMessage = getFriendlyErrorMessage(this.errorMessage);
     }
-    next();
 });
 
-const sanitizeUpdate = function (next) {
+const sanitizeUpdate = function () {
     const update = this.getUpdate();
     if (update) {
         if (update.errorMessage) {
@@ -118,7 +117,6 @@ const sanitizeUpdate = function (next) {
             update.$set.errorMessage = getFriendlyErrorMessage(update.$set.errorMessage);
         }
     }
-    next();
 };
 
 GenerationJobSchema.pre('findOneAndUpdate', sanitizeUpdate);

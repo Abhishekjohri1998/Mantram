@@ -40,11 +40,10 @@ const qAdsCategorySchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Auto-generate slug on save if not provided or if name changed
-qAdsCategorySchema.pre('validate', function(next) {
+qAdsCategorySchema.pre('validate', function() {
     if (this.name && (!this.slug || this.isModified('name'))) {
         this.slug = this.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
     }
-    next();
 });
 
 export default mongoose.model('QAdsCategory', qAdsCategorySchema);
