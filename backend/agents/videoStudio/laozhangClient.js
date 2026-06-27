@@ -230,9 +230,15 @@ function getImageTimeout(model) {
     return IMAGE_MODEL_TIMEOUTS[model] || IMAGE_MODEL_TIMEOUTS.default;
 }
 
-// ── Atlas Cloud Image Generation (primary for gpt-image-2) ───────────────────
-// Atlas Cloud confirmed compatible: /v1/images/generations with b64_json for gpt-image-2
-// Falls back to Laozhang if Atlas fails.
+// ── Atlas Cloud Image Generation ─────────────────────────────────────────────
+// For OpenAI models (gpt-image-2): uses /v1/images/generations with b64_json
+// For Gemini models (gemini-3.1-flash-image-preview, nanobanana-2, etc.):
+//   uses /v1/chat/completions which returns inline image data
+
+const GEMINI_IMAGE_MODELS = new Set([
+    'gemini-3.1-flash-image-preview', 'gemini-3-pro-image-preview',
+    'gemini-2.5-flash-preview-05-20', 'gemini-flash', 'nanobanana-2', 'nanobanana-pro',
+]);
 
 async function _atlasImageGenerate(prompt, { model = 'gpt-image-2', size = '1024x1024' } = {}) {
     const atlasKey = getAtlasImageApiKey();
@@ -245,6 +251,60 @@ async function _atlasImageGenerate(prompt, { model = 'gpt-image-2', size = '1024
     console.log(`🖼️  [Atlas] Image generation: ${model}, size=${size}, timeout=${timeoutMs/1000}s`);
     console.log(`   📝 prompt (first 200): ${prompt?.substring(0, 200)}...`);
 
+    // ── Gemini models: use /chat/completions (image output via chat) ──
+    const isGeminiModel = GEMINI_IMAGE_MODELS.has(model) || model.startsWith('gemini-');
+    
+    if (isGeminiModel) {
+        console.log(`🔄 [Atlas] Routing Gemini image model through /chat/completions`);
+        const response = await fetch(`${ATLAS_IMAGE_BASE_URL}/chat/completions`, fetchOptions({
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${atlasKey}` },
+            body: JSON.stringify({
+                model,
+                messages: [{ role: 'user', content: [{ type: 'text', text: finalPrompt }] }],
+                size,
+            }),
+            signal: AbortSignal.timeout(timeoutMs),
+        }));
+
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`Atlas Gemini image failed (${response.status}): ${errText.substring(0, 300)}`);
+        }
+
+        const data = await response.json();
+        let imageUrl = '';
+
+        // Check for inline image parts (Gemini-style response)
+        const parts = data.choices?.[0]?.message?.parts || [];
+        for (const part of parts) {
+            if (part.inline_data?.data && part.inline_data?.mime_type) {
+                imageUrl = `data:${part.inline_data.mime_type};base64,${part.inline_data.data}`;
+                break;
+            }
+        }
+
+        // Fallback: check message content for image URLs or data URIs
+        if (!imageUrl) {
+            const content = data.choices?.[0]?.message?.content || '';
+            const dataUriMatch = content.match(/!\[.*?\]\((data:image\/[^)]+)\)/);
+            if (dataUriMatch) imageUrl = dataUriMatch[1];
+            if (!imageUrl) { const httpsMatch = content.match(/(https?:\/\/[^\s"']+\.(png|jpg|jpeg|webp))/i); if (httpsMatch) imageUrl = httpsMatch[1]; }
+            if (!imageUrl) { const rawDataUri = content.match(/(data:image\/[a-z]+;base64,[A-Za-z0-9+/=]+)/); if (rawDataUri) imageUrl = rawDataUri[1]; }
+        }
+
+        if (!imageUrl) {
+            const content = data.choices?.[0]?.message?.content || '';
+            console.error(`❌ [Atlas Gemini] No image in response:`, content.substring(0, 500));
+            throw new Error('Atlas Gemini chat/completions returned no image');
+        }
+
+        const finalUrl = await ensureS3Url(imageUrl, 'studio/atlas-gemini');
+        console.log(`✅ [Atlas] Gemini image generated via ${model} → S3: ${(finalUrl || '').substring(0, 80)}`);
+        return { imageUrl: finalUrl, model, provider: 'atlascloud' };
+    }
+
+    // ── OpenAI models (gpt-image-2, etc.): use /images/generations ──
     const response = await fetch(`${ATLAS_IMAGE_BASE_URL}/images/generations`, fetchOptions({
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${atlasKey}` },
