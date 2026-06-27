@@ -411,6 +411,27 @@
 }
 .sb-animate-btn:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(255,77,0,0.4); }
 
+/* Stop Generation button — shown during long-form animating phase */
+.sb-stop-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 16px;
+    margin-top: 10px;
+    background: rgba(239,68,68,0.12);
+    border: 1px solid rgba(239,68,68,0.35);
+    border-radius: 10px;
+    color: #f87171; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s;
+    align-self: flex-start;
+}
+.sb-stop-btn .material-symbols-outlined { font-size: 16px; }
+.sb-stop-btn:hover:not(:disabled) {
+    background: rgba(239,68,68,0.22);
+    border-color: rgba(239,68,68,0.6);
+    color: #fca5a5;
+    transform: translateY(-1px);
+}
+.sb-stop-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
 /* .sb-animating-bar flex rules are defined at the bottom of this file (Long-Form Progress UI section) */
 
 .sb-overall-progress {

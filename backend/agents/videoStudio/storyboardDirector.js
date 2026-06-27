@@ -151,12 +151,14 @@ SECTION 3 — CUT PLAN (THE STORYBOARD)
 ═══════════════════════════════════════════════════════
 Write the exact shot list for ONE continuous video of ${duration} seconds.
 Cuts are camera angles / shot changes within the video — NOT separate videos.
-DENSITY: Pack the cuts — aim for fast-paced, high-energy commercial pacing. More cuts = more visual energy.
+DENSITY (MANDATORY): Minimum 1 cut per 3 seconds. A ${duration}s video MUST have AT LEAST ${Math.ceil(duration / 3)} cuts.
+Target ${Math.ceil(duration / 3)} to ${Math.ceil(duration / 2)} cuts. Each cut should be 2–4 seconds for high commercial energy.
+More cuts = more visual energy = better engagement. Never let any single cut exceed 5 seconds unless it is a special slow-motion or reveal moment.
 
 Each cut must have:
 - id: sequential number starting at 1
 - lens: cinematic lens spec (e.g. "40mm anamorphic", "100mm macro", "85mm prime")
-- duration: exact seconds for this cut (integer, min ${MIN_SHOT_DURATION}s, max ${MAX_SHOT_DURATION}s)
+- duration: exact seconds for this cut (integer, min ${MIN_SHOT_DURATION}s, max ${Math.min(5, MAX_SHOT_DURATION)}s for normal cuts, up to ${MAX_SHOT_DURATION}s only for special reveal/slow-motion)
 - move: camera movement (STEADICAM | DOLLY-IN | DOLLY-OUT | RACK-FOCUS | ARC | PULL-OUT | CRANE | HANDHELD | STATIC | WHIP-PAN | PUSH-IN)
 - shot: shot type (WIDE | MEDIUM | CLOSE-UP | EXTREME-CLOSE-UP | INSERT | MACRO | TWO-SHOT | OVER-SHOULDER | POV | ESTABLISHING)
 - scene: 1 short sentence narrative beat — WHO is doing WHAT in this exact cut. Be specific but VERY concise.
@@ -172,7 +174,11 @@ Each cut must have:
 
 RULES FOR CUTS:
 - Durations must SUM exactly to ${duration}s
+- MINIMUM ${Math.ceil(duration / 3)} CUTS REQUIRED — this is a hard constraint, not a suggestion
 - Follow a natural cinematic arc: COLD OPEN (intrigue) → BUILD (environment, character) → REVEAL (product hero moment) → DETAIL (macro features) → EMOTION (presenter or lifestyle) → RESOLVE (CTA/brand close)
+- USE ALL THESE SHOT TYPES across your cuts — rotate them for visual variety:
+  ECU/MACRO (product detail) → WS (environment) → MCU (character) → CU (emotion/face) → INSERT (product + hands) → OTS (interaction) → WS/CTA (close)
+  NO two consecutive cuts may use the same shot type.
 - Use professional lens + shot combinations (wide angle for establishing, macro/insert for product details, close-up for emotion, whip-pan for energy transitions)
 - The product must be visually featured in at least one INSERT/MACRO cut and one LIFESTYLE/IN-USE cut
 - If multiple characters are provided, DISTRIBUTE them across cuts — do not show all characters in every cut. Build ensemble storytelling: different characters carry different narrative beats.
@@ -629,18 +635,21 @@ export async function runStoryboardDirector({
 
     console.log(`[Storyboard Director] Calling ${directorModel} with ${imageUrls.length} vision images (${productImageUrls.length} product + ${resolvedAvatarUrls.length} avatar + ${refImageUrls.length} ref)...`);
 
-    // Scale maxTokens with video duration — 300s videos need ~18K tokens, 30s needs ~8K
-    const dynamicMaxTokens = Math.max(8000, Math.ceil(duration / 5) * 300);
-    console.log(`[Storyboard Director] Using maxTokens=${dynamicMaxTokens} for ${duration}s video`);
-
     // 5. Call Agent (multimodal)
+    // Scale token budget with duration — each cut needs ~180 tokens (id+lens+duration+move+shot+scene+framePrompt+voiceover).
+    // A 300s video targeting 1 cut/3s = 100 cuts = ~18,000 tokens. Give 20% headroom.
+    const expectedCuts = Math.ceil(duration / 3); // min density = 1 cut/3s
+    const tokensPerCut = 180;
+    const scaledTokens = Math.min(32000, Math.max(8000, Math.ceil(expectedCuts * tokensPerCut * 1.2)));
+    console.log(`[Storyboard Director] Token budget: ${scaledTokens} (${expectedCuts} cuts × ${tokensPerCut} tokens × 1.2 headroom)`);
+
     let rawOutput;
     try {
         rawOutput = await callMultimodalAgent(
             systemPrompt,
             userPrompt,
             imageUrls,
-            { temperature: 0.7, maxTokens: dynamicMaxTokens, returnRaw: true, provider: directorModel }
+            { temperature: 0.7, maxTokens: scaledTokens, returnRaw: true, provider: directorModel }
         );
         if (!rawOutput || typeof rawOutput !== 'string' || rawOutput.error) {
             throw new Error(rawOutput?.error || 'Empty or invalid response from LLM');
@@ -656,7 +665,7 @@ export async function runStoryboardDirector({
     } catch (parseErr) {
         console.error(`[Storyboard Director] Parse failed, retrying...`);
         const retrySystem = systemPrompt + '\n\nCRITICAL: Your previous output could not be parsed as JSON. Return ONLY raw JSON, zero other text.';
-        rawOutput = await callMultimodalAgent(retrySystem, userPrompt, imageUrls, { temperature: 0.4, maxTokens: dynamicMaxTokens, returnRaw: true, provider: directorModel });
+        rawOutput = await callMultimodalAgent(retrySystem, userPrompt, imageUrls, { temperature: 0.4, maxTokens: scaledTokens, returnRaw: true, provider: directorModel });
         if (!rawOutput || typeof rawOutput !== 'string' || rawOutput.error) {
             throw new Error(`Storyboard Director (${directorModel}) retry failed: ${rawOutput?.error || 'Empty or invalid response'}`);
         }

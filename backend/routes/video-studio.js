@@ -68,7 +68,7 @@ import redis from '../utils/redisClient.js';
 import { startLongFormGeneration, getLongFormJobStatus, cancelLongFormJob, estimateLongFormCost } from '../agents/videoStudio/longFormGenerator.js';
 import { runStoryboardDirector, recreateVideoPrompt } from '../agents/videoStudio/storyboardDirector.js';
 import { generateStoryboardPoster } from '../agents/videoStudio/storyboardFrames.js';
-import { startStoryboardLongForm, getStoryboardLongFormJobStatus, estimateStoryboardLongFormCredits, stitchSegments } from '../agents/videoStudio/storyboardLongForm.js';
+import { startStoryboardLongForm, getStoryboardLongFormJobStatus, cancelStoryboardLongFormJob, estimateStoryboardLongFormCredits, stitchSegments } from '../agents/videoStudio/storyboardLongForm.js';
 import { stitchVideoClips } from '../utils/videoStitcher.js';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
@@ -9092,6 +9092,24 @@ router.post('/long-form/cancel/:jobId', protect, async (req, res) => {
             { 'generation.longFormJobId': req.params.jobId },
             { status: 'cancelled' }
         ).catch(() => {});
+    }
+    res.json({ success: true, cancelled });
+});
+
+// ── POST /api/video-studio/storyboard/cancel/:jobId ────────────────────────────────────────
+// Cancels an active storyboard long-form job (sb-lf-* IDs).
+// Calls cancelStoryboardLongFormJob() which sets job.cancelled = true on the
+// in-memory job object. The pipeline checks this flag between each segment.
+router.post('/storyboard/cancel/:jobId', protect, async (req, res) => {
+    const { jobId } = req.params;
+    const cancelled = cancelStoryboardLongFormJob(jobId);
+    if (cancelled) {
+        // Update MongoDB project status so the UI reflects cancellation after page refresh
+        await VideoProject.findOneAndUpdate(
+            { 'storyboard.longFormJobId': jobId },
+            { status: 'storyboard-ready', 'storyboard.status': 'cancelled' }
+        ).catch(() => {});
+        console.log(`[Storyboard Cancel] ❌ Cancelled job: ${jobId}`);
     }
     res.json({ success: true, cancelled });
 });
