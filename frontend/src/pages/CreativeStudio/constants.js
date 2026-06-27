@@ -419,5 +419,6 @@ export const ANIMATE_MODELS = {
     'seedance-2.0-mini': { name: 'Seedance 2.0 Mini', icon: '⚡', dur: [5, 15], ratios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'], firstFrame: true, refImages: true, nativeAudio: true, desc: 'ByteDance Seedance 2.0 Mini' },
     'kling-3.0': { name: 'Kling 3.0', icon: '🖥️', dur: [3, 15], ratios: ['16:9', '9:16', '1:1'], firstFrame: true, refImages: false, nativeAudio: true, desc: 'Best motion & physics' },
     'veo-3.1': { name: 'Veo 3.1', icon: '🎬', dur: [4, 8], ratios: ['16:9', '9:16'], firstFrame: true, refImages: true, nativeAudio: true, desc: 'Premium cinematic quality' },
+    'veo-3.1-lite': { name: 'Veo 3.1 Lite', icon: '🎬', dur: [4, 8], ratios: ['16:9', '9:16'], firstFrame: true, refImages: true, nativeAudio: true, desc: 'Google Veo 3.1 Lite (Atlas)' },
     'seedance-1.0': { name: 'Seedance 1.0', icon: '🌱', dur: [5, 10], ratios: ['16:9', '9:16', '1:1', '4:3', '3:4'], firstFrame: true, refImages: false, nativeAudio: false, desc: 'Fast & affordable' },
 };

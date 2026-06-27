@@ -1527,6 +1527,15 @@ const VIDEO_PROVIDER_REGISTRY = {
             { id: 'kie', name: 'kie.ai', envKey: 'KIE_API_KEY', costPerSecond: 0.08, description: 'Fallback — taskId-based async', builtIn: true },
         ],
     },
+    'veo-3.1-lite': {
+        name: 'Veo 3.1 Lite',
+        icon: 'smart_display',
+        category: 'fast',
+        defaultProvider: 'atlascloud',
+        providers: [
+            { id: 'atlascloud', name: 'Atlas Cloud', envKey: 'ATLASCLOUD_API_KEY', costPerSecond: 0.05, description: 'Only provider — direct pay-as-you-go workflow, native audio + ref images', builtIn: true },
+        ],
+    },
     'seedance-1.0': {
         name: 'Seedance 1.0 Lite',
         icon: 'play_circle',

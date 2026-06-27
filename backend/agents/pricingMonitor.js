@@ -173,6 +173,11 @@ export const PROVIDER_PRICING = {
                 costPerSecFast: 0.06, costPerSecQuality: 0.10, unit: 'USD/sec',
                 pricingUrl: 'https://fal.ai/pricing',
             },
+            'veo-3.1-lite': {
+                name: 'Veo 3.1 Lite', type: 'video',
+                costPerSecFast: 0.05, costPerSecQuality: 0.08, unit: 'USD/sec',
+                pricingUrl: 'https://fal.ai/pricing',
+            },
             'hunyuan': {
                 name: 'HunyuanVideo (Tencent)', type: 'video',
                 costPerSecFast: 0.03, costPerSecQuality: 0.05, unit: 'USD/sec',

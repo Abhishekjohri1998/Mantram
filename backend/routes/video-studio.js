@@ -2495,7 +2495,7 @@ router.post('/agent/v2/chat', protect, async (req, res) => {
             generate:     'Video is being generated or is done. Help user download, share, or iterate.',
         };
 
-        const MODEL_IDS = ['seedance-2.0', 'seedance-2.0-mini', 'kling-3.0', 'veo-3.1', 'veo-3.1-fast', 'grok-imagine', 'gemini-flash', 'gemini-omni-flash'];
+        const MODEL_IDS = ['seedance-2.0', 'seedance-2.0-mini', 'kling-3.0', 'veo-3.1', 'veo-3.1-fast', 'veo-3.1-lite', 'grok-imagine', 'gemini-flash', 'gemini-omni-flash'];
 
         const MODEL_CONTEXT = `
 - seedance-2.0: Best for most ads. Fast, great image-to-video consistency, supports up to 120s.
@@ -2503,6 +2503,7 @@ router.post('/agent/v2/chat', protect, async (req, res) => {
 - kling-3.0: Best cinematic quality, multi-shot scripts, great for brand films. Up to 60s.
 - veo-3.1: Native audio/dialogue generation. Most realistic. Up to 30s.
 - veo-3.1-fast: Same as Veo but faster. Good for quick turnarounds.
+- veo-3.1-lite: Google Veo 3.1 Lite — high efficiency cinematic video with native audio, routed via Atlas.
 - grok-imagine: Fastest for short social reels & UGC. Up to 15s.
 - gemini-flash: Best for motion graphics and animated explainers.`;
 
@@ -4838,7 +4839,7 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), aiGe
         let genResult;
         let usedProvider;
 
-        if (selectedModel === 'seedance-2.0' || selectedModel === 'seedance-2.0-fast' || selectedModel === 'seedance-2.0-mini') {
+        if (selectedModel === 'seedance-2.0' || selectedModel === 'seedance-2.0-fast' || selectedModel === 'seedance-2.0-mini' || selectedModel === 'veo-3.1-lite') {
             // Atlas Cloud R2V path — ALL images as references (avatar + product)
             const allRefImages = imageUrls.slice(0, 9);
             console.log(`[UGC Generate] Seedance R2V: ${allRefImages.length} reference images`);
@@ -8309,7 +8310,7 @@ router.get('/', protect, async (req, res) => {
                         let provider = p.generation?.provider || '';
                         if (!provider) {
                             if (model === 'veo-3.1-fast') provider = 'kie';
-                            else if (model === 'seedance-2.0') provider = 'atlascloud';
+                            else if (model === 'seedance-2.0' || model === 'veo-3.1-lite') provider = 'atlascloud';
                             else if (model === 'grok-imagine') provider = 'grok';
                             else if (model === 'sora-2') provider = 'laozhang';
                             else if (model.startsWith('heygen')) provider = 'heygen';

@@ -59,6 +59,18 @@ function authHeaders() {
 }
 
 function resolveModelName(qualityMode, imageCount, model = 'seedance-2.0') {
+    if (model === 'veo-3.1-lite') {
+        if (imageCount > 1) {
+            console.log(`📌 Atlas Veo 3.1 Lite: ${imageCount} images → reference-to-video`);
+            return `google/veo-3.1-lite/reference-to-video`;
+        }
+        if (imageCount === 1) {
+            console.log(`📌 Atlas Veo 3.1 Lite: 1 image → image-to-video`);
+            return `google/veo-3.1-lite/image-to-video`;
+        }
+        return `google/veo-3.1-lite/text-to-video`;
+    }
+
     if (model === 'seedance-2.0-mini') {
         if (imageCount > 1) {
             console.log(`📌 Atlas Mini: ${imageCount} images → reference-to-video`);
@@ -642,7 +654,7 @@ export async function submitAtlasCloudVideoGeneration({
         taskInput.image_urls = firstFrameAssetUris;
     }
 
-    const payload = { model: 'seedance', task_type: modelName, input: taskInput };
+    const payload = { model: model === 'veo-3.1-lite' ? 'veo-3.1-lite' : 'seedance', task_type: modelName, input: taskInput };
     const taskId  = await submitAtlasCloudPayload(payload);
     return { taskId, provider: 'atlascloud', model, _payload: payload, type: 'generation' };
 }
@@ -686,7 +698,7 @@ export async function submitAtlasCloudImageToVideo({
     console.log(`🎯 [Atlas I2V] model=${modelName} | dur=${dur}s`);
 
     const payload = {
-        model: 'seedance', task_type: modelName,
+        model: model === 'veo-3.1-lite' ? 'veo-3.1-lite' : 'seedance', task_type: modelName,
         input: { prompt: finalPrompt, image_urls: [hostedUrl, ...hostedRefs.filter(Boolean)], aspect_ratio: aspectRatio || '16:9', duration: dur },
     };
     const taskId = await submitAtlasCloudPayload(payload);
@@ -700,7 +712,7 @@ export async function submitAtlasCloudVideoExtend({ parentTaskId, prompt, durati
     const dur = Math.min(Math.max(parseInt(duration, 10) || 5, 5), 10);
     console.log(`🔗 [Atlas Extend]: parent=${parentTaskId} dur=${dur}s`);
     const modelName = resolveModelName(qualityMode, 0, model);
-    const payload   = { model: 'seedance', task_type: modelName, input: { prompt: prompt || '', duration: dur, parent_task_id: parentTaskId } };
+    const payload   = { model: model === 'veo-3.1-lite' ? 'veo-3.1-lite' : 'seedance', task_type: modelName, input: { prompt: prompt || '', duration: dur, parent_task_id: parentTaskId } };
     const taskId    = await submitAtlasCloudPayload(payload);
     return { taskId, provider: 'atlascloud', model, mode: 'extend', _payload: payload, parentTaskId, type: 'generation' };
 }

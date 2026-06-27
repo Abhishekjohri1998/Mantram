@@ -184,6 +184,19 @@ Write as a director's shot note: scene + camera + audio in narrative prose.
 LIMIT: Under 200 words. Include one audio cue.`,
     },
 
+    'veo-3.1-lite': {
+        name: 'Veo 3.1 Lite',
+        maxWords: 200,
+        structure: `
+VEO 3.1 LITE — OPTIMAL PROMPT STRUCTURE:
+Write as a director's shot note: scene + camera + audio in narrative prose.
+VEO LITE STRENGTHS — always exploit these:
+- Cinematic photorealism and physics
+- Native audio: describe sound effects/ambience inline (e.g. "VISUAL: ... | AUDIO: ...")
+- Consistent character reference anchoring
+LIMIT: Under 200 words. Keep it visual, punchy, and cinematic.`,
+    },
+
     'grok-imagine': {
         name: 'Grok Imagine',
         maxWords: 80,

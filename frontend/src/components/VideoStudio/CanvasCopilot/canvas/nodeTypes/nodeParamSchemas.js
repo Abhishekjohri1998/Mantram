@@ -1,6 +1,6 @@
 export const NODE_PARAM_SCHEMAS = {
     video_generate: {
-        model:       { type: 'enum',   label: 'Model',        options: ['seedance-2.0','seedance-2.0-mini','kling-3.0','veo-3.1','veo-3.1-fast','grok-imagine','gemini-flash'] },
+        model:       { type: 'enum',   label: 'Model',        options: ['seedance-2.0','seedance-2.0-mini','kling-3.0','veo-3.1','veo-3.1-fast','veo-3.1-lite','grok-imagine','gemini-flash'] },
         duration:    { type: 'number', label: 'Duration (s)',  min: 3, max: 120 },
         aspectRatio: { type: 'enum',   label: 'Aspect Ratio', options: ['9:16','16:9','1:1','4:5','21:9'] },
         motionMode:  { type: 'enum',   label: 'Motion Mode',  options: ['subtle','balanced','dynamic'] },
@@ -17,7 +17,7 @@ export const NODE_PARAM_SCHEMAS = {
         quality:     { type: 'enum', label: 'Quality',      options: ['draft','standard','hd'] },
     },
     prompt_expand: {
-        targetModel: { type: 'enum',   label: 'Target Model',  options: ['seedance-2.0','seedance-2.0-mini','kling-3.0','veo-3.1','veo-3.1-fast','grok-imagine','gemini-flash'] },
+        targetModel: { type: 'enum',   label: 'Target Model',  options: ['seedance-2.0','seedance-2.0-mini','kling-3.0','veo-3.1','veo-3.1-fast','veo-3.1-lite','grok-imagine','gemini-flash'] },
         style:       { type: 'string', label: 'Style Override' },
     },
     voiceover: {

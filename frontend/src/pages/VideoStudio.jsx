@@ -2127,7 +2127,8 @@ export default function VideoStudio() {
                                     routing.selectedModel === 'happyhorse-1.1' ? 'HappyHorse 1.1' :
                                     routing.selectedModel === 'veo-3.1' ? 'Google Veo 3.1' :
                                         routing.selectedModel === 'veo-3.1-fast' ? 'Google Veo 3.1 Fast' :
-                                            routing.selectedModel === 'kling-3.0' ? 'Kling 3.0' :
+                                            routing.selectedModel === 'veo-3.1-lite' ? 'Google Veo 3.1 Lite' :
+                                                routing.selectedModel === 'kling-3.0' ? 'Kling 3.0' :
                                                 routing.selectedModel === 'seedance-2.0' ? 'Seedance 2.0 Pro' :
                                                     routing.selectedModel === 'seedance-2.0-mini' ? 'Seedance 2.0 Mini' :
                                                         routing.selectedModel === 'seedance-1.0' ? 'Seedance 1.0' :
@@ -2158,6 +2159,7 @@ export default function VideoStudio() {
                                     { id: 'kling-3.0', name: 'Kling 3.0', icon: 'videocam', desc: 'Multi-shot storyboards, native audio + voice IDs, 3-15s', bestFor: 'Product demos, action shots, storyboard videos', features: ['multi-shot', 'native-audio', 'voice-ids', '3-15s'], available: true, recommended: false },
                                     { id: 'veo-3.1', name: 'Google Veo 3.1', icon: 'movie', desc: 'Cinematic quality with native audio + extend-video', bestFor: 'Premium brand films, cinematic ads', features: ['native-audio', 'cinematic', 'extend-video', '5-8s'], available: true, recommended: false },
                                     { id: 'veo-3.1-fast', name: 'Veo 3.1 Fast', icon: 'bolt', desc: 'Faster & cheaper Veo 3.1 — great for prototyping', bestFor: 'Quick iterations, content series, social video', features: ['native-audio', 'fast', '5-8s', 'cost-efficient'], available: true, recommended: false },
+                                    { id: 'veo-3.1-lite', name: 'Veo 3.1 Lite', icon: 'movie', desc: 'Google Veo 3.1 Lite model via Atlas Cloud — high efficiency, native audio + ref images', bestFor: 'High-volume campaign videos, product showcases with narration', features: ['ref-images', 'i2v', 'native-audio', '4-8s'], available: true, recommended: true },
                                     { id: 'seedance-2.0', name: 'Seedance 2.0 Pro', icon: 'local_movies', desc: 'Cinematic video with native audio, camera control & physics', bestFor: 'Premium ads, product showcases, brand films', features: ['native-audio', 'camera-control', 'cinematic', '4-15s'], available: true, recommended: false },
                                     { id: 'seedance-2.0-mini', name: 'Seedance 2.0 Mini', icon: 'bolt', desc: 'ByteDance Seedance 2.0 Mini — lightweight, low-cost video generation', bestFor: 'Lightweight & cost-efficient reels/shorts', features: ['i2v', 'extend', 'native-audio', '4-15s', 'budget'], available: true, recommended: false },
                                     { id: 'seedance-1.0', name: 'Seedance 1.0 Lite', icon: 'speed', desc: 'Fast & affordable video generation', bestFor: 'Quick prototypes, social content, UGC', features: ['fast', 'affordable', '5-10s'], available: true, recommended: false },
