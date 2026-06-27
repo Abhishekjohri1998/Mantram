@@ -9,12 +9,27 @@ export class OpenAIProvider extends BaseProvider {
     constructor(config) {
         super(config);
         this.name = 'openai';
-        this.baseUrl = 'https://api.openai.com/v1';
+        this.baseUrl = config.baseUrl || 'https://api.openai.com/v1';
         // LaoZhang proxy — used automatically for gpt-image-2 when key is available
         // This mirrors exactly how Creative Studio's openaiImageGenerate() works
         this.lzApiKey = config.laozhangApiKey;
         this.lzBaseUrl = config.laozhangBaseUrl || 'https://api.laozhang.ai/v1';
     }
+
+    set baseUrl(val) {
+        if (val && typeof val === 'string') {
+            let normalized = val.trim();
+            if (normalized.includes('atlascloud.ai') && !normalized.endsWith('/v1') && !normalized.includes('/v1/')) {
+                normalized = normalized.replace(/\/$/, '') + '/v1';
+            }
+            this._baseUrl = normalized;
+        }
+    }
+
+    get baseUrl() {
+        return this._baseUrl || 'https://api.openai.com/v1';
+    }
+
 
     /**
      * Map model names for proxy providers (Atlas Cloud, Laozhang).
