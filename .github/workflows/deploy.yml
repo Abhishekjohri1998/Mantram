@@ -294,8 +294,13 @@ jobs:
       - name: 🔒 Revoke Runner IP (Cleanup)
         if: always()
         run: |
+          RUNNER_IP="${{ steps.ip.outputs.ipv4 }}"
+          if [ -z "$RUNNER_IP" ]; then
+            echo "⚠️ Runner IP is empty — skipping SG revoke"
+            exit 0
+          fi
           aws ec2 revoke-security-group-ingress \
             --group-id ${{ secrets.AWS_SECURITY_GROUP_ID }} \
             --protocol tcp \
             --port 22 \
-            --cidr ${{ steps.ip.outputs.ipv4 }}/32 || echo "Rule already removed or not found"
+            --cidr "$RUNNER_IP/32" || echo "Rule already removed or not found"
