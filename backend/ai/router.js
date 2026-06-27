@@ -525,9 +525,9 @@ class ModelRouter {
      */
     _calcTimeout(maxTokens) {
         if (!maxTokens || maxTokens <= 4000) return this.PER_CALL_TIMEOUT_MS;
-        // Scale: 45s base + 15s per 1000 extra tokens above 4000, capped at 300s
+        // Scale: 45s base + 15s per 1000 extra tokens above 4000, capped at 600s
         const extraSeconds = Math.ceil((maxTokens - 4000) / 1000) * 15;
-        return Math.min(this.PER_CALL_TIMEOUT_MS + (extraSeconds * 1000), 300_000);
+        return Math.min(this.PER_CALL_TIMEOUT_MS + (extraSeconds * 1000), 600_000);
     }
 
     /**
