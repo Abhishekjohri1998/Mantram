@@ -361,3 +361,32 @@ export function resolveImageRole({ hasAvatar, isFashion, explicitRole } = {}) {
     if (isFashion) return 'fashion-model';
     return 'product';
 }
+
+/**
+ * sanitizeRawText — Apply deity/religious/sensitive phrase sanitization to raw text
+ * that will be fed into an LLM prompt as context (e.g. structuredPlan.cuts[].scene,
+ * imagePrompt strings, brief text). This prevents the LLM from incorporating trigger
+ * words into its generated output.
+ *
+ * Unlike sanitizePromptForProvider, this does NOT touch @image tags, provider-specific
+ * formatting, or enforce character limits. It only applies RC#6 and RC#7 mappings.
+ *
+ * @param {string} text - The raw text to sanitize
+ * @returns {string}    - Sanitized text safe for LLM ingestion
+ */
+export function sanitizeRawText(text) {
+    if (!text || typeof text !== 'string') return text || '';
+    let p = text;
+    // Apply deity phrase map (RC#6)
+    for (const [pattern, replacement] of DEITY_PHRASE_MAP) {
+        p = p.replace(pattern, replacement);
+    }
+    // Apply sensitive phrase map (RC#7)
+    for (const [pattern, replacement] of SENSITIVE_PHRASE_MAP) {
+        p = p.replace(pattern, replacement);
+    }
+    // Apply hard violence/nudity ban
+    HARD_BANNED.lastIndex = 0;
+    p = p.replace(HARD_BANNED, '');
+    return p;
+}

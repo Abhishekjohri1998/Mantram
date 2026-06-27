@@ -10302,16 +10302,29 @@ async function generateAnimateVideoPrompt({
 
         // Build timed cut list with attire/staging from framePrompt
         let elapsed = 0;
+        // Pre-sanitize cut content before Claude sees it (RC#6/7)
+        // structuredPlan is stored in MongoDB from the original storyboard which may
+        // contain deity/religious terms that must not be echoed into the generated videoPrompt.
+        let sanitizeRawTextFn = (t) => t;
+        try {
+            const { sanitizeRawText } = await import('../agents/videoStudio/promptSanitizer.js');
+            sanitizeRawTextFn = sanitizeRawText;
+        } catch (e) { /* graceful fallback */ }
+
         const cutLines = structuredPlan.cuts.map(cut => {
             const start = elapsed;
             const end = elapsed + cut.duration;
             elapsed = end;
+            // Sanitize scene and framePrompt to remove deity/religious terms from LLM context
+            const safeScene = sanitizeRawTextFn(cut.scene || '');
+            const safeFramePrompt = sanitizeRawTextFn(cut.framePrompt || '');
             // Include framePrompt as attire/staging directive (truncated to avoid token bloat)
-            const attireLine = cut.framePrompt && cut.framePrompt.trim().length > 10
-                ? `\n      → Attire/Staging: ${cut.framePrompt.substring(0, 150)}`
+            const attireLine = safeFramePrompt && safeFramePrompt.trim().length > 10
+                ? `\n      → Attire/Staging: ${safeFramePrompt.substring(0, 150)}`
                 : '';
-            return `  CUT ${cut.id} [${start}s–${end}s] ${cut.duration}s | ${cut.lens} | ${cut.shot} | ${cut.move}\n      Scene: ${cut.scene}${attireLine}`;
+            return `  CUT ${cut.id} [${start}s–${end}s] ${cut.duration}s | ${cut.lens} | ${cut.shot} | ${cut.move}\n      Scene: ${safeScene}${attireLine}`;
         }).join('\n');
+
 
         const colorStr = structuredPlan.colorPalette?.length
             ? structuredPlan.colorPalette.map((hex, i) => `${hex} (${structuredPlan.paletteNames?.[i] || ''})`).join(', ')
@@ -10456,8 +10469,22 @@ Write the final video prompt now. Follow the cut plan timings exactly. Ensure ev
         throw new Error('Video prompt generation returned empty result');
     }
 
+    // RC#6/7 post-LLM sanitization: Claude may have paraphrased or echoed deity/religious
+    // terms from the structuredPlan even after input sanitization. Run as final safety net.
+    try {
+        const { sanitizeRawText } = await import('../agents/videoStudio/promptSanitizer.js');
+        const safeCleaned = sanitizeRawText(cleaned);
+        if (safeCleaned !== cleaned) {
+            console.log(`[generateAnimateVideoPrompt] ⚠️ RC#6/7 post-LLM sanitization removed trigger terms`);
+            cleaned = safeCleaned;
+        }
+    } catch (sanitizeErr) {
+        console.warn(`[generateAnimateVideoPrompt] sanitizeRawText import failed: ${sanitizeErr.message}`);
+    }
+
     return cleaned;
 }
+
 
 // ── POST /api/video-studio/storyboard/animate ────────────────────────────────
 // Step 3: Animate each storyboard frame via I2V (Seedance 2.0)

@@ -370,9 +370,32 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
         let scenes = [];
         try {
             // Pass structuredPlan so scenePlanner can use cuts[] directly (no LLM re-decomposition)
-            const structuredPlan = params.structuredPlan || null;
+            let structuredPlan = params.structuredPlan || null;
+
+            // RC#6/7: Pre-sanitize videoPrompt and structuredPlan cut content before scene planning.
+            // These values come from MongoDB and may contain deity/religious terms from the original
+            // storyboard creation. Sanitize them before they reach the video generation API.
+            let safeVideoPrompt = params.videoPrompt;
+            try {
+                const { sanitizeRawText } = await import('./promptSanitizer.js');
+                safeVideoPrompt = sanitizeRawText(params.videoPrompt || '');
+                if (structuredPlan?.cuts?.length > 0) {
+                    structuredPlan = {
+                        ...structuredPlan,
+                        cuts: structuredPlan.cuts.map(cut => ({
+                            ...cut,
+                            scene: sanitizeRawText(cut.scene || ''),
+                            framePrompt: sanitizeRawText(cut.framePrompt || ''),
+                        })),
+                    };
+                    console.log(`[SB LongForm ${jobId}] ✅ RC#6/7: Sanitized ${structuredPlan.cuts.length} cuts pre-flight`);
+                }
+            } catch (sanitizeErr) {
+                console.warn(`[SB LongForm ${jobId}] ⚠️ sanitizeRawText import failed: ${sanitizeErr.message}`);
+            }
+
             scenes = await planStoryboardScenes({
-                videoPrompt: params.videoPrompt,
+                videoPrompt: safeVideoPrompt,
                 imageUrl: signedImageUrl,
                 targetDuration: params.totalDuration,
                 model: params.model,
@@ -382,7 +405,7 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
                 productFeatures,
                 referenceImages: finalReferenceImages,
                 characterNames: avatarNames,
-                structuredPlan,  // ← NEW: passes cuts[] for direct timing mapping
+                structuredPlan,  // ← passes sanitized cuts[] for direct timing mapping
             });
             console.log(`[SB LongForm ${jobId}] 📋 Decomposed into ${scenes.length} scenes.`);
         } catch (planErr) {
@@ -393,6 +416,7 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
                 visualPrompt: `Segment ${i + 1} of ${segCount}: Continue storyboard flow. ${params.videoPrompt?.substring(0, 300)}`,
                 dialogue: [],
             }));
+
         }
 
         job.scenes = scenes;
