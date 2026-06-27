@@ -134,18 +134,22 @@ const SENSITIVE_PHRASE_MAP = [
 // Strip meta-instruction blocks that confuse the model and add no visual value.
 // ─────────────────────────────────────────────────────────────────────────────
 const SEEDANCE_META_STRIP = [
-    // Strip "Total this segment: Xs" instruction lines
+    // Legacy CUT-format instruction lines (no longer generated but strip if present in old stored prompts)
     [/Total this segment:\s*\d+s\.?[^\n]*/gi,         ''],
-    // Strip "Do not overshoot or undershoot" instructions
     [/Do not overshoot or undershoot\.?/gi,            ''],
-    // Strip "Each cut transitions directly to the next with a hard cut" instructions
     [/Each cut transitions? directly to the next with a hard cut\.?/gi, ''],
-    // Strip "follow EXACTLY" directives
     [/\(follow EXACTLY — durations are mandatory\)/gi, ''],
-    // Reformat verbose SEGMENT headers more succinctly
+    [/TIMED CUT PLAN \(follow EXACTLY.*?\):\n/gi,      ''],
+    // Legacy SEGMENT header (old format) — replace with compact label
     [/SEGMENT (\d+) OF (\d+) — (\d+)s\nEnvironment:/gi, 'Scene $1/$2 —'],
-    // Strip attire/staging meta labels (keep the content, remove the label)
+    // Redundant meta-labels — keep content, strip verbose labels
     [/\| Attire\/staging: /gi,                         ' — '],
+    // "Segment X of Y. Maintain absolute visual consistency" footer (keep trimmed)
+    [/\nSegment \d+ of \d+\. Maintain absolute visual consistency with the character reference sheet\./gi, ''],
+    // Instruction labels not useful to Seedance's visual parser
+    [/\nCONTINUATION SEGMENT \d+\/\d+ — maintain exact visual continuity from previous segment\. No brand CTA\./gi, ''],
+    [/\nOPENING SEGMENT — establish the world, hook immediately\. No brand CTA\./gi, ''],
+    [/\nCLOSING SEGMENT — emotional peak, hard cut to product hero, brand name\/tagline in final 2 seconds ONLY\./gi, ''],
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
