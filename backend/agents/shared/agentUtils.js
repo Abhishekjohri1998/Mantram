@@ -490,15 +490,37 @@ export async function callMultimodalAgent(systemPrompt, userPrompt, imageUrls = 
 
     console.log(`🧠 MCoT: Multimodal Agent — ${validImages.length} images, prompt: ${userPrompt.substring(0, 80)}...`);
 
-    try {
-        const result = await router.generateText({
+    // Primary provider for vision tasks — default to Gemini, fall back to Claude on 503
+    const primaryVisionProvider = options.provider || 'gemini';
+
+    const _runVisionCall = async (provider) => {
+        return router.generateText({
             systemPrompt,
             userPrompt,
             temperature,
             maxTokens,
-            images: validImages, 
+            images: validImages,
             jsonMode: options.jsonMode || false,
-        }, { provider: options.provider || 'gemini' });
+        }, { provider });
+    };
+
+    try {
+        let result;
+        try {
+            result = await _runVisionCall(primaryVisionProvider);
+        } catch (primaryErr) {
+            // If Gemini is overloaded (503), retry with Claude before giving up
+            const is503 = primaryErr.message?.includes('503') ||
+                          primaryErr.message?.toLowerCase().includes('overloaded') ||
+                          primaryErr.message?.toLowerCase().includes('high demand') ||
+                          primaryErr.message?.toLowerCase().includes('capacity');
+            if (is503 && primaryVisionProvider !== 'anthropic' && primaryVisionProvider !== 'claude') {
+                console.warn(`🧠 MCoT: Primary vision provider (${primaryVisionProvider}) is 503. Retrying with Claude...`);
+                result = await _runVisionCall('anthropic');
+            } else {
+                throw primaryErr;
+            }
+        }
 
         const text = result.text || '';
         console.log(`🧠 MCoT: Multimodal response received in ${Date.now() - startMs}ms (${text.length} chars)`);

@@ -45,7 +45,19 @@ export function getFriendlyErrorMessage(error) {
         return 'Job cancelled.';
     }
 
-    // 4. Default: fetch failures, timeouts, connection issues, API provider failures,
+    // 4. AI provider temporarily overloaded (503 / high demand)
+    if (
+        lowerMsg.includes('503') ||
+        lowerMsg.includes('overloaded') ||
+        lowerMsg.includes('high demand') ||
+        lowerMsg.includes('service unavailable') ||
+        lowerMsg.includes('capacity') ||
+        lowerMsg.includes('all ai providers')
+    ) {
+        return 'AI models are temporarily overloaded — please try again in 30 seconds.';
+    }
+
+    // 5. Default: fetch failures, timeouts, connection issues, API provider failures,
     // and raw internal server errors are formatted as "AI models are currently busy"
     return 'AI models are currently busy — please try again';
 }
