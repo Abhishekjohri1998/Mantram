@@ -323,6 +323,65 @@ function generateFallbackScenes({ sceneCount, durations, arcScenes, language, pr
  *
  * When structuredPlan is missing, fall back to LLM decomposition.
  */
+/**
+ * Procedurally expand segment cuts if there are fewer than 5 cuts.
+ * Cycles through camera angles, moves, and lens profiles to maintain commercial pacing.
+ */
+function ensureMinCutsPerSegment(cuts, duration) {
+    if (cuts.length >= 5) return cuts;
+
+    const targetCount = 5;
+    const subDuration = Math.round((duration / targetCount) * 100) / 100; // clean float precision
+
+    const SHOT_ROTATION = ['WIDE', 'CLOSE-UP', 'MEDIUM', 'INSERT', 'ESTABLISHING', 'TWO-SHOT', 'MACRO'];
+    const MOVE_ROTATION = ['STEADICAM', 'DOLLY-IN', 'STATIC', 'PUSH-IN', 'ARC', 'RACK-FOCUS', 'ORBIT'];
+    const LENS_ROTATION = ['24mm wide-angle', '85mm portrait', '50mm prime', '100mm macro', '35mm anamorphic'];
+
+    const expandedCuts = [];
+    let currentCutIdx = 0;
+
+    for (let i = 0; i < targetCount; i++) {
+        const timeOffset = i * subDuration;
+        let originalCut = cuts[currentCutIdx] || cuts[cuts.length - 1];
+
+        let tempSum = 0;
+        for (let j = 0; j < cuts.length; j++) {
+            tempSum += cuts[j].duration;
+            if (timeOffset < tempSum) {
+                originalCut = cuts[j];
+                currentCutIdx = j;
+                break;
+            }
+        }
+
+        const shotType = SHOT_ROTATION[i % SHOT_ROTATION.length];
+        const cameraMove = MOVE_ROTATION[i % MOVE_ROTATION.length];
+        const lensSpec = LENS_ROTATION[i % LENS_ROTATION.length];
+
+        let visualModifier = '';
+        if (shotType === 'INSERT' || shotType === 'MACRO') {
+            visualModifier = ' Focus closely on the product design and labels.';
+        } else if (shotType === 'CLOSE-UP') {
+            visualModifier = " Focus on the presenter's face and expression.";
+        } else if (shotType === 'WIDE' || shotType === 'ESTABLISHING') {
+            visualModifier = ' Show the surrounding cafe/studio set and background depth.';
+        }
+
+        expandedCuts.push({
+            ...originalCut,
+            id: `${originalCut.id || 1}_sub${i + 1}`,
+            duration: subDuration,
+            shot: shotType,
+            move: cameraMove,
+            lens: lensSpec,
+            framePrompt: originalCut.framePrompt ? `${originalCut.framePrompt}${visualModifier}` : originalCut.scene,
+            scene: originalCut.scene || `Scene shot ${i + 1}`,
+        });
+    }
+
+    return expandedCuts;
+}
+
 export async function planStoryboardScenes({
     videoPrompt,
     imageUrl,
@@ -363,9 +422,9 @@ export async function planStoryboardScenes({
         const sceneCount = segments.length;
 
         const scenes = segments.map((seg, i) => {
-            // ── Build Seedance-native directorial prompt targeting ~2000-2200 chars ──
-            // Seedance performs best with the SHOT N structure + STYLE/ENVIRONMENT/MOOD block.
-            // Reference: promptEnhancer.js MODEL_STYLE_GUIDES['seedance-2.0'] — "under 2200 characters"
+            // Guarantee at least 5 cuts per segment (e.g. 5 cuts of 2s for a 10s segment)
+            const activeCuts = ensureMinCutsPerSegment(seg.cutsInSegment, seg.duration);
+
             let elapsed = 0;
 
             // Build STYLE block from structuredPlan metadata
@@ -389,7 +448,7 @@ export async function planStoryboardScenes({
             // KEY: framePrompt = rich visual + camera description (up to 40 words)
             //      scene       = narrative beat (1 short sentence)
             // Seedance is a VISUAL model — use framePrompt as primary, scene as context.
-            const shotLines = seg.cutsInSegment.map((cut, ci) => {
+            const shotLines = activeCuts.map((cut, ci) => {
                 const start = elapsed;
                 const end = elapsed + cut.duration;
                 elapsed = end;
@@ -457,14 +516,14 @@ export async function planStoryboardScenes({
                 }
             }
 
-            console.log(`[ScenePlanner] Seg ${i+1}: ${visualPrompt.length} chars, ${seg.cutsInSegment.length} shots, ${seg.duration}s`);
+            console.log(`[ScenePlanner] Seg ${i+1}: ${visualPrompt.length} chars, ${activeCuts.length} shots, ${seg.duration}s`);
 
             return {
                 sceneId: i + 1,
                 duration: seg.duration,
-                cutsInSegment: seg.cutsInSegment,
+                cutsInSegment: activeCuts,
                 visualPrompt,
-                dialogue: seg.cutsInSegment.flatMap(c => c.voiceover
+                dialogue: activeCuts.flatMap(c => c.voiceover
                     ? [{ text: c.voiceover, emotion: 'natural' }]
                     : c.dialogue ? [{ text: c.dialogue, emotion: 'natural' }] : []
                 ),
