@@ -57,6 +57,7 @@ const MODELS = [
     { id: 'kling-3.0',     name: 'Kling 3.0',    icon: '👑', tier: 'Premium', tagline: 'Cinematic + multi-shot',     maxDur: 60,  color: '#f59e0b' },
     { id: 'veo-3.1',       name: 'Veo 3.1',      icon: '🎤', tier: 'Ultra',   tagline: 'Native audio + realistic',   maxDur: 30,  color: '#8b5cf6' },
     { id: 'veo-3.1-fast',  name: 'Veo Fast',     icon: '⚡', tier: 'Premium', tagline: 'Fast Veo + audio',           maxDur: 30,  color: '#6d28d9' },
+    { id: 'veo-3.1-lite',  name: 'Veo Lite',     icon: '🎬', tier: 'Lite',    tagline: 'Veo 3.1 Lite + audio',       maxDur: 30,  color: '#4f46e5' },
     { id: 'grok-imagine',  name: 'Grok Video',   icon: '🤖', tier: 'Fast',    tagline: 'Fastest for reels',          maxDur: 15,  color: '#ef4444' },
     { id: 'gemini-flash',  name: 'Gemini Flash', icon: '✨', tier: 'Pro',     tagline: 'Motion graphics + animated', maxDur: 30,  color: '#3b82f6' },
 ]

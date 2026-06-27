@@ -28,7 +28,7 @@ const MODEL_ENDPOINTS = {
 };
 
 export const MODEL_AVAILABLE = {
-    'kling-3.0-o': true, 'kling-3.0': true, 'veo-3.1': true, 'veo-3.1-fast': true,
+    'kling-3.0-o': true, 'kling-3.0': true, 'veo-3.1': true, 'veo-3.1-fast': true, 'veo-3.1-lite': true,
     'seedance-1.0': true, 'seedance-2.0': true, 'seedance-2.0-fast': true, 'seedance-2.0-mini': true, 'grok-imagine': true,
     'hunyuan': true, 'sora-2': true, 'happyhorse-1.0': true, 'happyhorse-1.1': true, 'gemini-flash': true,
     'gemini-omni-flash': true,
@@ -43,6 +43,7 @@ export const COST_PER_SECOND = {
     'kling-3.0': { fast: 0.07, quality: 0.12 },
     'veo-3.1': { fast: 0.10, quality: 0.25 },
     'veo-3.1-fast': { fast: 0.06, quality: 0.10 },
+    'veo-3.1-lite': { fast: 0.05, quality: 0.08 },
     'seedance-1.0': { fast: 0.08, quality: 0.12 },
     // Atlas Cloud actual billing based on 1080p baseline:
     // Seedance 2.0 Fast: 480p is $0.768/10s = $0.0768/sec.
@@ -66,6 +67,7 @@ const DURATION_LIMITS = {
     'kling-3.0-o': { min: 5, max: 15 },
     'veo-3.1': { min: 5, max: 8 },
     'veo-3.1-fast': { min: 5, max: 8 },
+    'veo-3.1-lite': { min: 4, max: 8 },
     'seedance-1.0': { min: 5, max: 10 },
     'seedance-2.0': { min: 5, max: 15 },
     'seedance-2.0-fast': { min: 5, max: 15 },
@@ -118,6 +120,16 @@ export const MODEL_CAPABILITIES = {
         resolutions: ['720p', '1080p', '4k'], aspectRatios: ['16:9', '9:16'],
         features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: true, multiShot: false, nativeAudio: true, voiceIds: false, cameraControl: false },
         maxReferenceImages: 3, costPerSecond: COST_PER_SECOND['veo-3.1-fast'], recommended: false,
+    },
+    'veo-3.1-lite': {
+        id: 'veo-3.1-lite', name: 'Veo 3.1 Lite', icon: '🎬', provider: 'atlascloud',
+        description: 'Google Veo 3.1 Lite — high efficiency cinematic video with native audio + ref images',
+        bestFor: 'High-volume cinematic social campaigns, product showcases',
+        duration: { min: 4, max: 8, native: 8, step: 2 },
+        resolutions: ['720p', '1080p'], aspectRatios: ['16:9', '9:16'],
+        features: { firstFrame: true, lastFrame: true, referenceImages: true, extendVideo: false, multiShot: false, nativeAudio: true, voiceIds: false, cameraControl: false },
+        maxReferenceImages: 9, costPerSecond: COST_PER_SECOND['veo-3.1-lite'], recommended: true,
+        maxPromptLength: 200000,
     },
     'seedance-2.0': {
         id: 'seedance-2.0', name: 'Seedance 2.0 Pro', icon: '🎞️', provider: 'dynamic',
@@ -252,7 +264,7 @@ export function estimateCost(model = 'kling-3.0', durationSeconds = 5, resolutio
     let resMult = 1.0;
     
     // Atlas Cloud models have specific resolution multipliers based on observed billing
-    const ATLAS_MODELS = ['seedance-2.0', 'seedance-2.0-fast', 'happyhorse-1.0', 'happyhorse-1.1', 'gemini-flash', 'gemini-omni-flash'];
+    const ATLAS_MODELS = ['seedance-2.0', 'seedance-2.0-fast', 'happyhorse-1.0', 'happyhorse-1.1', 'gemini-flash', 'gemini-omni-flash', 'veo-3.1-lite'];
     if (ATLAS_MODELS.includes(model)) {
         // e.g. 10s seedance-2.0-fast 480p is $0.768. If base is $0.1536/s -> $1.536 for 10s.
         // So 480p multiplier is exactly 0.5.
@@ -663,6 +675,34 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         } catch (err) {
             console.error(`❌ [Gemini Flash] Atlas Cloud submission failed: ${err.message}`);
             throw new Error(`Gemini Flash Video generation failed: ${err.message}`);
+        }
+    }
+
+    // Veo 3.1 Lite — routes directly to Atlas Cloud
+    if (model === 'veo-3.1-lite') {
+        console.log(`🎬 [Veo 3.1 Lite] Routing to Atlas Cloud...`);
+        try {
+            const result = await submitAtlasCloudVideoGeneration({
+                prompt: safePrompt,
+                imageUrl: s3ImageUrl,
+                duration,
+                aspectRatio: aspectRatio || '16:9',
+                resolution: resolution || '720p',
+                referenceImages: s3ReferenceImages.filter(Boolean),
+                customCharacterNames,
+                model: model,
+            });
+            return {
+                requestId: result.taskId,
+                endpoint: 'atlascloud-veo-3.1-lite',
+                statusUrl: null,
+                resultUrl: null,
+                provider: 'atlascloud',
+                _atlasCloudPayload: result._payload,
+            };
+        } catch (err) {
+            console.error(`❌ [Veo 3.1 Lite] Atlas Cloud submission failed: ${err.message}`);
+            throw new Error(`Veo 3.1 Lite generation failed: ${err.message}`);
         }
     }
 

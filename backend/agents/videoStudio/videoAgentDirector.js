@@ -195,7 +195,7 @@ OUTPUT FORMAT — Return ONLY valid JSON, no markdown:
     { "role": "HOOK", "duration": 5, "purpose": "what happens in this scene" },
     { "role": "BUILD", "duration": 10, "purpose": "..." }
   ],
-  "modelRecommendation": "seedance-2.0|kling-3.0|veo-3.1|grok-imagine|gemini-flash",
+  "modelRecommendation": "seedance-2.0|kling-3.0|veo-3.1|veo-3.1-lite|grok-imagine|gemini-flash",
   "modelReasoning": "why this model fits this video type",
   "refsNeeded": {
     "character": true,
@@ -208,6 +208,7 @@ MODEL SELECTION GUIDE:
 - seedance-2.0: Best for most videos, great image-to-video consistency, fast, supports long-form
 - kling-3.0: Multi-shot scripts, cinematic quality, best for brand stories
 - veo-3.1: Native audio generation, best for product demos with narration
+- veo-3.1-lite: Google Veo 3.1 Lite — high efficiency cinematic video with native audio, routed via Atlas.
 - grok-imagine: Fast social content, reels, UGC-style, low cost
 - gemini-flash: Motion graphics, explainers, animated content`;
 
@@ -532,6 +533,12 @@ export async function writeModelPrompt({
 - Describe scene transitions: cut to, dissolve into, smash cut
 - Veo excels at physics-realistic motion and fluid transitions`,
 
+        'veo-3.1-lite': `VEO 3.1 LITE PROMPT RULES:
+- Directorial narrative: keep visually descriptive and active
+- Native audio: describe sound effects/ambience inline
+- Use character/product ref tags (@image1, @image2) for visual consistency
+- Focus on natural physical interaction in present tense`,
+
         'grok-imagine': `GROK VIDEO PROMPT RULES:
 - Keep prompts energetic and direct, short punchy sentences
 - Great for fast-paced UGC and social content
@@ -671,6 +678,21 @@ export const VIDEO_AGENT_MODELS = [
         speed: 'Fast',
         quality: '⭐⭐⭐⭐',
         color: '#6d28d9',
+    },
+    {
+        id: 'veo-3.1-lite',
+        name: 'Veo 3.1 Lite',
+        icon: '🎬',
+        tier: 'Lite',
+        tagline: 'Google Veo 3.1 Lite — high efficiency cinematic video with native audio, routed via Atlas',
+        maxDuration: 30,
+        supportsLongForm: false,
+        supportsImageRef: true,
+        supportsAudio: true,
+        bestFor: ['social-reel', 'ugc', 'product-demo'],
+        speed: 'Fast',
+        quality: '⭐⭐⭐⭐',
+        color: '#4f46e5',
     },
     {
         id: 'grok-imagine',

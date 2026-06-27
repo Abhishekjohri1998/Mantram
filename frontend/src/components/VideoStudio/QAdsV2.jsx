@@ -38,6 +38,7 @@ const VIDEO_MODELS = [
     {value:'kling-3.0-o',label:'Kling Omni',msIcon:'auto_awesome'},
     {value:'veo-3.1',label:'Veo 3.1',msIcon:'movie'},
     {value:'veo-3.1-fast',label:'Veo 3.1 Fast',msIcon:'bolt'},
+    {value:'veo-3.1-lite',label:'Veo 3.1 Lite',msIcon:'movie'},
     {value:'seedance-1.0',label:'Seedance 1.0',msIcon:'speed'},
 ]
 
@@ -731,10 +732,11 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
         else if (m === 'gemini-flash' || m === 'gemini-omni-flash') costPerSec = 0.15;
         else if (m === 'kling-3.0') costPerSec = 0.07;
         else if (m === 'veo-3.1') costPerSec = 0.10;
+        else if (m === 'veo-3.1-lite') costPerSec = 0.05;
         else if (m === 'grok-imagine') costPerSec = 0.08;
         
         let resMult = 1.0;
-        const ATLAS_MODELS = ['seedance-2.0', 'seedance-2.0-fast', 'seedance-2.0-mini', 'happyhorse-1.0', 'happyhorse-1.1', 'gemini-flash', 'gemini-omni-flash'];
+        const ATLAS_MODELS = ['seedance-2.0', 'seedance-2.0-fast', 'seedance-2.0-mini', 'happyhorse-1.0', 'happyhorse-1.1', 'gemini-flash', 'gemini-omni-flash', 'veo-3.1-lite'];
         if (ATLAS_MODELS.includes(m)) {
             if (r === '480p') resMult = 0.5;
             else if (r === '720p') resMult = 0.6;

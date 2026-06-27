@@ -71,6 +71,7 @@ const MODELS = [
     { value: 'seedance-2.0', label: 'Seedance 2.0' },
     { value: 'seedance-2.0-mini', label: 'Seedance 2.0 Mini' },
     { value: 'kling-3.0', label: 'Kling 3.0' },
+    { value: 'veo-3.1-lite', label: 'Veo 3.1 Lite' },
     { value: 'gemini-flash', label: 'Gemini Flash Video' }
 ];
 
@@ -223,10 +224,11 @@ export default function Storyboard({
             else if (modelId === 'gemini-flash' || modelId === 'gemini-omni-flash') costPerSec = 0.15;
             else if (modelId === 'kling-3.0') costPerSec = 0.07;
             else if (modelId === 'veo-3.1') costPerSec = 0.10;
+            else if (modelId === 'veo-3.1-lite') costPerSec = 0.05;
             else if (modelId === 'grok-imagine') costPerSec = 0.08;
             
             let resMult = 1.0;
-            const ATLAS_MODELS = ['seedance-2.0', 'seedance-2.0-fast', 'seedance-2.0-mini', 'happyhorse-1.0', 'happyhorse-1.1', 'gemini-flash', 'gemini-omni-flash'];
+            const ATLAS_MODELS = ['seedance-2.0', 'seedance-2.0-fast', 'seedance-2.0-mini', 'happyhorse-1.0', 'happyhorse-1.1', 'gemini-flash', 'gemini-omni-flash', 'veo-3.1-lite'];
             if (ATLAS_MODELS.includes(modelId)) {
                 if (res === '480p') resMult = 0.5;
                 else if (res === '720p') resMult = 0.6;

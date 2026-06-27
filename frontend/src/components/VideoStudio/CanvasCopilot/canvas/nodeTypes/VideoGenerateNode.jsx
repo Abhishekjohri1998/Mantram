@@ -200,6 +200,7 @@ export default function VideoGenerateNode({ data, selected }) {
                             <option value="kling-3.0">Kling 3.0</option>
                             <option value="veo-3.1">Veo 3.1</option>
                             <option value="veo-3.1-fast">Veo Fast</option>
+                            <option value="veo-3.1-lite">Veo 3.1 Lite</option>
                             <option value="grok-imagine">Grok</option>
                             <option value="gemini-flash">Gemini</option>
                         </select>

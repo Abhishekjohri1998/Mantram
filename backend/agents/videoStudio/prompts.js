@@ -284,6 +284,7 @@ AVAILABLE MODELS:
 - kling-3.0: Best for realistic motion, physics, multi-shot storyboards, dialogue scenes. 3–15s. Native audio + voice IDs. Cost: ~$0.07/s
 - veo-3.1: Best cinematic quality + photorealistic native audio. 5–8s (extendable). Premium. Cost: ~$0.15/s
 - veo-3.1-fast: Faster/cheaper Veo 3.1 variant. 5–8s. Great for prototyping. Cost: ~$0.08/s
+- veo-3.1-lite: Google Veo 3.1 Lite — high efficiency cinematic video with native audio, routed via Atlas. 4-8s. Cost: ~$0.05/s.
 - seedance-1.0: Fast & affordable. 5–10s. Good for quick social content. Cost: ~$0.05/s
 - seedance-2.0: Upgraded Seedance — camera control, native audio, cinematic quality. 4–15s. Cost: ~$0.08/s
 
@@ -291,10 +292,10 @@ ROUTING RULES:
 - DEFAULT: grok-imagine — best balance of speed, quality, reference images, extend capability, and cost
 - Multiple shots / storyboard needing multi_prompt? → kling-3.0 (only model with multi_prompt support)
 - Social reel / quick creative with reference images? → grok-imagine (supports up to 7 reference images)
-- Cinematic premiere / premium brand film? → veo-3.1 or veo-3.1-fast
+- Cinematic premiere / premium brand film? → veo-3.1, veo-3.1-fast, or veo-3.1-lite
 - Premium product showcase with precise camera moves? → seedance-2.0 (camera control strength)
-- Dialogue / voice acting? → kling-3.0 (voice IDs) or veo-3.1 (native audio)
-- Budget / prototype / fastest turnaround? → seedance-1.0 or grok-imagine
+- Dialogue / voice acting? → kling-3.0 (voice IDs) or veo-3.1/veo-3.1-lite (native audio)
+- Budget / prototype / fastest turnaround? → seedance-1.0, grok-imagine, or veo-3.1-lite
 
 RESPONSE FORMAT — respond with ONLY valid JSON:
 {
@@ -354,7 +355,7 @@ export const PROMPT_ENHANCER_PROMPT = (brandContext = '', styleMemory = '', mode
   const KLING_GUIDE = 'Multi-shot format "SHOT 1: [...] | SHOT 2: [...]". Include exact body movement, physics, character-environment interaction.';
   const VEO_GUIDE = 'Director\'s-note narrative style. Include ambient audio cues alongside visual description. Reference commercial styles ("Apple product launch feel").';
   const GENERIC_GUIDE = '[Subject+Action] + [Setting] + [Visual Style] + [Camera Move] + [Light & Mood]. Add "cinematic, 4K quality" suffix.';
-  const MODEL_GUIDES = { 'seedance-2.0': SEEDANCE_GUIDE, 'seedance-1.0': SEEDANCE_GUIDE, 'kling-3.0': KLING_GUIDE, 'veo-3.1': VEO_GUIDE, 'veo-3.1-fast': VEO_GUIDE, 'grok-imagine': GENERIC_GUIDE, 'gemini-flash': 'Cinematic narrative prose with @image tags for references. @image1=avatar, @image2=product. Describe subject/product appearance. NO TEXT OR LOGO RENDERING: Keep all visual descriptions completely text-free and logo-free. BANNED CLICHÉS: Banned lazy AI phrases: "POV:", "I was today years old when...", "Am I the only one who...", "Stop scrolling!", "Hear me out...", "Unboxing my new...".' };
+  const MODEL_GUIDES = { 'seedance-2.0': SEEDANCE_GUIDE, 'seedance-1.0': SEEDANCE_GUIDE, 'kling-3.0': KLING_GUIDE, 'veo-3.1': VEO_GUIDE, 'veo-3.1-fast': VEO_GUIDE, 'veo-3.1-lite': VEO_GUIDE, 'grok-imagine': GENERIC_GUIDE, 'gemini-flash': 'Cinematic narrative prose with @image tags for references. @image1=avatar, @image2=product. Describe subject/product appearance. NO TEXT OR LOGO RENDERING: Keep all visual descriptions completely text-free and logo-free. BANNED CLICHÉS: Banned lazy AI phrases: "POV:", "I was today years old when...", "Am I the only one who...", "Stop scrolling!", "Hear me out...", "Unboxing my new...".' };
   const guide = MODEL_GUIDES[model] || SEEDANCE_GUIDE;
 
   return `You are an elite Ad Film Director and AI video prompt engineer. Rewrite the raw brief into a production-grade cinematic prompt for ${model}.
