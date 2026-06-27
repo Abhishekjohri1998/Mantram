@@ -104,11 +104,22 @@ function buildStoryboardDirectorPrompt({
     cuts = [],
     avatarNames = [],
 }) {
+    // Dynamic cut density scaling to prevent token limit truncation/timeout on long-form videos
+    let targetSecsPerCut = 3;
+    if (duration > 180) {
+        targetSecsPerCut = 8;
+    } else if (duration > 90) {
+        targetSecsPerCut = 6;
+    } else if (duration > 45) {
+        targetSecsPerCut = 4.5;
+    }
+    const minCuts = Math.max(5, Math.ceil(duration / targetSecsPerCut));
+    const maxCuts = Math.max(8, Math.ceil(duration / Math.max(2, targetSecsPerCut - 1)));
+    const cutDurationRange = duration > 60 ? '3–8 seconds' : '2–4 seconds';
+    const singleCutMax = duration > 60 ? 10 : 5;
+
     const logoTagInstruction = (includeBranding && logoUrl)
         ? `\n- <<<image_logo>>> = brand logo — describe it as: "${logoDescription || 'brand logo'}".`
-        : '';
-    const logoPromptInstruction = (includeBranding && logoUrl)
-        ? `\n- Brand logo: Whenever the logo appears in the grid panels or footer, reference it as "the brand logo (<<<image_logo>>>)".`
         : '';
 
     const brandDNASection = includeBranding
@@ -139,6 +150,10 @@ Define the visual identity that must stay consistent across every frame:
 - materialNotes: the physical materials present in the scene (e.g. "polished marble, walnut wood, brushed brass, ceramic glaze, steam condensation")
 ${logoTagInstruction}
 
+${brandDNASection}
+
+${charRefBlock}
+
 ═══════════════════════════════════════════════════════
 SECTION 2 — ENVIRONMENT / SET DESIGN
 ═══════════════════════════════════════════════════════
@@ -151,14 +166,14 @@ SECTION 3 — CUT PLAN (THE STORYBOARD)
 ═══════════════════════════════════════════════════════
 Write the exact shot list for ONE continuous video of ${duration} seconds.
 Cuts are camera angles / shot changes within the video — NOT separate videos.
-DENSITY (MANDATORY): Minimum 1 cut per 3 seconds. A ${duration}s video MUST have AT LEAST ${Math.ceil(duration / 3)} cuts.
-Target ${Math.ceil(duration / 3)} to ${Math.ceil(duration / 2)} cuts. Each cut should be 2–4 seconds for high commercial energy.
-More cuts = more visual energy = better engagement. Never let any single cut exceed 5 seconds unless it is a special slow-motion or reveal moment.
+DENSITY (MANDATORY): Minimum 1 cut per ${targetSecsPerCut} seconds. A ${duration}s video MUST have AT LEAST ${minCuts} cuts.
+Target ${minCuts} to ${maxCuts} cuts. Each cut should be ${cutDurationRange} for optimal pacing and flow.
+More cuts = more visual energy = better engagement. Never let any single cut exceed ${singleCutMax} seconds unless it is a special slow-motion or reveal moment.
 
 Each cut must have:
 - id: sequential number starting at 1
 - lens: cinematic lens spec (e.g. "40mm anamorphic", "100mm macro", "85mm prime", "24mm wide-angle", "85mm portrait")
-- duration: exact seconds for this cut (integer, min ${MIN_SHOT_DURATION}s, max ${Math.min(5, MAX_SHOT_DURATION)}s for normal cuts, up to ${MAX_SHOT_DURATION}s only for special reveal/slow-motion)
+- duration: exact seconds for this cut (integer, min ${MIN_SHOT_DURATION}s, max ${Math.min(singleCutMax, MAX_SHOT_DURATION)}s for normal cuts, up to ${MAX_SHOT_DURATION}s only for special reveal/slow-motion)
 - move: camera movement (STEADICAM | DOLLY-IN | DOLLY-OUT | RACK-FOCUS | ARC | PULL-OUT | CRANE | HANDHELD | STATIC | WHIP-PAN | PUSH-IN | MATCH-CUT | TILT-UP | TILT-DOWN | ORBIT)
 - shot: shot type (WIDE | MEDIUM | CLOSE-UP | EXTREME-CLOSE-UP | INSERT | MACRO | TWO-SHOT | OVER-SHOULDER | POV | ESTABLISHING | LOW-ANGLE | HIGH-ANGLE | DUTCH-TILT)
 - scene: 1 vivid, active-voice sentence — what is VISUALLY HAPPENING right now: use strong motion verbs (slices / pours / emerges / spins / glows / drifts / explodes / contracts / reveals / bursts). E.g. "The amber liquid pours in slow motion into the crystal glass, creating rippling reflections." Not: "Presenter picks up product."
@@ -177,7 +192,7 @@ Each cut must have:
 
 RULES FOR CUTS:
 - Durations must SUM exactly to ${duration}s
-- MINIMUM ${Math.ceil(duration / 3)} CUTS REQUIRED — this is a hard constraint, not a suggestion
+- MINIMUM ${minCuts} CUTS REQUIRED — this is a hard constraint, not a suggestion
 - Follow a natural cinematic arc: COLD OPEN (intrigue) → BUILD (environment, character) → REVEAL (product hero moment) → DETAIL (macro features) → EMOTION (presenter or lifestyle) → RESOLVE (CTA/brand close)
 - USE ALL THESE SHOT TYPES across your cuts — rotate them for visual variety:
   ECU/MACRO (product detail) → WS (environment) → MCU (character) → CU (emotion/face) → INSERT (product + hands) → OTS (interaction) → WS/CTA (close)
@@ -490,13 +505,54 @@ function parseStoryboardOutput(rawText, targetDuration) {
         const cutsTotal = plan.cuts.reduce((sum, c) => sum + c.duration, 0);
         plan.totalDuration = cutsTotal;
 
-        // If there's a duration mismatch, scale the last cut to fix it
+        // If there's a duration mismatch, distribute it safely without creating extremely long segments
         if (cutsTotal !== targetDuration && plan.cuts.length > 0) {
-            const diff = targetDuration - cutsTotal;
-            plan.cuts[plan.cuts.length - 1].duration = Math.max(
-                MIN_SHOT_DURATION,
-                plan.cuts[plan.cuts.length - 1].duration + diff
-            );
+            let diff = targetDuration - cutsTotal;
+            if (diff > 0) {
+                // 1. First pass: distribute extra duration across existing cuts up to 8s max per cut
+                for (let i = plan.cuts.length - 1; i >= 0 && diff > 0; i--) {
+                    const currentDur = plan.cuts[i].duration;
+                    const canAdd = Math.min(8 - currentDur, diff);
+                    if (canAdd > 0) {
+                        plan.cuts[i].duration += canAdd;
+                        diff -= canAdd;
+                    }
+                }
+                // 2. Second pass: if still remaining duration, append new cuts using the style of the last cut
+                let lastCut = plan.cuts[plan.cuts.length - 1];
+                let nextId = plan.cuts.length + 1;
+                while (diff > 0) {
+                    const newDur = Math.min(4, diff);
+                    plan.cuts.push({
+                        ...lastCut,
+                        id: nextId++,
+                        duration: newDur,
+                        scene: `${lastCut.scene} (continuation)`,
+                        framePrompt: `${lastCut.framePrompt} (maintaining exact visual continuity, shot continuation)`,
+                    });
+                    diff -= newDur;
+                }
+            } else if (diff < 0) {
+                // Shrink cuts to fit target duration (min 2 seconds per cut)
+                let shrinkRemaining = Math.abs(diff);
+                for (let i = plan.cuts.length - 1; i >= 0 && shrinkRemaining > 0; i--) {
+                    const currentDur = plan.cuts[i].duration;
+                    const canSubtract = Math.min(currentDur - MIN_SHOT_DURATION, shrinkRemaining);
+                    if (canSubtract > 0) {
+                        plan.cuts[i].duration -= canSubtract;
+                        shrinkRemaining -= canSubtract;
+                    }
+                }
+                // If still too long, remove cuts from the end
+                while (shrinkRemaining > 0 && plan.cuts.length > 1) {
+                    const removed = plan.cuts.pop();
+                    shrinkRemaining -= removed.duration;
+                }
+                // Force the last remaining cut to fit exactly
+                if (shrinkRemaining !== 0) {
+                    plan.cuts[plan.cuts.length - 1].duration = Math.max(MIN_SHOT_DURATION, plan.cuts[plan.cuts.length - 1].duration - shrinkRemaining);
+                }
+            }
             plan.totalDuration = plan.cuts.reduce((sum, c) => sum + c.duration, 0);
         }
     } else {
@@ -640,8 +696,15 @@ export async function runStoryboardDirector({
 
     // 5. Call Agent (multimodal)
     // Scale token budget with duration — each cut needs ~180 tokens (id+lens+duration+move+shot+scene+framePrompt+voiceover).
-    // A 300s video targeting 1 cut/3s = 100 cuts = ~18,000 tokens. Give 20% headroom.
-    const expectedCuts = Math.ceil(duration / 3); // min density = 1 cut/3s
+    let targetSecsPerCut = 3;
+    if (duration > 180) {
+        targetSecsPerCut = 8;
+    } else if (duration > 90) {
+        targetSecsPerCut = 6;
+    } else if (duration > 45) {
+        targetSecsPerCut = 4.5;
+    }
+    const expectedCuts = Math.max(5, Math.ceil(duration / targetSecsPerCut));
     const tokensPerCut = 180;
     const scaledTokens = Math.min(32000, Math.max(8000, Math.ceil(expectedCuts * tokensPerCut * 1.2)));
     console.log(`[Storyboard Director] Token budget: ${scaledTokens} (${expectedCuts} cuts × ${tokensPerCut} tokens × 1.2 headroom)`);
