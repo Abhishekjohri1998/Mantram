@@ -493,7 +493,27 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
             // 2. Scene visual prompt (already contains CUT N [Xs-Ys] timing if structuredPlan was used)
             // 3. Position hint (opening / continuation / final)
             const scenePrompt = scenes[i]?.visualPrompt || params.videoPrompt;
-            const segPrompt = `${charIdentityPreamble}${scenePrompt}\n\n${positionHint}\nSegment ${i+1} of ${segCount}. Maintain absolute visual consistency with the character reference sheet.`;
+            // Use actualSegCount (not stale segCount from initial estimate) for correct segment numbering
+            const segPromptRaw = `${charIdentityPreamble}${scenePrompt}\n\n${positionHint}\nSegment ${i+1} of ${actualSegCount}. Maintain absolute visual consistency with the character reference sheet.`;
+
+            // Trim to ~2600 chars — preserves 2200-char visualPrompt + preamble + position hint.
+            // Seedance's sweet spot is under 2200 chars per their official guide (promptEnhancer.js).
+            // We allow 2600 to accommodate charIdentityPreamble (200-300 chars) + positionHint (120 chars).
+            const ATLAS_SEGMENT_MAX_CHARS = 2600;
+            let segPrompt = segPromptRaw;
+            if (segPrompt.length > ATLAS_SEGMENT_MAX_CHARS) {
+                const truncated = segPrompt.substring(0, ATLAS_SEGMENT_MAX_CHARS);
+                const lastPeriod  = truncated.lastIndexOf('.');
+                const lastNewline = truncated.lastIndexOf('\n');
+                const breakPoint  = Math.max(lastPeriod, lastNewline);
+                segPrompt = breakPoint > ATLAS_SEGMENT_MAX_CHARS * 0.7
+                    ? truncated.substring(0, breakPoint + 1).trim()
+                    : truncated.trim();
+                if (!segPrompt.includes('4K ultra HD')) segPrompt += '\n4K ultra HD, cinematic detail, sharp clarity, stable picture.';
+                console.log(`[SB LongForm ${jobId}] ✂️ Seg ${i+1} prompt trimmed: ${segPromptRaw.length}→${segPrompt.length} chars`);
+            }
+            console.log(`[SB LongForm ${jobId}] 📝 Seg ${i+1} prompt: ${segPrompt.length} chars`);
+
 
             const qualityMode = params.model === 'seedance-2.0' ? 'quality' : 'fast';
 

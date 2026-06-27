@@ -363,38 +363,99 @@ export async function planStoryboardScenes({
         const sceneCount = segments.length;
 
         const scenes = segments.map((seg, i) => {
-            // Build a precise timed visual prompt for this segment
+            // ── Build Seedance-native directorial prompt targeting ~2000-2200 chars ──
+            // Seedance performs best with the SHOT N structure + STYLE/ENVIRONMENT/MOOD block.
+            // Reference: promptEnhancer.js MODEL_STYLE_GUIDES['seedance-2.0'] — "under 2200 characters"
             let elapsed = 0;
-            const cutLines = seg.cutsInSegment.map(cut => {
+
+            // Build STYLE block from structuredPlan metadata
+            const palette = (structuredPlan.colorPalette || []).join(', ');
+            const paletteNames = (structuredPlan.paletteNames || []).join(', ');
+            const moodKeywords = (structuredPlan.moodKeywords || []).join(', ');
+            const cinemaRules = structuredPlan.cinematographyRules || '';
+            const environment = structuredPlan.environmentFingerprint || 'Professional studio environment with cinematic lighting';
+            const materialNotes = structuredPlan.materialNotes || '';
+            const emotionalArc = structuredPlan.emotionalArc || '';
+            const totalSegs = sceneCount;
+            const isFirstSeg = i === 0;
+            const isLastSeg = i === totalSegs - 1;
+
+            // Build character preamble
+            const charPreamble = characterNames.length > 0
+                ? `CHARACTERS: ${characterNames.map(n => `"${n}"`).join(', ')}. Lock: exact face, hair colour, skin tone per reference sheet. Wardrobe follows per-shot costume description.\n`
+                : '';
+
+            // Build SHOT lines in Seedance directorial format — expanded, detailed
+            const shotLines = seg.cutsInSegment.map((cut, ci) => {
                 const start = elapsed;
                 const end = elapsed + cut.duration;
                 elapsed = end;
-                // Include scene description AND costume if mentioned in framePrompt
-                const attireHint = cut.framePrompt && cut.framePrompt.length > 10
-                    ? ` | Attire/staging: ${cut.framePrompt.substring(0, 120)}`
+                const shotNum = ci + 1;
+                // Voiceover inline if present
+                const voiceoverLine = cut.voiceover ? ` Voiceover: "${cut.voiceover}"` : '';
+                // Expand staging/attire detail from framePrompt
+                const stagingDetail = cut.framePrompt && cut.framePrompt.length > 10
+                    ? ` | Staging: ${cut.framePrompt.substring(0, 150)}`
                     : '';
-                return `  CUT ${cut.id} [${start}s–${end}s] ${cut.lens} ${cut.shot} ${cut.move}: ${cut.scene}${attireHint}`;
+                return `SHOT ${shotNum} [${start}s-${end}s]: ${(cut.shot || 'MEDIUM').replace(/_/g,' ')}, ${cut.lens || '50mm'} ${cut.move || 'STEADICAM'} — ${cut.scene}${stagingDetail}${voiceoverLine}`;
             }).join('\n');
 
-            const charPreamble = characterNames.length > 0
-                ? `CHARACTERS IN THIS SEGMENT: ${characterNames.map((n, ci) => `"${n}"`).join(', ')}. Each character must wear the costume/attire described in their cut line. Face identity is locked to the character reference sheet.\n\n`
-                : '';
+            // Segment position note
+            const segPositionNote = isFirstSeg
+                ? 'OPENING SEGMENT — establish the world, hook immediately. No brand CTA.'
+                : isLastSeg
+                ? 'CLOSING SEGMENT — emotional peak, hard cut to product hero, brand name/tagline in final 2 seconds ONLY.'
+                : `CONTINUATION SEGMENT ${i + 1}/${totalSegs} — maintain exact visual continuity from previous segment. No brand CTA.`;
 
-            const visualPrompt = `${charPreamble}SEGMENT ${i + 1} OF ${sceneCount} — ${seg.duration}s\nEnvironment: ${structuredPlan.environmentFingerprint || 'See storyboard'}\n\nTIMED CUT PLAN (follow EXACTLY — durations are mandatory):\n${cutLines}\n\nTotal this segment: ${seg.duration}s. Do not overshoot or undershoot. Each cut transitions directly to the next with a hard cut.${isNonEnglish ? `\n\nAll dialogue/voiceover MUST be in ${language}.` : ''}`;
+            // Assemble full Seedance-native prompt — target 1800-2200 chars
+            const promptParts = [
+                charPreamble.trim(),
+                `STYLE: ${cinemaRules || 'Hyperrealistic cinematic live-action. Sharp focus. Shallow depth of field. Natural motion blur on fast moves.'}`,
+                `COLOR PALETTE: ${paletteNames || 'See reference'} (${palette}). Apply palette to lighting and set design — never recolor the product itself.`,
+                materialNotes ? `MATERIALS: ${materialNotes}` : null,
+                `ENVIRONMENT: ${environment}`,
+                `MOOD: ${moodKeywords || 'Premium, cinematic, engaging'}. Arc: ${emotionalArc || 'build tension then reveal'}.`,
+                isNonEnglish ? `LANGUAGE: All dialogue and voiceover MUST be in ${language} script/characters.` : null,
+                '',
+                shotLines,
+                '',
+                segPositionNote,
+                `Total segment: ${seg.duration}s. Hard cuts between shots — no dissolves. Reference all provided @image tags for character and product visual consistency.`,
+                '4K ultra HD, cinematic detail, sharp clarity, natural textures, stable picture.',
+            ].filter(p => p !== null).join('\n');
+
+            // Enforce ~2200 char Seedance sweet spot — truncate gracefully, keep quality suffix
+            const SEEDANCE_MAX_CHARS = 2200;
+            let visualPrompt = promptParts;
+            if (visualPrompt.length > SEEDANCE_MAX_CHARS) {
+                const truncated = visualPrompt.substring(0, SEEDANCE_MAX_CHARS);
+                const lastPeriod  = truncated.lastIndexOf('.');
+                const lastNewline = truncated.lastIndexOf('\n');
+                const breakPoint  = Math.max(lastPeriod, lastNewline);
+                visualPrompt = breakPoint > SEEDANCE_MAX_CHARS * 0.7
+                    ? truncated.substring(0, breakPoint + 1).trim()
+                    : truncated.trim();
+                // Always keep quality suffix
+                if (!visualPrompt.includes('4K ultra HD')) {
+                    visualPrompt += '\n4K ultra HD, cinematic detail, sharp clarity, stable picture.';
+                }
+            }
+
+            console.log(`[ScenePlanner] Seg ${i+1}: ${visualPrompt.length} chars, ${seg.cutsInSegment.length} shots, ${seg.duration}s`);
 
             return {
                 sceneId: i + 1,
                 duration: seg.duration,
                 cutsInSegment: seg.cutsInSegment,
                 visualPrompt,
-                dialogue: seg.cutsInSegment.flatMap(c => c.dialogue
-                    ? [{ text: c.dialogue, emotion: 'natural' }]
-                    : []
+                dialogue: seg.cutsInSegment.flatMap(c => c.voiceover
+                    ? [{ text: c.voiceover, emotion: 'natural' }]
+                    : c.dialogue ? [{ text: c.dialogue, emotion: 'natural' }] : []
                 ),
             };
         });
 
-        console.log(`[ScenePlanner] ✅ Direct cut→segment mapping: ${cuts.length} cuts → ${scenes.length} segments (${scenes.map(s => `${s.cutsInSegment.length}cut(s)/${s.duration}s`).join(' | ')})`);
+        console.log(`[ScenePlanner] ✅ Direct cut→segment mapping: ${cuts.length} cuts → ${scenes.length} segments (${scenes.map(s => `${s.cutsInSegment.length}shot(s)/${s.duration}s/${s.visualPrompt.length}chars`).join(' | ')})`);
         return scenes;
     }
 
