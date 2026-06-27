@@ -383,10 +383,51 @@ function parseStoryboardOutput(rawText, targetDuration) {
     try {
         plan = JSON.parse(cleaned);
     } catch (e) {
+        // ── JSON Repair Pipeline ─────────────────────────────────
+        console.warn(`[Storyboard Parse] Initial parse failed: ${e.message}. Attempting repair...`);
+        
+        // Extract the outermost JSON object
+        let jsonStr = cleaned;
         const jsonMatch = cleaned.match(/\{[\s\S]+\}/);
-        if (jsonMatch) {
-            plan = JSON.parse(jsonMatch[0]);
-        } else {
+        if (jsonMatch) jsonStr = jsonMatch[0];
+
+        // 1. Remove trailing commas before } or ]
+        jsonStr = jsonStr.replace(/,\s*([\]}])/g, '$1');
+        
+        // 2. Remove unescaped control characters (newlines/tabs inside strings)
+        jsonStr = jsonStr.replace(/[\x00-\x1F\x7F]/g, (ch) => {
+            if (ch === '\n') return '\\n';
+            if (ch === '\r') return '\\r';
+            if (ch === '\t') return '\\t';
+            return '';
+        });
+
+        // 3. Fix truncated JSON — close unclosed brackets/braces
+        let openBraces = 0, openBrackets = 0;
+        let inString = false, escaped = false;
+        for (const ch of jsonStr) {
+            if (escaped) { escaped = false; continue; }
+            if (ch === '\\') { escaped = true; continue; }
+            if (ch === '"') { inString = !inString; continue; }
+            if (inString) continue;
+            if (ch === '{') openBraces++;
+            if (ch === '}') openBraces--;
+            if (ch === '[') openBrackets++;
+            if (ch === ']') openBrackets--;
+        }
+        // Remove trailing comma before closing
+        jsonStr = jsonStr.replace(/,\s*$/, '');
+        // Close any unclosed brackets/braces
+        for (let i = 0; i < openBrackets; i++) jsonStr += ']';
+        for (let i = 0; i < openBraces; i++) jsonStr += '}';
+        // Clean trailing commas again after closing
+        jsonStr = jsonStr.replace(/,\s*([\]}])/g, '$1');
+
+        try {
+            plan = JSON.parse(jsonStr);
+            console.log(`[Storyboard Parse] ✅ JSON repair succeeded`);
+        } catch (e2) {
+            console.error(`[Storyboard Parse] ❌ Repair failed: ${e2.message}. Raw (first 500): ${jsonStr.substring(0, 500)}`);
             throw new Error(`Failed to parse storyboard JSON: ${e.message}`);
         }
     }
