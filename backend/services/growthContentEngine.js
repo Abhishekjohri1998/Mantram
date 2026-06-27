@@ -797,8 +797,8 @@ export async function generateDailyContent(forceDate = null, brandId = null) {
         const sub1 = REDDIT_SUBREDDITS[dayIndex % REDDIT_SUBREDDITS.length];
         const sub2 = REDDIT_SUBREDDITS[(dayIndex + 1) % REDDIT_SUBREDDITS.length];
 
-        // 3. Generate content via Claude (Anthropic)
-        console.log(`✍️ [GrowthEngine] Generating content via Claude using Itinerary Day ${itineraryDay.day}...`);
+        // 3. Generate content via AI (Gemini Flash via Atlas Cloud — Claude hangs, native Gemini has JSON issues)
+        console.log(`✍️ [GrowthEngine] Generating content via Gemini Flash using Itinerary Day ${itineraryDay.day}...`);
         const router = getAIRouter();
         const prompt = buildGenerationPrompt(dayOfWeek, itineraryDay, trendingTopics, [sub1, sub2], brandContext);
         const randomSeed = Math.random().toString(36).substring(7);
@@ -809,9 +809,10 @@ export async function generateDailyContent(forceDate = null, brandId = null) {
                 userPrompt: `Generate today's growth marketing content for ${brandName}. Today is ${dayOfWeek}, ${dateKey}. Itinerary Day: ${itineraryDay.day} (${itineraryDay.title}). Random Seed: ${randomSeed}. Return the JSON object.`,
                 temperature: 0.85,
                 maxTokens: 16000,
-                model: 'claude-sonnet-4-6',
+                model: 'gemini-2.5-flash',
+                responseFormat: { type: 'json_object' },
             },
-            { provider: 'anthropic' }
+            { provider: 'gemini' }
         );
 
         // 4. Parse the JSON response (robust multi-step sanitization)

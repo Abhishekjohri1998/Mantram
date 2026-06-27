@@ -60,7 +60,7 @@ export class OpenAIProvider extends BaseProvider {
         return modelId;
     }
 
-    async generateText({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 2048, model, imageParts }) {
+    async generateText({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 2048, model, imageParts, responseFormat }) {
         const rawModelId = model || this.config.defaultModel || 'gpt-4o-mini';
         // Atlas Cloud uses namespaced model IDs — map native names when routed through Atlas
         const modelId = this._mapModelForProvider(rawModelId);
@@ -85,6 +85,18 @@ export class OpenAIProvider extends BaseProvider {
             ];
         }
 
+        const body = {
+            model: modelId,
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userContent },
+            ],
+            temperature,
+            max_tokens: maxTokens,
+        };
+        // Add response_format if requested (e.g. { type: 'json_object' } for guaranteed valid JSON)
+        if (responseFormat) body.response_format = responseFormat;
+
         const startTime = Date.now();
         const response = await fetch(`${this.baseUrl}/chat/completions`, fetchOptions({
             method: 'POST',
@@ -92,15 +104,7 @@ export class OpenAIProvider extends BaseProvider {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${this.apiKey}`,
             },
-            body: JSON.stringify({
-                model: modelId,
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userContent },
-                ],
-                temperature,
-                max_tokens: maxTokens,
-            }),
+            body: JSON.stringify(body),
         }));
 
         if (!response.ok) {
