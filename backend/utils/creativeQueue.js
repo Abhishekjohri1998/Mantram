@@ -85,6 +85,27 @@ creativeQueue.on('error', (err) => {
 export const initCreativeWorker = (internalGenerateCreative) => {
     console.log('👷 Creative Worker Initialized (Concurrency: 10)');
 
+    // ── Redis health check — verify Bull can actually reach Redis ──
+    creativeQueue.isReady().then(async () => {
+        console.log('✅ [Queue] Redis connection confirmed — Bull queue is ready');
+        try {
+            const counts = await creativeQueue.getJobCounts();
+            console.log(`📊 [Queue] Current jobs — waiting: ${counts.waiting}, active: ${counts.active}, delayed: ${counts.delayed}, failed: ${counts.failed}`);
+            // Clean up stale active/waiting jobs from previous crashes
+            if (counts.active > 0 || counts.waiting > 5) {
+                console.log(`🧹 [Queue] Cleaning stale jobs (${counts.active} active, ${counts.waiting} waiting)...`);
+                await creativeQueue.clean(0, 'active');
+                await creativeQueue.clean(300000, 'wait'); // 5 min old waiting jobs
+                console.log('✅ [Queue] Stale jobs cleaned');
+            }
+        } catch (e) {
+            console.warn(`⚠️ [Queue] Job count check failed: ${e.message}`);
+        }
+    }).catch((err) => {
+        console.error(`🚨 [Queue] Redis NOT reachable — Bull queue WILL NOT process jobs! Error: ${err.message}`);
+        console.error(`🚨 [Queue] Jobs will fall back to inline processing if queue add fails.`);
+    });
+
     creativeQueue.process(10, async (job) => {
         const { jobId, userId, payload } = job.data;
         const { brandId, type, prompt, options, creditsDeducted } = payload;

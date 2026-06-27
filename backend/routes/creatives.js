@@ -115,7 +115,8 @@ async function createCreativeJob(req, res) {
 
         // ── QUEUE EXECUTION ──────────────────────────────────────
         // Push generation payload to Redis-backed Bull queue.
-        creativeQueue.add({
+        // If queue fails (Redis down), fall back to direct inline processing.
+        const queuePayload = {
             jobId,
             userId: req.user._id,
             payload: {
@@ -125,7 +126,46 @@ async function createCreativeJob(req, res) {
                 options,
                 creditsDeducted: req.creditsDeducted || 0
             }
-        });
+        };
+
+        try {
+            const queueJob = await Promise.race([
+                creativeQueue.add(queuePayload),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Queue add timeout (5s) — Redis may be down')), 5000))
+            ]);
+            console.log(`📤 [Job] Queued ${jobId} → Bull Job #${queueJob.id}`);
+        } catch (queueErr) {
+            console.warn(`⚠️ [Job] Queue failed for ${jobId}: ${queueErr.message}. Processing inline...`);
+            // Direct inline processing as fallback (no Redis needed)
+            (async () => {
+                try {
+                    const User = (await import('mongoose')).default.model('User');
+                    const user = await User.findById(req.user._id);
+                    if (!user) throw new Error('User not found');
+
+                    await GenerationJob.findOneAndUpdate({ jobId }, { status: 'processing', startedAt: new Date() });
+
+                    const data = await internalGenerateCreative({
+                        body: { brandId: sanitizedBrandId, type, prompt, options, jobId },
+                        user,
+                        creditsDeducted: req.creditsDeducted || 0,
+                        jobId,
+                    });
+
+                    if (data?.success && data?.creative) {
+                        console.log(`✅ [Inline] JOB ${jobId} completed — Creative: ${data.creative._id}`);
+                    } else {
+                        throw new Error(data?.error || 'Pipeline returned no creative');
+                    }
+                } catch (inlineErr) {
+                    console.error(`❌ [Inline] JOB ${jobId} failed:`, inlineErr.message);
+                    await GenerationJob.findOneAndUpdate(
+                        { jobId },
+                        { status: 'failed', completedAt: new Date(), errorMessage: inlineErr.message }
+                    );
+                }
+            })();
+        }
 
 
     } catch (error) {
