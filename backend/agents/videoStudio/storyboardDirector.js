@@ -157,15 +157,18 @@ More cuts = more visual energy = better engagement. Never let any single cut exc
 
 Each cut must have:
 - id: sequential number starting at 1
-- lens: cinematic lens spec (e.g. "40mm anamorphic", "100mm macro", "85mm prime")
+- lens: cinematic lens spec (e.g. "40mm anamorphic", "100mm macro", "85mm prime", "24mm wide-angle", "85mm portrait")
 - duration: exact seconds for this cut (integer, min ${MIN_SHOT_DURATION}s, max ${Math.min(5, MAX_SHOT_DURATION)}s for normal cuts, up to ${MAX_SHOT_DURATION}s only for special reveal/slow-motion)
-- move: camera movement (STEADICAM | DOLLY-IN | DOLLY-OUT | RACK-FOCUS | ARC | PULL-OUT | CRANE | HANDHELD | STATIC | WHIP-PAN | PUSH-IN)
-- shot: shot type (WIDE | MEDIUM | CLOSE-UP | EXTREME-CLOSE-UP | INSERT | MACRO | TWO-SHOT | OVER-SHOULDER | POV | ESTABLISHING)
-- scene: 1 short sentence narrative beat — WHO is doing WHAT in this exact cut. Be specific but VERY concise.
-- framePrompt: a concise image generation prompt for this panel. CRITICAL: Keep under 40 words to avoid token limits:
-  • Specify dynamic camera angles, lighting, subject position, and props.
-  • Reference the @image sequence: e.g. "Product as shown in @image1, presenter as in @image2"
-  • When multiple characters are present, name them explicitly: "Character 'Riya' (@image3) hands product to Character 'Arjun' (@image4)"
+- move: camera movement (STEADICAM | DOLLY-IN | DOLLY-OUT | RACK-FOCUS | ARC | PULL-OUT | CRANE | HANDHELD | STATIC | WHIP-PAN | PUSH-IN | MATCH-CUT | TILT-UP | TILT-DOWN | ORBIT)
+- shot: shot type (WIDE | MEDIUM | CLOSE-UP | EXTREME-CLOSE-UP | INSERT | MACRO | TWO-SHOT | OVER-SHOULDER | POV | ESTABLISHING | LOW-ANGLE | HIGH-ANGLE | DUTCH-TILT)
+- scene: 1 vivid, active-voice sentence — what is VISUALLY HAPPENING right now: use strong motion verbs (slices / pours / emerges / spins / glows / drifts / explodes / contracts / reveals / bursts). E.g. "The amber liquid pours in slow motion into the crystal glass, creating rippling reflections." Not: "Presenter picks up product."
+- framePrompt: a 50-60 word VISUAL SCENE DESCRIPTION that goes directly into Seedance AI video generation. This is the most important field. Write it as a precise visual frame:
+  • Camera angle + depth of field: "Extreme low angle looking up, bokeh background, razor-sharp product foreground"
+  • Lighting: "warm amber key light from camera-left, cool rim light separating subject from background"
+  • Subject position + action: "Product @image1 tilted at 30°, slow rotation revealing label detail"
+  • Surface interaction: "condensation beads rolling down the glass surface, catching the light"
+  • @image reference: always reference provided images by tag (@image1=product, @image2=character)
+  Example: "Extreme low-angle, product @image1 rotating 360° on a marble pedestal with warm amber key light, cool blue rim light, condensation visible. Presenter @image2 seen defocused in background, approving. Bokeh sparkle from background lighting rig."
 - voiceover: (string) Write a spoken voiceover line or dialogue for this cut in the native script of "${dialogueLanguage}". 
   * Decide if a voiceover is required or not by analyzing the images, product, brand style, brochure text, and user brief. Ads for products, real estate, brochures, tutorials, etc., generally always benefit from voiceover narration to explain features.
   * If voiceover is appropriate, write a natural, compelling spoken line in "${dialogueLanguage}".

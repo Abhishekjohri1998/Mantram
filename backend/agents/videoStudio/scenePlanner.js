@@ -385,19 +385,35 @@ export async function planStoryboardScenes({
                 ? `CHARACTERS: ${characterNames.map(n => `"${n}"`).join(', ')}. Lock: exact face, hair colour, skin tone per reference sheet. Wardrobe follows per-shot costume description.\n`
                 : '';
 
-            // Build SHOT lines in Seedance directorial format — expanded, detailed
+            // Build SHOT lines in Seedance directorial format
+            // KEY: framePrompt = rich visual + camera description (up to 40 words)
+            //      scene       = narrative beat (1 short sentence)
+            // Seedance is a VISUAL model — use framePrompt as primary, scene as context.
             const shotLines = seg.cutsInSegment.map((cut, ci) => {
                 const start = elapsed;
                 const end = elapsed + cut.duration;
                 elapsed = end;
                 const shotNum = ci + 1;
-                // Voiceover inline if present
-                const voiceoverLine = cut.voiceover ? ` Voiceover: "${cut.voiceover}"` : '';
-                // Expand staging/attire detail from framePrompt
-                const stagingDetail = cut.framePrompt && cut.framePrompt.length > 10
-                    ? ` | Staging: ${cut.framePrompt.substring(0, 150)}`
+
+                // Primary visual description: framePrompt contains dynamic angles, lighting, props, subjects
+                const primaryVisual = cut.framePrompt && cut.framePrompt.trim().length > 15
+                    ? cut.framePrompt.trim()
+                    : cut.scene || `Shot ${shotNum}`;
+
+                // Narrative context: what happens in this cut
+                const narrativeBeat = (cut.scene && cut.framePrompt && cut.framePrompt.trim().length > 15)
+                    ? ` Story: ${cut.scene.trim()}`
                     : '';
-                return `SHOT ${shotNum} [${start}s-${end}s]: ${(cut.shot || 'MEDIUM').replace(/_/g,' ')}, ${cut.lens || '50mm'} ${cut.move || 'STEADICAM'} — ${cut.scene}${stagingDetail}${voiceoverLine}`;
+
+                // Voiceover inline
+                const voiceoverLine = cut.voiceover && cut.voiceover.trim()
+                    ? ` VO: "${cut.voiceover.trim()}"`
+                    : '';
+
+                // Shot grammar: shot type + lens + camera move in Seedance's language
+                const shotGrammar = `${(cut.shot || 'MEDIUM').replace(/_/g,' ')}, ${cut.lens || '50mm'} ${cut.move || 'STEADICAM'}`;
+
+                return `SHOT ${shotNum} [${start}s-${end}s] ${shotGrammar}: ${primaryVisual}${narrativeBeat}${voiceoverLine}`;
             }).join('\n');
 
             // Segment position note
