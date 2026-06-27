@@ -575,13 +575,20 @@ export async function runStoryboardDirector({
     console.log(`[Storyboard Director] Calling ${directorModel} with ${imageUrls.length} vision images (${productImageUrls.length} product + ${resolvedAvatarUrls.length} avatar + ${refImageUrls.length} ref)...`);
 
     // 5. Call Agent (multimodal)
+    // Scale token budget with duration — each cut needs ~180 tokens (id+lens+duration+move+shot+scene+framePrompt+voiceover).
+    // A 300s video targeting 1 cut/3s = 100 cuts = ~18,000 tokens. Give 20% headroom.
+    const expectedCuts = Math.ceil(duration / 3); // min density = 1 cut/3s
+    const tokensPerCut = 180;
+    const scaledTokens = Math.min(32000, Math.max(8000, Math.ceil(expectedCuts * tokensPerCut * 1.2)));
+    console.log(`[Storyboard Director] Token budget: ${scaledTokens} (${expectedCuts} cuts × ${tokensPerCut} tokens × 1.2 headroom)`);
+
     let rawOutput;
     try {
         rawOutput = await callMultimodalAgent(
             systemPrompt,
             userPrompt,
             imageUrls,
-            { temperature: 0.7, maxTokens: 8000, returnRaw: true, provider: directorModel }
+            { temperature: 0.7, maxTokens: scaledTokens, returnRaw: true, provider: directorModel }
         );
         if (!rawOutput || typeof rawOutput !== 'string' || rawOutput.error) {
             throw new Error(rawOutput?.error || 'Empty or invalid response from LLM');
