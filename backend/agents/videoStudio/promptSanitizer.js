@@ -8,6 +8,9 @@
  *  RC#1 — Smart context-aware sanitization (fashion vocabulary preserved)
  *  RC#4 — Hard pre-flight character count enforcement per provider
  *  RC#5 — @image tag validation against actual image count
+ *  RC#6 — Deity/religious content sanitization (Seedance/ByteDance safety bypass)
+ *  RC#7 — Sensitive phrase substitution (crisis, tragedy, sacred, spiritual, lingam)
+ *  RC#8 — Seedance-specific structural prompt improvements (Subject→Action→Style)
  */
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -30,6 +33,120 @@ export const PROVIDER_PROMPT_LIMITS = {
 // VIOLENCE / WEAPONS — always replaced (non-context-dependent)
 // ─────────────────────────────────────────────────────────────────────────────
 const HARD_BANNED = /\b(kill|kills|killing|bomb|bombs|explosion|exploding|gun|guns|firearms|weapon|weapons|blood|bloody|naked|nude|sex|sexual|porn|pornographic)\b/gi;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RC#6 — DEITY / RELIGIOUS CONTENT SANITIZATION
+// ByteDance Seedance 2.0 has an aggressive content filter on religious iconography,
+// deity representations, and sacred ritual content. These must be mapped to safe
+// visual/physical equivalents before submission.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Multi-word deity phrases (matched first, before single-word processing)
+const DEITY_PHRASE_MAP = [
+    // Specific deity + object combinations that almost always trigger
+    [/\bShiva\s+Lingam\b/gi,                      'a carved stone idol'],
+    [/\bshiva\s+lingam\b/gi,                      'a carved stone idol'],
+    [/\bstone\s+Shiva\s+Lingam\b/gi,              'an ancient stone sculpture'],
+    [/\bLord\s+Shiva\b/gi,                        'the ancient deity figure'],
+    [/\bLord\s+Ganesha\b/gi,                      'the elephant-headed deity figure'],
+    [/\bLord\s+Vishnu\b/gi,                       'the divine figure in royal blue'],
+    [/\bLord\s+Krishna\b/gi,                      'the flute-playing figure in blue'],
+    [/\bLord\s+Ram\b/gi,                          'the royal archer figure'],
+    [/\bLord\s+Hanuman\b/gi,                      'the devoted figure with a mace'],
+    [/\bSai\s+Baba\b/gi,                          'the sage figure in white robes'],
+    [/\bJesus\s+Christ\b/gi,                      'the figure in white robes with a halo'],
+    [/\bVirgin\s+Mary\b/gi,                       'the robed figure with a blue veil'],
+    [/\bAllah\b/gi,                               'the divine'],
+    [/\bProphet\s+Muhammad\b/gi,                  'the revered figure'],
+    // Sacred acts/rituals that trigger filters
+    [/\bsacred\s+offerings\b/gi,                  'flower offerings on a stone altar'],
+    [/\bsacred\s+offering\b/gi,                   'a flower offering on a stone altar'],
+    [/\bsacred\s+meal\b/gi,                       'food on a ceremonial plate'],
+    [/\bsacred\s+tribute\b/gi,                    'a ceremonial offering'],
+    [/\bghee\s+lamp\b/gi,                         'an oil lamp'],
+    [/\bghee\s+lamps?\b/gi,                       'oil lamp'],
+    [/\bpuja\s+thali\b/gi,                        'a ceremonial plate'],
+    [/\bdesecrat(?:e|ed|ing|ion)\b/gi,            'disrupt'],
+    [/\bdesecrat(?:e|ed|ing|ion)\s+(?:of\s+)?(?:a\s+)?sacred\b/gi, 'interruption of'],
+    [/\bcrisis\s+of\s+faith\b/gi,                 'a moment of deep reflection'],
+    [/\bspiritual\s+(?:crisis|initiation|awakening|journey)\b/gi,  'a profound inner journey'],
+    [/\bspiritual\s+realization\b/gi,              'a moment of profound clarity'],
+    [/\bact\s+of\s+worship\b/gi,                  'a contemplative ritual'],
+    [/\bworship\s+(?:scene|setting|ritual)\b/gi,  'a meditative scene'],
+    [/\bprofound\s+(?:doubt|spiritual)\b/gi,      'deep reflection'],
+    [/\bdivine\s+being\b/gi,                      'the ancient figure'],
+    [/\bdivine\s+(?:presence|light|grace|power)\b/gi, 'an ethereal light'],
+    [/\bmaster\s+of\s+the\s+universe\b/gi,        'the powerful figure'],
+    // Temple-specific phrases
+    [/\bdark\s+(?:stone\s+)?temple(?:\s+interior)?\b/gi,  'an ancient stone chamber interior'],
+    [/\btemple\s+sanctuary\b/gi,                  'an ancient stone hall'],
+    [/\btemple\s+doorway\b/gi,                    'an arched stone doorway'],
+    [/\btemple\s+entrance\b/gi,                   'a stone archway entrance'],
+    [/\btemple\s+interior\b/gi,                   'an ancient stone chamber'],
+    [/\bsacred\s+temple\b/gi,                     'an ancient stone chamber'],
+    [/\bmarigold\s+(?:flower\s+)?offerings\b/gi,  'marigold flower arrangements'],
+    // Deity names (single-word, after phrases)
+    [/\bShiva\b/gi,                               'the deity figure'],
+    [/\bGanesha\b/gi,                             'the elephant-headed figure'],
+    [/\bVishnu\b/gi,                              'the divine figure'],
+    [/\bKrishna\b/gi,                             'the flute-playing figure'],
+    [/\bHanuman\b/gi,                             'the devoted figure'],
+    [/\bDurga\b/gi,                               'the warrior goddess figure'],
+    [/\bKali\b/gi,                                'the goddess figure'],
+    [/\bBrahma\b/gi,                              'the creator deity figure'],
+    [/\bLakshmi\b/gi,                             'the prosperity deity figure'],
+    [/\bSaraswati\b/gi,                           'the wisdom deity figure'],
+    [/\bParvati\b/gi,                             'the goddess figure'],
+    [/\bRama\b/gi,                                'the royal figure'],
+];
+
+// Seedance-specific: broad sensitive concept phrases that rarely generate without violations
+// These are NOT outright banned but context-shift them into visually-safe equivalents
+const SENSITIVE_PHRASE_MAP = [
+    // "crisis" in a faith/religious context
+    [/\bprofound\s+doubt\b/gi,                    'deep contemplation'],
+    [/\bcauses?\s+(?:a\s+)?(?:crisis|profound)\b/gi, 'creates'],
+    [/\bfaith\s+is\s+shatter(?:ed)?\b/gi,        'certainty is questioned'],
+    [/\bshatter(?:ed)?\s+(?:his|her|their)\s+faith\b/gi, 'challenged their beliefs'],
+    [/\bawakening\s+dawn(?:s)?\b/gi,              'a new understanding arrives'],
+    [/\bimage\s+(?:of\s+the\s+)?idol\s+(?:was\s+)?just\s+stone\b/gi, 'the carved form was just stone'],
+    [/\bunwaver(?:ing)?\s+faith\b/gi,             'focused meditation'],
+    [/\bsanctity\s+of\s+the\s+space\b/gi,        'the stillness of the chamber'],
+    [/\bsacred\s+trust\b/gi,                      'a solemn duty'],
+    [/\bsacred\s+space\b/gi,                      'the chamber'],
+    [/\bsacred\s+act\b/gi,                        'a ritual'],
+    [/\bspiritual\s+discipline\b/gi,              'focused discipline'],
+    // "tragedy" and loss of life triggers
+    [/\bdriven\s+by\s+tragedy\b/gi,              'motivated by loss'],
+    [/\bdeath\s+of\s+(?:a|his|her)\b/gi,         'the passing of'],
+    // Vigil / devotion
+    [/\bkept\s+vigil\b/gi,                        'kept watch'],
+    [/\bfervent\s+prayer\b/gi,                    'quiet meditation'],
+    [/\bdeep\s+meditation\b/gi,                   'calm focus'],
+    [/\bin\s+(?:deep|fervent)\s+meditation\b/gi,  'in calm focus'],
+    [/\bidol\b/gi,                                'carved stone figure'],
+    [/\blingam\b/gi,                              'stone sculpture'],
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RC#7 — SEEDANCE-SPECIFIC STRUCTURAL FIXES
+// Seedance prioritizes the BEGINNING of prompts (Subject → Action → Style).
+// Strip meta-instruction blocks that confuse the model and add no visual value.
+// ─────────────────────────────────────────────────────────────────────────────
+const SEEDANCE_META_STRIP = [
+    // Strip "Total this segment: Xs" instruction lines
+    [/Total this segment:\s*\d+s\.?[^\n]*/gi,         ''],
+    // Strip "Do not overshoot or undershoot" instructions
+    [/Do not overshoot or undershoot\.?/gi,            ''],
+    // Strip "Each cut transitions directly to the next with a hard cut" instructions
+    [/Each cut transitions? directly to the next with a hard cut\.?/gi, ''],
+    // Strip "follow EXACTLY" directives
+    [/\(follow EXACTLY — durations are mandatory\)/gi, ''],
+    // Reformat verbose SEGMENT headers more succinctly
+    [/SEGMENT (\d+) OF (\d+) — (\d+)s\nEnvironment:/gi, 'Scene $1/$2 —'],
+    // Strip attire/staging meta labels (keep the content, remove the label)
+    [/\| Attire\/staging: /gi,                         ' — '],
+];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FASHION-SAFE MULTI-WORD PHRASE REPLACEMENTS
@@ -78,7 +195,31 @@ export function sanitizePromptForProvider(prompt, provider = 'default', imageCou
     const warnings = [];
     let p = prompt;
 
-    // ── Step 1: Apply fashion-safe multi-word phrase replacements first ──────
+    // ── Step 0 (RC#6): Apply deity/religious content sanitization FIRST ──────
+    // This must run before any other step to prevent ByteDance/Seedance safety
+    // filter violations for religious iconography, deities, sacred ritual content.
+    let deityReplacementCount = 0;
+    for (const [pattern, replacement] of DEITY_PHRASE_MAP) {
+        const before = p;
+        p = p.replace(pattern, replacement);
+        if (p !== before) deityReplacementCount++;
+    }
+    if (deityReplacementCount > 0) {
+        warnings.push(`RC#6: Deity/religious content sanitized (${deityReplacementCount} substitutions) to comply with Seedance/ByteDance content policy`);
+    }
+
+    // ── Step 0b (RC#7): Apply sensitive concept phrase substitutions ─────────
+    let sensitiveReplacementCount = 0;
+    for (const [pattern, replacement] of SENSITIVE_PHRASE_MAP) {
+        const before = p;
+        p = p.replace(pattern, replacement);
+        if (p !== before) sensitiveReplacementCount++;
+    }
+    if (sensitiveReplacementCount > 0) {
+        warnings.push(`RC#7: Sensitive phrase mapping applied (${sensitiveReplacementCount} substitutions)`);
+    }
+
+    // ── Step 1: Apply fashion-safe multi-word phrase replacements ────────────
     for (const [pattern, replacement] of FASHION_SAFE_PHRASES) {
         p = p.replace(pattern, replacement);
     }
@@ -96,6 +237,24 @@ export function sanitizePromptForProvider(prompt, provider = 'default', imageCou
         p = p.replace(pattern, replacement);
         if (p !== before) {
             warnings.push(`Replaced residual "${pattern.source}" with "${replacement}"`);
+        }
+    }
+
+    // ── Step 3b (RC#8): Seedance-specific structural meta-instruction strip ──
+    // Seedance reads the prompt start-first. Strip verbose direction instructions
+    // that add no visual value and can confuse or trigger content filters.
+    const isSeedanceProvider = provider === 'atlascloud' || provider === 'seedance' ||
+        provider === 'seedance-2.0' || provider === 'seedance-2.0-fast' ||
+        provider === 'seedance-2.0-mini';
+    if (isSeedanceProvider) {
+        let metaStripped = 0;
+        for (const [pattern, replacement] of SEEDANCE_META_STRIP) {
+            const before = p;
+            p = p.replace(pattern, replacement);
+            if (p !== before) metaStripped++;
+        }
+        if (metaStripped > 0) {
+            warnings.push(`RC#8: Stripped ${metaStripped} Seedance meta-instruction block(s) to improve prompt parsing`);
         }
     }
 

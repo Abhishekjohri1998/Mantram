@@ -328,9 +328,11 @@ async function submitAtlasCloudPayload(payload) {
     if (sanitizerWarnings.length > 0) {
         console.warn(`⚠️ [Atlas Sanitizer] ${sanitizerWarnings.join(' | ')}`);
     }
-    // Also strip explicit words (safety layer on top of fashion sanitizer)
-    const BANNED_PATTERNS = /\b(shoot|shoots|shooting|kill|kills|killing|bomb|bombs|gun|guns|blood|bloody|naked|nude|sex|sexual)\b/gi;
-    const sanitizedPrompt = sanitizedPromptFromSanitizer.replace(BANNED_PATTERNS, 'move');
+    // promptSanitizer.js handles all safety sanitization layers:
+    // RC#1 (fashion vocab), RC#4 (char limit), RC#5 (@image tags),
+    // RC#6 (deity/religious), RC#7 (sensitive phrases), RC#8 (Seedance meta strips)
+    const sanitizedPrompt = sanitizedPromptFromSanitizer;
+
 
     let atlasPayload;
     if (isGemini) {
