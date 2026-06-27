@@ -196,8 +196,8 @@ export async function generateStoryboardPoster(
     console.log(`  raw buffers: product=${rawProductBuffers.length}, avatars=${allRawAvatarBuffers.length}, logo=${!!rawLogoBuffer}, refs=${rawRefBuffers.length}`);
     console.log(`  Prompt (first 120): ${finalPrompt.substring(0, 120)}...`);
 
-    const PRIMARY_TIMEOUT_MS = 30000;
-    const FALLBACK_TIMEOUT_MS = 60000;
+    const PRIMARY_TIMEOUT_MS = 90000;   // 90s — accommodates heavy multi-reference grid rendering
+    const FALLBACK_TIMEOUT_MS = 120000; // 120s — fallback model timeout
 
     if (useNanoBanana) {
         try {
