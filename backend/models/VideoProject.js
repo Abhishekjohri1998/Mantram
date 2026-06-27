@@ -268,5 +268,6 @@ videoProjectSchema.index({ user: 1, createdAt: -1 });              // listing wi
 videoProjectSchema.index({ user: 1, brand: 1, createdAt: -1 });    // brand-filtered listing
 videoProjectSchema.index({ isActive: 1, isPublished: 1 });         // admin visibility filtering
 videoProjectSchema.index({ showOnHomeScreen: 1 });                  // homescreen showcase query
+videoProjectSchema.index({ createdAt: -1 });                        // system-wide listing/admin sort queries
 
 export default mongoose.model('VideoProject', videoProjectSchema);
