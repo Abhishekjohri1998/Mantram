@@ -270,126 +270,64 @@ async function _atlasImageGenerate(prompt, { model = 'gpt-image-2', size = '1024
     return { imageUrl: finalUrl, model, provider: 'atlascloud' };
 }
 
-// ── Laozhang-only image generation (for non-GPT models like Gemini Flash Image) ──
-
-async function _laozhangOnlyImageGenerate(prompt, { model, size, finalPrompt }) {
-    const apiKey = getApiKey();
-    const timeoutMs = getImageTimeout(model);
-
-    let response;
-    let tryB64 = true;
-    
-    try {
-        response = await fetch(`${LAOZHANG_BASE_URL}/images/generations`, fetchOptions({
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-            body: JSON.stringify({ model, prompt: finalPrompt, n: 1, size, response_format: 'b64_json' }),
-            signal: AbortSignal.timeout(timeoutMs),
-        }));
-        if (!response.ok) tryB64 = false;
-    } catch (err) {
-        tryB64 = false;
-    }
-
-    if (!tryB64) {
-        console.log(`⚠️  [LaoZhang] b64_json failed, retrying with response_format='url'...`);
-        response = await fetch(`${LAOZHANG_BASE_URL}/images/generations`, fetchOptions({
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-            body: JSON.stringify({ model, prompt: finalPrompt, n: 1, size, response_format: 'url' }),
-            signal: AbortSignal.timeout(timeoutMs),
-        }));
-    }
-
-    if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`LaoZhang image failed (${response.status}): ${errText}`);
-    }
-
-    const data = await response.json();
-    const imgData = data.data?.[0];
-    const b64 = imgData?.b64_json || '';
-    const imageUrl = imgData?.url || '';
-    if (!b64 && !imageUrl) throw new Error('LaoZhang returned empty image response');
-    const rawData = b64 ? `data:image/png;base64,${b64}` : imageUrl;
-    
-    const finalUrl = await ensureS3Url(rawData, 'studio/laozhang');
-    if (finalUrl.includes('laozhang.ai/fileSystem/')) {
-        throw new Error('LaoZhang image hosting system returned an error.');
-    }
-    return { imageUrl: finalUrl, model, provider: 'laozhang' };
-}
+// ── Atlas Cloud Image Generation for ALL models ──────────────────────────────
+// Atlas Cloud is the primary and only proxy. No LaoZhang.
+// Falls back to native Gemini/Vertex if Atlas fails.
 
 export async function laozhangImageGenerate(prompt, { model = 'gemini-3.1-flash-image-preview', size = '1024x1024' } = {}) {
     const timeoutMs = getImageTimeout(model);
     console.log(`🖼️  [ImageGen] model=${model}, size=${size}, timeout=${timeoutMs/1000}s`);
-
-    const arInstruction = size !== '1024x1024' ? `\n\n[CRITICAL REQUIREMENT: Generate this exact aspect ratio/size: ${size}]` : '';
-    const finalPrompt = prompt + arInstruction;
     console.log(`   📝 prompt (first 200): ${prompt?.substring(0, 200)}...`);
 
-    // ── Strategy: Atlas primary for gpt-image-2, Laozhang for everything else ──
-    const useAtlasPrimary = model === 'gpt-image-2' && isAtlasImageAvailable();
-
-    if (useAtlasPrimary) {
+    // ── Strategy: Atlas Cloud is the ONLY proxy — no LaoZhang ──
+    if (isAtlasImageAvailable()) {
         try {
             return await _atlasImageGenerate(prompt, { model, size });
         } catch (atlasErr) {
-            console.warn(`⚠️ [Atlas Image] Primary failed: ${atlasErr.message}. Falling back to LaoZhang...`);
-            // Fall through to Laozhang
+            console.warn(`⚠️ [Atlas Image] Failed: ${atlasErr.message}. Falling back to native Gemini/Vertex...`);
         }
     }
 
-    // ── Laozhang path (primary for non-GPT models, fallback for GPT Image 2) ──
+    // ── Native Gemini / Vertex fallback ──
     try {
-        const result = await _laozhangOnlyImageGenerate(prompt, { model, size, finalPrompt });
-        console.log(`✅ [LaoZhang] Image generated via ${model}: ${(result.imageUrl || '').substring(0, 80)}`);
-        return result;
-    } catch (err) {
-        console.warn(`[Image Gen] ⚠️ LaoZhang failed: ${err.message}. Trying direct Gemini/Vertex fallback...`);
+        const { generateImageWithVertex } = await import('../../services/vertexImage.js');
+        const credsVar = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+        let credsExist = false;
         try {
-            const { generateImageWithVertex } = await import('../../services/vertexImage.js');
-            // Check if key is available
-            const credsVar = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-            let credsExist = false;
-            try {
-                const { existsSync } = await import('fs');
-                if (credsVar && existsSync(credsVar)) credsExist = true;
-            } catch (e) {}
-            const devKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
-            if (!credsExist && !devKey) {
-                throw new Error("No direct Gemini API key or GCP credentials configured.");
-            }
-
-            // Map size string (e.g. "1024x1024") to closest aspect ratio
-            const arMap = {
-                '1024x1024': '1:1', '1344x768': '16:9', '768x1344': '9:16', '896x1120': '4:5', '896x1184': '3:4', '1184x896': '4:3', '1248x832': '3:2', '832x1248': '2:3'
-            };
-            const aspectRatio = arMap[size] || '1:1';
-
-            const activeModel = 'imagen-3.0-generate-002'; // standard Imagen 3 quality
-            const parts = [{ text: prompt }];
-
-            const data = await generateImageWithVertex(parts, activeModel, 0.4, { aspectRatio, imageSize: '1K' });
-            
-            const resParts = data.candidates?.[0]?.content?.parts || [];
-            let fallbackImageUrl = null;
-            for (const part of resParts) {
-                if (part.inlineData?.mimeType?.startsWith('image/')) {
-                    fallbackImageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-                    break;
-                }
-            }
-
-            if (!fallbackImageUrl) throw new Error('Gemini fallback returned no image in response');
-            
-            const finalUrl = await ensureS3Url(fallbackImageUrl, 'studio/gemini-fallback');
-            console.log(`✅ [Image Gen] Vertex fallback succeeded (S3): ${finalUrl.substring(0, 80)}...`);
-            return { imageUrl: finalUrl, model: activeModel, provider: 'gemini' };
-        } catch (fallbackErr) {
-            console.error(`[Image Gen] ❌ Direct Gemini fallback failed: ${fallbackErr.message}`);
-            throw err; // throw original error
+            const { existsSync } = await import('fs');
+            if (credsVar && existsSync(credsVar)) credsExist = true;
+        } catch (e) {}
+        const devKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
+        if (!credsExist && !devKey) {
+            throw new Error("No Gemini API key or GCP credentials configured.");
         }
+
+        const arMap = {
+            '1024x1024': '1:1', '1344x768': '16:9', '768x1344': '9:16',
+            '896x1120': '4:5', '896x1184': '3:4', '1184x896': '4:3',
+            '1248x832': '3:2', '832x1248': '2:3'
+        };
+        const aspectRatio = arMap[size] || '1:1';
+        const activeModel = 'imagen-3.0-generate-002';
+        const parts = [{ text: prompt }];
+
+        const data = await generateImageWithVertex(parts, activeModel, 0.4, { aspectRatio, imageSize: '1K' });
+        const resParts = data.candidates?.[0]?.content?.parts || [];
+        let fallbackImageUrl = null;
+        for (const part of resParts) {
+            if (part.inlineData?.mimeType?.startsWith('image/')) {
+                fallbackImageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                break;
+            }
+        }
+        if (!fallbackImageUrl) throw new Error('Vertex Imagen returned no image');
+
+        const finalUrl = await ensureS3Url(fallbackImageUrl, 'studio/vertex-image');
+        console.log(`✅ [Vertex-Fallback] Image generated via Imagen 3: ${finalUrl.substring(0, 80)}...`);
+        return { imageUrl: finalUrl, model: activeModel, provider: 'vertex' };
+    } catch (vxErr) {
+        console.error(`❌ [ImageGen] All providers failed. Vertex: ${vxErr.message}`);
+        throw new Error(`Image generation failed: All providers exhausted. ${vxErr.message}`);
     }
 }
 
@@ -467,10 +405,9 @@ export async function laozhangGptImageWithRefs(prompt, imageUrls = [], { model =
 
     console.log(`🎨 [GPT-Image-2+Refs] Calling /images/edits — model=${model}, size=${size}, ref=${Math.round(refBuffer.length/1024)}KB`);
 
-    // Try Atlas Cloud first for /images/edits, then Laozhang
+    // Use Atlas Cloud only for /images/edits (no LaoZhang)
     const providers = [];
     if (isAtlasImageAvailable()) providers.push({ name: 'Atlas', baseUrl: ATLAS_IMAGE_BASE_URL, key: getAtlasImageApiKey() });
-    providers.push({ name: 'LaoZhang', baseUrl: LAOZHANG_BASE_URL, key: getApiKey() });
 
     for (const prov of providers) {
         try {
@@ -527,11 +464,17 @@ export async function laozhangGptImageWithRefs(prompt, imageUrls = [], { model =
 
 export async function laozhangMultimodalImageGenerate(prompt, imageUrls = [], { model = 'gemini-3.1-flash-image-preview', size = '1024x1024' } = {}) {
     try {
-        const apiKey = getApiKey();
         const timeoutMs = getImageTimeout(model);
         if (!imageUrls || imageUrls.length === 0) return laozhangImageGenerate(prompt, { model, size });
 
-        console.log(`🖼️  [LaoZhang-Multimodal] Image gen: ${model}, ${imageUrls.length} ref URLs, size=${size}, timeout=${timeoutMs/1000}s`);
+        // Use Atlas Cloud as the primary provider
+        const atlasKey = getAtlasImageApiKey();
+        const useAtlas = !!atlasKey;
+        const baseUrl = useAtlas ? ATLAS_IMAGE_BASE_URL : LAOZHANG_BASE_URL;
+        const apiKey = useAtlas ? atlasKey : getApiKey();
+        const providerName = useAtlas ? 'Atlas' : 'LaoZhang';
+
+        console.log(`🖼️  [${providerName}-Multimodal] Image gen: ${model}, ${imageUrls.length} ref URLs, size=${size}, timeout=${timeoutMs/1000}s`);
         console.log(`   📝 prompt (first 200): ${prompt?.substring(0, 200)}...`);
         for (const url of imageUrls) console.log(`   🔗 ref: ${url.substring(0, 100)}...`);
 
@@ -540,10 +483,10 @@ export async function laozhangMultimodalImageGenerate(prompt, imageUrls = [], { 
             if (!url) continue;
             
             let finalUrl = url;
-            // If it's an external URL, fetch it server-side to bypass CDN 403 blocks that hit LaoZhang's servers directly
+            // If it's an external URL, fetch it server-side to bypass CDN 403 blocks
             if (url.startsWith('http')) {
                 try {
-                    console.log(`📥 [LaoZhang] Pre-fetching image URL to avoid CDN blocks: ${url.substring(0, 80)}...`);
+                    console.log(`📥 [${providerName}] Pre-fetching image URL: ${url.substring(0, 80)}...`);
                     const r = await fetch(url, fetchOptions({
                         headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36' }
                     }));
@@ -554,10 +497,10 @@ export async function laozhangMultimodalImageGenerate(prompt, imageUrls = [], { 
                             finalUrl = `data:${mimeType};base64,${Buffer.from(arr).toString('base64')}`;
                         }
                     } else {
-                        console.warn(`⚠️ [LaoZhang] Pre-fetch failed (HTTP ${r.status}) for: ${url.substring(0,60)}`);
+                        console.warn(`⚠️ [${providerName}] Pre-fetch failed (HTTP ${r.status}) for: ${url.substring(0,60)}`);
                     }
                 } catch (e) {
-                    console.warn(`⚠️ [LaoZhang] Pre-fetch error: ${e.message}`);
+                    console.warn(`⚠️ [${providerName}] Pre-fetch error: ${e.message}`);
                 }
             }
             
@@ -568,7 +511,7 @@ export async function laozhangMultimodalImageGenerate(prompt, imageUrls = [], { 
         const arInstruction = size !== '1024x1024' ? `\n\n[CRITICAL REQUIREMENT: Generate this exact aspect ratio/size: ${size}]` : '';
         contentParts.push({ type: 'text', text: prompt + arInstruction });
 
-        const response = await fetch(`${LAOZHANG_BASE_URL}/chat/completions`, fetchOptions({
+        const response = await fetch(`${baseUrl}/chat/completions`, fetchOptions({
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
             body: JSON.stringify({ model, messages: [{ role: 'user', content: contentParts }], size }),
@@ -577,8 +520,8 @@ export async function laozhangMultimodalImageGenerate(prompt, imageUrls = [], { 
 
         if (!response.ok) {
             const errText = await response.text();
-            console.error(`❌ [LaoZhang-Multimodal] Image failed (${response.status}):`, errText);
-            throw new Error(`LaoZhang multimodal image failed (${response.status}): ${errText}`);
+            console.error(`❌ [${providerName}-Multimodal] Image failed (${response.status}):`, errText);
+            throw new Error(`${providerName} multimodal image failed (${response.status}): ${errText}`);
         }
 
         const data = await response.json();
@@ -603,21 +546,17 @@ export async function laozhangMultimodalImageGenerate(prompt, imageUrls = [], { 
 
         if (!imageUrl) {
             const content = data.choices?.[0]?.message?.content || '';
-            console.error(`❌ [LaoZhang-Multimodal] No image in response:`, content.substring(0, 500));
-            throw new Error('LaoZhang multimodal returned response but no image found');
+            console.error(`❌ [${providerName}-Multimodal] No image in response:`, content.substring(0, 500));
+            throw new Error(`${providerName} multimodal returned response but no image found`);
         }
 
         const isBase64 = imageUrl.startsWith('data:');
         
         // Auto-upload base64 to S3
-        const finalUrl = await ensureS3Url(imageUrl, 'studio/laozhang-multimodal');
-        
-        if (finalUrl.includes('laozhang.ai/fileSystem/')) {
-            throw new Error('LaoZhang image hosting system returned an error. File upload and download system is not enabled.');
-        }
+        const finalUrl = await ensureS3Url(imageUrl, `studio/${providerName.toLowerCase()}-multimodal`);
 
-        console.log(`✅ [LaoZhang-Multimodal] Image generated with ${imageUrls.length} refs (${isBase64 ? 'base64' : 'URL'})${finalUrl !== imageUrl ? ' -> Uploaded to S3' : ''}: ${finalUrl.substring(0, 80)}...`);
-        return { imageUrl: finalUrl, model, provider: 'laozhang' };
+        console.log(`✅ [${providerName}-Multimodal] Image generated with ${imageUrls.length} refs (${isBase64 ? 'base64' : 'URL'})${finalUrl !== imageUrl ? ' -> Uploaded to S3' : ''}: ${finalUrl.substring(0, 80)}...`);
+        return { imageUrl: finalUrl, model, provider: useAtlas ? 'atlascloud' : 'laozhang' };
     } catch (err) {
         console.warn(`[LaoZhang-Multimodal] ⚠️ Generation failed: ${err.message}. Trying direct Gemini/Vertex fallback...`);
         try {

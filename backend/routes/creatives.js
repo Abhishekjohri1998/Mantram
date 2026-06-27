@@ -2195,40 +2195,26 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
             console.log(`📌 [RefLabels] Injected ${refCount} image role label(s) into prompt preamble`);
         }
 
-        // ── Generate via LaoZhang (NanoBanana 2) or native Gemini fallback ──
-        // LaoZhang MUST be used when model is 'gemini-3.1-flash-image-preview' — that model
-        // doesn't exist on the direct Gemini API. Native router gets a 404 → misclassified as busy.
-        const { laozhangImageGenerate: lzImageGen, laozhangMultimodalImageGenerate: lzMultimodalGen, isLaozhangAvailable: lzAvailable } = await import('../agents/videoStudio/laozhangClient.js');
-        const useLaoZhang = lzAvailable();
-        const lzSize = (() => {
-            // Map aspectRatio to a pixel size string for LaoZhang
+        // ── Generate via Atlas Cloud (NanoBanana 2) or native Gemini fallback ──
+        // Atlas Cloud is the primary proxy. laozhangImageGenerate internally routes through Atlas Cloud.
+        const { laozhangImageGenerate: imageGen, laozhangMultimodalImageGenerate: multimodalGen } = await import('../agents/videoStudio/laozhangClient.js');
+        const pixelSize = (() => {
+            // Map aspectRatio to a pixel size string for the proxy
             const sizeMap = { '1:1': '1024x1024', '16:9': '1344x768', '9:16': '768x1344', '4:5': '896x1120', '3:4': '896x1184', '4:3': '1184x896', '3:2': '1248x832', '2:3': '832x1248' };
             return sizeMap[nativeAspectRatio] || '1024x1024';
         })();
 
-        console.log(`🚀 Generating image via ${useLaoZhang ? `LaoZhang (${LZ_IMAGE_MODEL})` : `Native Gemini (${NATIVE_GEMINI_IMAGE_MODEL})`}... (prompt: ${finalPromptForModel.length} chars, refs: ${refCount})`);
+        console.log(`🚀 Generating image via Atlas Cloud (${LZ_IMAGE_MODEL})... (prompt: ${finalPromptForModel.length} chars, refs: ${refCount})`);
 
         let routerResult;
-        if (useLaoZhang) {
-            try {
-                // LaoZhang path — supports gemini-3.1-flash-image-preview (NanoBanana 2)
-                const lzResult = refCount > 0
-                    ? await lzMultimodalGen(finalPromptForModel, finalImageParts.map(p => p.inlineData ? `data:${p.inlineData.mimeType};base64,${p.inlineData.data}` : null).filter(Boolean), { model: LZ_IMAGE_MODEL, size: lzSize })
-                    : await lzImageGen(finalPromptForModel, { model: LZ_IMAGE_MODEL, size: lzSize });
-                routerResult = { imageUrl: lzResult.imageUrl };
-            } catch (lzErr) {
-                console.warn(`⚠️ LaoZhang image generation failed, falling back to Native Gemini: ${lzErr.message}`);
-                // Native Gemini fallback — use valid model ID (NOT gemini-3.1-flash-image-preview)
-                const result = await router.generateImage({
-                    prompt: finalPromptForModel,
-                    aspectRatio: nativeAspectRatio,
-                    model: NATIVE_GEMINI_IMAGE_MODEL,
-                    imageParts: finalImageParts,
-                    size: imageSize
-                }, { provider: 'gemini' });
-                routerResult = result;
-            }
-        } else {
+        try {
+            // Atlas Cloud path — supports gemini-3.1-flash-image-preview (NanoBanana 2)
+            const genResult = refCount > 0
+                ? await multimodalGen(finalPromptForModel, finalImageParts.map(p => p.inlineData ? `data:${p.inlineData.mimeType};base64,${p.inlineData.data}` : null).filter(Boolean), { model: LZ_IMAGE_MODEL, size: pixelSize })
+                : await imageGen(finalPromptForModel, { model: LZ_IMAGE_MODEL, size: pixelSize });
+            routerResult = { imageUrl: genResult.imageUrl };
+        } catch (atlasErr) {
+            console.warn(`⚠️ Atlas Cloud image generation failed, falling back to Native Gemini: ${atlasErr.message}`);
             // Native Gemini fallback — use valid model ID (NOT gemini-3.1-flash-image-preview)
             const result = await router.generateImage({
                 prompt: finalPromptForModel,
