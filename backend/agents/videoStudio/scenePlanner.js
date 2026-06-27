@@ -204,14 +204,25 @@ RULES & CREATIVE GUIDELINES:
 1. BRAND CATEGORY & EMOTIONAL ARC:
    - Analyze the brand context, vertical, and product category. Tailor the visual language, camerawork, pacing, color palette, and mood to match the vertical (e.g. high-fashion luxury uses slow, dramatic, soft-lit, high-contrast, atmospheric studio shots with rich fabric textures; tech uses sleek, high-tech, futuristic UI overlays, dynamic movement, and clean blue/teal grading).
    - Write creative, narrative-driven scenes that build an emotional arc (Hook, Build-up, Demonstration, Call to Action) instead of flat, literal summaries of product features.
-2. VISUAL PROMPT DEPTH & MOTION:
-   - Each visualPrompt must be a richly detailed, self-contained description (at least 100 words) describing the subject, active dynamic motion, camera angles (e.g., slow tracking shot, low-angle pan, close-up), lighting (e.g. golden hour backlight, soft diffused key light), and art direction. Avoid static poses; describe active, cinematic motion.
-3. SPATIAL CHAINING & MATCH CUTS:
+2. VISUAL PROMPT DEPTH & MOTION (CRITICAL — affects generation quality directly):
+   - Each visualPrompt is a self-contained AI video generation prompt. The longer the scene, the richer the prompt must be.
+   - Word count MINIMUMS per scene duration (strictly enforced):
+     • Scene ≤ 5s → at least 60 words
+     • Scene 5–8s → at least 120 words
+     • Scene 8–12s → at least 180 words
+     • Scene > 12s → at least 240 words (multiple timed sub-cuts, e.g. "At 0s: ..., at 5s: ..., at 10s: ...")
+   - Each prompt must describe: subject identity, active dynamic motion (not static pose), camera angle and movement, lighting setup, color grade, background environment, and how the scene ends.
+   - For scenes > 10s: break the scene into explicit timed sub-shots within the prompt. Example: "[0–4s] Wide establishing shot... [4–8s] Push to medium close-up... [8–12s] Tight product shot, freeze frame on logo."
+   - Avoid static poses; describe active, cinematic motion throughout.
+3. SHOT VARIETY (CRITICAL for visual energy):
+   - NO two consecutive scenes may use the same shot type. Rotate: ECU (extreme close-up), CU (close-up), MCU (medium close-up), MS (medium shot), WS (wide shot), OTS (over-the-shoulder), POV.
+   - Each scene must specify a unique camera move: dolly, push, pull, orbit, crane, handheld, static.
+4. SPATIAL CHAINING & MATCH CUTS:
    - Design seamless visual transitions between scenes. The transitionOut of a scene must directly align with the opening framing of the next scene (e.g., a match cut on action or a camera push-in to a specific object/actor), creating a continuous and visually unified film.
-4. DIALOGUE:
+5. DIALOGUE:
    - Write natural, emotionally resonant dialogue or voiceover (1-3 lines per scene) matching the suggested emotion, formatted as DIALOGUE [emotion]: "text in ${language}".
    - ${isNonEnglish ? `ALL dialogue MUST be in ${language} script/characters. If any line is in English, the output is REJECTED.` : ''}
-5. Product must appear in at least ${Math.ceil(sceneCount * 0.7)} of ${sceneCount} scenes, integrated naturally into the environment.
+6. Product must appear in at least ${Math.ceil(sceneCount * 0.7)} of ${sceneCount} scenes, integrated naturally into the environment.
 
 OUTPUT FORMAT (strict JSON array):
 [
@@ -219,18 +230,25 @@ OUTPUT FORMAT (strict JSON array):
     "sceneId": 1,
     "role": "HOOK",
     "duration": ${durations[0]},
-    "visualPrompt": "Detailed cinematic prompt (100+ words) describing the action, lighting, color grading, setting, and subject, referencing @image1 and @image2...",
+    "visualPrompt": "Self-contained cinematic AI video prompt (min ${durations[0] <= 5 ? 60 : durations[0] <= 8 ? 120 : durations[0] <= 12 ? 180 : 240}+ words for a ${durations[0]}s scene). Describe subject, motion, camera, lighting, color grade, and environment. For scenes >10s add timed sub-shots like [0-4s], [4-8s]...",
     "dialogue": [
       { "text": "dialogue line in ${language}", "emotion": "curious" }
     ],
-    "camerawork": "Medium close-up at 50mm, slow dolly-in...",
+    "camerawork": "Unique camera type and movement — e.g. low-angle dolly-in at 35mm, handheld push-to-close...",
     "transitionOut": "Camera pushes into close-up, matching the visual opening of next scene"
   }
 ]
 
 Return ONLY the JSON array. No explanation, no markdown.`;
 
-    const userPrompt = `Plan ${sceneCount} scenes for a ${targetDuration}s ${language} video ad. Product: ${productData?.productName || 'Unknown'}. Brief: "${prompt?.substring(0, 500) || 'Compelling product ad'}". Settings: ${JSON.stringify({ hookShot: settings?.hookShot, cta: settings?.cta, style: settings?.style })}`;
+    // Build per-scene word-count hint for the user prompt so the LLM sees it on both system + user side
+    const sceneWordHints = arcScenes.map((s, i) => {
+        const d = durations[i];
+        const minWords = d <= 5 ? 60 : d <= 8 ? 120 : d <= 12 ? 180 : 240;
+        return `Scene ${i+1} [${d}s] → min ${minWords} words`;
+    }).join(', ');
+
+    const userPrompt = `Plan ${sceneCount} scenes for a ${targetDuration}s ${language} video ad. Product: ${productData?.productName || 'Unknown'}. Brief: "${prompt?.substring(0, 500) || 'Compelling product ad'}". Settings: ${JSON.stringify({ hookShot: settings?.hookShot, cta: settings?.cta, style: settings?.style })}. WORD COUNT TARGETS: ${sceneWordHints}.`;
 
     console.log(`[ScenePlanner] Planning ${sceneCount} scenes for ${targetDuration}s video (${model}, ${language})...`);
 

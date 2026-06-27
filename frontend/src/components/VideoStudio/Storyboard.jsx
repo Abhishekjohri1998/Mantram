@@ -210,6 +210,8 @@ export default function Storyboard({
     const [editedPrompts, setEditedPrompts] = useState({}); // {segIdx: editedPrompt}
     const [isCompiling, setIsCompiling] = useState(false);
     const [isBatchGeneratingSegments, setIsBatchGeneratingSegments] = useState(false);
+    const [isCancelling, setIsCancelling] = useState(false); // stop generation in progress
+    const longFormJobIdRef = useRef(null); // stores the active sb-lf-* job ID for cancel
     
     const pollRef = useRef(null);
     const projectIdRef = useRef(null);
@@ -764,6 +766,7 @@ export default function Storyboard({
 
             if (data.longForm) {
                 setIsLongForm(true);
+                longFormJobIdRef.current = data.jobId || null; // store for Stop Generation
                 setPhaseLabel('Planning segments...');
                 setPhaseDetail(`${data.segments || Math.ceil(duration / 10)} segments will be generated`);
             } else {
@@ -874,6 +877,7 @@ export default function Storyboard({
         
         const isLf = !!sb.longFormJobId;
         setIsLongForm(isLf);
+        if (isLf) longFormJobIdRef.current = sb.longFormJobId; // restore job ID for Stop Generation
         
         if (proj.status === 'storyboard-ready') {
             setPhase('review');
@@ -1072,6 +1076,34 @@ export default function Storyboard({
             setIsCompiling(false);
         }
     }, [projectIdRef, onVideoComplete]);
+
+    // ── Stop long-form storyboard generation ──
+    const handleStopGeneration = useCallback(async () => {
+        const jobId = longFormJobIdRef.current;
+        if (!jobId) {
+            // Fallback: no jobId in memory, just reset the phase
+            if (pollRef.current) clearInterval(pollRef.current);
+            setPhase('review');
+            return;
+        }
+        if (!window.confirm('Stop video generation? Segments already completed will be preserved in Manual mode, but the pipeline will not generate new ones.')) return;
+        setIsCancelling(true);
+        try {
+            await fetch(`${API}/storyboard/cancel/${jobId}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('mantram_token')}` },
+            });
+        } catch (e) {
+            console.warn('[Storyboard] Cancel request failed:', e.message);
+        } finally {
+            setIsCancelling(false);
+            if (pollRef.current) clearInterval(pollRef.current);
+            longFormJobIdRef.current = null;
+            setPhase('review');
+            setPhaseLabel('');
+            setPhaseDetail('');
+        }
+    }, []);
 
     // ── Render helpers ──
     const isLoading = phase === 'directing' || phase === 'storyboarding';
@@ -1837,6 +1869,18 @@ export default function Storyboard({
                                         )}
                                         {phaseDetail && <span className="sb-lf-detail">{phaseDetail}</span>}
                                     </div>
+                                )}
+                                {/* Stop Generation button — only for long-form */}
+                                {isLongForm && (
+                                    <button
+                                        className="sb-stop-btn"
+                                        onClick={handleStopGeneration}
+                                        disabled={isCancelling}
+                                        title="Stop video generation"
+                                    >
+                                        <span className="material-symbols-outlined">{isCancelling ? 'hourglass_empty' : 'stop_circle'}</span>
+                                        {isCancelling ? 'Stopping...' : 'Stop Generation'}
+                                    </button>
                                 )}
                                 {/* Show the generated video prompt so user can see what Claude wrote */}
                                 {generatedVideoPrompt && (

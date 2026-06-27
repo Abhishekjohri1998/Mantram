@@ -28,6 +28,22 @@ const ATLAS_CONSOLE_BASE    = 'https://console.atlascloud.ai/api/v1';
 // (The old 4000-char limit was truncating rich storyboard prompts with 4-section CUT PLAN data)
 const ATLASCLOUD_MAX_PROMPT_LENGTH = 10000;
 
+// ── Seedance Negative Prompt — injected into every Seedance video generation ──
+// These are the most common Seedance failure modes. Explicitly excluding them
+// significantly improves anatomical accuracy, face fidelity, and visual quality.
+const SEEDANCE_NEGATIVE_PROMPT = [
+    'morphed faces', 'distorted faces', 'blurry faces', 'melting faces',
+    'extra fingers', 'extra limbs', 'extra arms', 'extra legs', 'missing fingers',
+    'deformed hands', 'wrong anatomy', 'incorrect anatomy', 'anatomical deformities',
+    'floating objects', 'disembodied limbs', 'duplicate subjects', 'cloned subjects',
+    'text artifacts', 'watermarks', 'subtitles', 'burnt-in text', 'logos overlaid',
+    'blurry motion', 'motion blur artifacts', 'judder', 'frame tearing',
+    'horror elements', 'gore', 'nudity', 'explicit content',
+    'low quality', 'pixelated', 'overexposed', 'underexposed',
+    'cartoonish style', 'anime style', 'illustrated style',
+    'inconsistent lighting', 'flat lighting', 'unnatural skin tone',
+].join(', ');
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function truncatePrompt(prompt, maxLen = ATLASCLOUD_MAX_PROMPT_LENGTH) {
@@ -632,11 +648,12 @@ export async function submitAtlasCloudVideoGeneration({
     console.log(`📝 [Atlas] Prompt (first 200): ${finalPrompt.substring(0, 200)}`);
 
     const taskInput = {
-        prompt:         finalPrompt,
-        aspect_ratio:   aspectRatio || '16:9',
-        duration:       dur,
-        resolution:     resolution === '4k' ? '4k' : (resolution === '1080p' ? '1080p' : (resolution === '480p' ? '480p' : '720p')),
-        generate_audio: refAudio ? false : (generateAudio !== false),
+        prompt:          finalPrompt,
+        negative_prompt: SEEDANCE_NEGATIVE_PROMPT,
+        aspect_ratio:    aspectRatio || '16:9',
+        duration:        dur,
+        resolution:      resolution === '4k' ? '4k' : (resolution === '1080p' ? '1080p' : (resolution === '480p' ? '480p' : '720p')),
+        generate_audio:  refAudio ? false : (generateAudio !== false),
         customCharacterNames,
     };
 

@@ -516,7 +516,7 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
                         imageUrl: segmentFirstFrameUrl,
                         duration: sceneDurations[i],
                         aspectRatio: params.format,
-                        generateAudio: true,
+                        generateAudio: false, // Disabled: native audio causes segment failures; storyboard uses its own TTS voiceover pipeline
                         referenceImages: segmentRefs.slice(0, 6),
                         qualityMode,
                         resolution: params.resolution,
@@ -588,7 +588,7 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
                             imageUrl: segmentFirstFrameUrl,
                             duration: sceneDurations[i],
                             aspectRatio: params.format,
-                            generateAudio: true,
+                            generateAudio: false, // Disabled: see primary generation above
                             referenceImages: segmentRefs.slice(0, 6),
                             qualityMode,
                             resolution: params.resolution,

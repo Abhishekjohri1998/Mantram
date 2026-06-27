@@ -198,7 +198,7 @@ async function runPipeline(jobId, params) {
                         imageUrl: lastFrameUrl,
                         duration: scene.duration,
                         aspectRatio: params.aspectRatio,
-                        generateAudio: true, // Native audio only
+                        generateAudio: false, // Native audio disabled — long-form uses FFmpeg audio pipeline
                         referenceImages: params.referenceImages.slice(0, 9),
                         qualityMode: params.settings?.quality || 'fast',
                         imageRole: params.imageRole,
@@ -210,7 +210,7 @@ async function runPipeline(jobId, params) {
                         imageUrl: lastFrameUrl,
                         duration: scene.duration,
                         aspectRatio: params.aspectRatio,
-                        generateAudio: true, // Native audio only
+                        generateAudio: false, // Native audio disabled — long-form uses FFmpeg audio pipeline
                         referenceImages: params.referenceImages.slice(0, 9),
                     });
                 }
@@ -254,7 +254,7 @@ async function runPipeline(jobId, params) {
                             imageUrl: lastFrameUrl,
                             duration: scene.duration,
                             aspectRatio: params.aspectRatio,
-                            generateAudio: true,
+                            generateAudio: false, // Native audio disabled — see primary generation
                             referenceImages: params.referenceImages.slice(0, 9),
                             qualityMode: params.settings?.quality || 'fast',
                             imageRole: params.imageRole,
@@ -266,7 +266,7 @@ async function runPipeline(jobId, params) {
                             imageUrl: lastFrameUrl,
                             duration: scene.duration,
                             aspectRatio: params.aspectRatio,
-                            generateAudio: true,
+                            generateAudio: false, // Native audio disabled — see primary generation
                             referenceImages: params.referenceImages.slice(0, 9),
                         });
                     }

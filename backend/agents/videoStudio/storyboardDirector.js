@@ -151,12 +151,14 @@ SECTION 3 — CUT PLAN (THE STORYBOARD)
 ═══════════════════════════════════════════════════════
 Write the exact shot list for ONE continuous video of ${duration} seconds.
 Cuts are camera angles / shot changes within the video — NOT separate videos.
-DENSITY: Pack the cuts — aim for fast-paced, high-energy commercial pacing. More cuts = more visual energy.
+DENSITY (MANDATORY): Minimum 1 cut per 3 seconds. A ${duration}s video MUST have AT LEAST ${Math.ceil(duration / 3)} cuts.
+Target ${Math.ceil(duration / 3)} to ${Math.ceil(duration / 2)} cuts. Each cut should be 2–4 seconds for high commercial energy.
+More cuts = more visual energy = better engagement. Never let any single cut exceed 5 seconds unless it is a special slow-motion or reveal moment.
 
 Each cut must have:
 - id: sequential number starting at 1
 - lens: cinematic lens spec (e.g. "40mm anamorphic", "100mm macro", "85mm prime")
-- duration: exact seconds for this cut (integer, min ${MIN_SHOT_DURATION}s, max ${MAX_SHOT_DURATION}s)
+- duration: exact seconds for this cut (integer, min ${MIN_SHOT_DURATION}s, max ${Math.min(5, MAX_SHOT_DURATION)}s for normal cuts, up to ${MAX_SHOT_DURATION}s only for special reveal/slow-motion)
 - move: camera movement (STEADICAM | DOLLY-IN | DOLLY-OUT | RACK-FOCUS | ARC | PULL-OUT | CRANE | HANDHELD | STATIC | WHIP-PAN | PUSH-IN)
 - shot: shot type (WIDE | MEDIUM | CLOSE-UP | EXTREME-CLOSE-UP | INSERT | MACRO | TWO-SHOT | OVER-SHOULDER | POV | ESTABLISHING)
 - scene: 1 short sentence narrative beat — WHO is doing WHAT in this exact cut. Be specific but VERY concise.
@@ -172,7 +174,11 @@ Each cut must have:
 
 RULES FOR CUTS:
 - Durations must SUM exactly to ${duration}s
+- MINIMUM ${Math.ceil(duration / 3)} CUTS REQUIRED — this is a hard constraint, not a suggestion
 - Follow a natural cinematic arc: COLD OPEN (intrigue) → BUILD (environment, character) → REVEAL (product hero moment) → DETAIL (macro features) → EMOTION (presenter or lifestyle) → RESOLVE (CTA/brand close)
+- USE ALL THESE SHOT TYPES across your cuts — rotate them for visual variety:
+  ECU/MACRO (product detail) → WS (environment) → MCU (character) → CU (emotion/face) → INSERT (product + hands) → OTS (interaction) → WS/CTA (close)
+  NO two consecutive cuts may use the same shot type.
 - Use professional lens + shot combinations (wide angle for establishing, macro/insert for product details, close-up for emotion, whip-pan for energy transitions)
 - The product must be visually featured in at least one INSERT/MACRO cut and one LIFESTYLE/IN-USE cut
 - If multiple characters are provided, DISTRIBUTE them across cuts — do not show all characters in every cut. Build ensemble storytelling: different characters carry different narrative beats.
