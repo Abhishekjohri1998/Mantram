@@ -325,8 +325,11 @@ class ModelRouter {
         const triedProviders = new Set([provider.name]);
         let lastError = null;
 
+        // Dynamic timeout: scale up for large token requests (e.g. Growth Engine's 16k tokens)
+        const dynamicTimeout = this._calcTimeout(params.maxTokens);
+
         try {
-            const result = await this._withTimeout(provider.generateText(params), provider.name);
+            const result = await this._withTimeout(provider.generateText(params), provider.name, dynamicTimeout);
             if (!result || !result.text || !result.text.trim()) {
                 throw new Error(`Model returned an empty response (likely blocked by safety/recitation filters or rate limits).`);
             }
@@ -374,7 +377,7 @@ class ModelRouter {
                     
                     // Strip the model ID so the fallback uses its own default model
                     const { model: _, ...fallbackParams } = params;
-                    const result = await this._withTimeout(fallback.generateText(fallbackParams), fallback.name);
+                    const result = await this._withTimeout(fallback.generateText(fallbackParams), fallback.name, dynamicTimeout);
                     if (!result || !result.text || !result.text.trim()) {
                         throw new Error(`Model returned an empty response.`);
                     }
@@ -534,16 +537,31 @@ class ModelRouter {
     }
 
     /**
-     * Wrap a provider call with a timeout to prevent indefinite hangs.
-     * If the provider doesn't respond within PER_CALL_TIMEOUT_MS, rejects with a timeout error.
+     * Calculate dynamic timeout based on maxTokens requested.
+     * Base: 45s. For large requests (>4000 tokens), scale up to 180s max.
      */
-    _withTimeout(promise, providerName) {
+    _calcTimeout(maxTokens) {
+        if (!maxTokens || maxTokens <= 4000) return this.PER_CALL_TIMEOUT_MS;
+        // Scale: 45s base + 10s per 1000 extra tokens above 4000, capped at 180s
+        const extraSeconds = Math.ceil((maxTokens - 4000) / 1000) * 10;
+        return Math.min(this.PER_CALL_TIMEOUT_MS + (extraSeconds * 1000), 180_000);
+    }
+
+    /**
+     * Wrap a provider call with a timeout to prevent indefinite hangs.
+     * If the provider doesn't respond within the timeout, rejects with a timeout error.
+     * @param {Promise} promise - The provider call promise
+     * @param {string} providerName - Provider name for error messages
+     * @param {number} [timeoutMs] - Custom timeout in ms (defaults to PER_CALL_TIMEOUT_MS)
+     */
+    _withTimeout(promise, providerName, timeoutMs) {
+        const ms = timeoutMs || this.PER_CALL_TIMEOUT_MS;
         return Promise.race([
             promise,
             new Promise((_, reject) =>
                 setTimeout(
-                    () => reject(new Error(`TIMEOUT: Provider ${providerName} did not respond within ${this.PER_CALL_TIMEOUT_MS / 1000}s`)),
-                    this.PER_CALL_TIMEOUT_MS
+                    () => reject(new Error(`TIMEOUT: Provider ${providerName} did not respond within ${ms / 1000}s`)),
+                    ms
                 )
             ),
         ]);
