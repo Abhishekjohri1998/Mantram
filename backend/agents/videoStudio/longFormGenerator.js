@@ -54,7 +54,7 @@ export function cancelLongFormJob(jobId) {
 
 // ── Credit Estimation ────────────────────────────────────────────────────────
 export function estimateLongFormCost(model, targetDuration, resolution = '1080p', mode = 'fast') {
-    const maxPerSegment = { 'veo-3.1': 8, 'veo-3.1-fast': 8, 'hunyuan': 10 }[model] || 15;
+    const maxPerSegment = { 'veo-3.1': 8, 'veo-3.1-fast': 8, 'veo-3.1-lite': 8, 'hunyuan': 10 }[model] || 15;
     const optimalPerSegment = Math.min(maxPerSegment, 10);
     const segments = Math.ceil(targetDuration / optimalPerSegment);
     const perSegment = estimateCost(model, optimalPerSegment, resolution, mode);

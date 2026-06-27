@@ -354,8 +354,9 @@ async function generateWithGptImage2(
 
     const useEditsEndpoint = refBuffers.length > 0;
 
-    const apiKey = config.ai?.laozhangApiKey || process.env.LAOZHANG_API_KEY || process.env.OPENAI_API_KEY;
-    const baseUrl = config.ai?.laozhangBaseUrl || 'https://api.laozhang.ai/v1';
+    const isAtlas = !!process.env.ATLASCLOUD_API_KEY;
+    const apiKey = isAtlas ? process.env.ATLASCLOUD_API_KEY : (config.ai?.laozhangApiKey || process.env.LAOZHANG_API_KEY || process.env.OPENAI_API_KEY);
+    const baseUrl = isAtlas ? 'https://api.atlascloud.ai/v1' : (config.ai?.laozhangBaseUrl || 'https://api.laozhang.ai/v1');
     const endpoint = useEditsEndpoint ? `${baseUrl}/images/edits` : `${baseUrl}/images/generations`;
 
     console.log(`[SB Poster][GPT-Image-2] ${endpoint} | refs=${refBuffers.length} | size=${size}`);
@@ -580,8 +581,9 @@ export async function generateCharacterReferenceSheet(avatarBuffers = [], avatar
         return null;
     }
 
-    const apiKey = config.ai?.laozhangApiKey || process.env.LAOZHANG_API_KEY || process.env.OPENAI_API_KEY;
-    const baseUrl = config.ai?.laozhangBaseUrl || 'https://api.laozhang.ai/v1';
+    const isAtlas = !!process.env.ATLASCLOUD_API_KEY;
+    const apiKey = isAtlas ? process.env.ATLASCLOUD_API_KEY : (config.ai?.laozhangApiKey || process.env.LAOZHANG_API_KEY || process.env.OPENAI_API_KEY);
+    const baseUrl = isAtlas ? 'https://api.atlascloud.ai/v1' : (config.ai?.laozhangBaseUrl || 'https://api.laozhang.ai/v1');
     const endpoint = `${baseUrl}/images/edits`;
 
     const charList = avatarNames.length > 0
