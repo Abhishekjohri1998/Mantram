@@ -1058,7 +1058,9 @@ export const brainstormStudio = {
                 else if (evt.type === 'session_id') onSessionId?.(evt.sessionId);
                 else if (evt.type === 'done') onDone?.(evt.sessionState, evt.questionOptions || null);
                 else if (evt.type === 'error') onError?.(evt.message);
-            } catch { /* ignore malformed SSE */ }
+            } catch (err) { 
+                console.error('[fidatoChat] JSON parse error for SSE:', err.message, 'Raw string:', raw); 
+            }
         };
 
         // Read timeout: if no data arrives for 30 seconds during streaming, abort
@@ -1072,16 +1074,22 @@ export const brainstormStudio = {
         };
 
         try {
+            console.log('[fidatoChat] Response received. Starting stream read...');
             resetReadTimeout();
             while (true) {
                 const { done, value } = await reader.read();
-                if (done) break;
-                resetReadTimeout(); // Got data — reset the read timeout
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || '';
-                for (const line of lines) {
-                    processLine(line);
+                if (value) {
+                    resetReadTimeout();
+                    buffer += decoder.decode(value, { stream: !done });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+                    for (const line of lines) {
+                        processLine(line);
+                    }
+                }
+                if (done) {
+                    console.log('[fidatoChat] Stream read finished. done = true');
+                    break;
                 }
             }
             clearTimeout(readTimeoutId);
