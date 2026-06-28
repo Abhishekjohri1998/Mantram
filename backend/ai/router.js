@@ -41,8 +41,20 @@ class ModelRouter {
         }
 
         // Register all providers — they self-check if API key exists
-        // ── Gemini: Atlas Cloud primary → Laozhang fallback → Native Gemini ──
-        if (providerConfigs.atlascloud?.apiKey) {
+        // ── Gemini: Native Gemini first (if key exists) → Atlas Cloud fallback → Laozhang fallback ──
+        if (providerConfigs.gemini?.apiKey) {
+            console.log('🔄 Routing Gemini directly via Native Google API');
+            this.providers.gemini = new GeminiProvider({
+                apiKey: providerConfigs.gemini.apiKey,
+                imageApiKey: providerConfigs.gemini.imageApiKey,
+                defaultModel: config.ai.defaultGeminiModel || 'gemini-2.5-flash-preview-05-20',
+                defaultImageModel: config.ai.defaultImageModel || 'gemini-2.5-flash-preview-05-20',
+                // GCP Vertex AI (Billed)
+                gcpProjectId: providerConfigs.gemini?.gcpProjectId,
+                gcpLocation: providerConfigs.gemini?.gcpLocation,
+                googleApplicationCredentials: providerConfigs.gemini?.googleApplicationCredentials,
+            });
+        } else if (providerConfigs.atlascloud?.apiKey) {
             console.log('🔄 Routing Gemini through Atlas Cloud (OpenAI format)');
             const geminiAtlasProvider = new OpenAIProvider({
                 apiKey: providerConfigs.atlascloud.apiKey,
@@ -60,17 +72,6 @@ class ModelRouter {
             geminiLzProvider.name = 'gemini';
             geminiLzProvider.baseUrl = providerConfigs.laozhang.baseUrl;
             this.providers.gemini = geminiLzProvider;
-        } else {
-            this.providers.gemini = new GeminiProvider({
-                apiKey: providerConfigs.gemini?.apiKey,
-                imageApiKey: providerConfigs.gemini?.imageApiKey,
-                defaultModel: config.ai.defaultGeminiModel || 'gemini-2.5-flash-preview-05-20',
-                defaultImageModel: config.ai.defaultImageModel || 'gemini-2.5-flash-preview-05-20',
-                // GCP Vertex AI (Billed)
-                gcpProjectId: providerConfigs.gemini?.gcpProjectId,
-                gcpLocation: providerConfigs.gemini?.gcpLocation,
-                googleApplicationCredentials: providerConfigs.gemini?.googleApplicationCredentials,
-            });
         }
         this.providers.openai = new OpenAIProvider({
             apiKey: providerConfigs.openai?.apiKey,

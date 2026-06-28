@@ -146,24 +146,15 @@ Instructions:
                         strategy.totalPostsGenerated += 1;
                         if (pushStepFn) await pushStepFn(`Reel drafted: ${post.title}`);
                     } else {
-                        // Generate image for post
-                        if (pushStepFn) await pushStepFn(`Generating image for: ${post.title}`);
-                        
-                        const enhancedSys = buildEnhanceSystemPrompt('gemini-3.1-flash-image-preview', 'image', 0, '1:1', brandContext);
-                        const enhancedUsr = buildEnhanceUserPrompt(post.visualPrompt, null, 'image');
-                        const enhancedState = await callAgent(enhancedSys, enhancedUsr, 0.65, 2000);
-                        const finalPrompt = enhancedState?.enhancedPrompt || post.visualPrompt;
-
-                        const router = getRouter();
-                        const result = await router.generateImage({ prompt: finalPrompt, aspectRatio: '1:1' });
-                        const finalImageUrl = await persistToS3(result.imageUrl, 'daily-strategy');
-                        
+                        // Enforce budget priority: For manual review/drafts (autoPublish = false), we do NOT pre-generate
+                        // the image in the background to save API costs. The user can generate the image on-demand
+                        // in the Studio when reviewing/approving the draft, just like video reels.
                         const calendarItem = {
                             date: new Date().toISOString().split('T')[0],
                             contentType: post.format === 'carousel' ? 'carousel' : 'static',
                             platform: post.platform || 'linkedin',
                             targetStudio: 'creative',
-                            status: 'pending', // user wants it in draft state first, 'pending' is valid enum
+                            status: 'pending', // draft state
                             brief: {
                                 angle: post.title,
                                 captionDraft: post.caption,
@@ -172,15 +163,15 @@ Instructions:
                             },
                             generatedAsset: {
                                 falRequestId: null,
-                                imageUrl: finalImageUrl,
-                                provider: result.provider,
-                                status: 'completed',
-                                autoPublish: false // user requested manual review
+                                imageUrl: null, // Generated on-demand by user
+                                provider: 'none',
+                                status: 'pending_user_approval',
+                                autoPublish: false
                             }
                         };
                         strategy.calendar.push(calendarItem);
                         strategy.totalPostsGenerated += 1;
-                        if (pushStepFn) await pushStepFn(`Image generated: ${post.title}`);
+                        if (pushStepFn) await pushStepFn(`Image draft created: ${post.title}`);
                     }
                 } catch (genErr) {
                     console.error(`[DailyStrategyEngine] Asset generation failed for post "${post.title}":`, genErr);
