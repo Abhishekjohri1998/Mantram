@@ -2520,6 +2520,7 @@ ${outputFormat}`;
 
   const actResult = await aiCall(systemPrompt, `Intent: ${intent}\n${brandContext}\n\nBrief:\n${answersText}`, {
     temperature: 0.85, maxTokens: 6000,
+    provider: 'gemini', model: 'gemini-2.5-flash'
   });
   try {
     return parseJSON(actResult) || {};
@@ -2885,6 +2886,13 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
         sessionState: newSessionState,
         questionOptions: questionOptions || null,
       });
+    } else {
+      // ── CATCH-ALL FOR UNHANDLED OR HALLUCINATED ACTIONS ──
+      console.warn(`[fidato-chat] UNHANDLED ACTION: "${action}" — falling back to text response`);
+      const fallbackMsg = fidatoResponse || "Tell me more about what you have in mind!";
+      await streamWords(res, fallbackMsg);
+      await saveFidatoMsg(fallbackMsg);
+      sseEvent(res, { type: 'done', sessionState: newSessionState });
     }
 
     // ── Persist session to DB ─────────────────────────────────────────────
