@@ -12,8 +12,8 @@ import { callAgentText } from '../shared/agentUtils.js';
 // ── Scene Duration Allocation ──────────────────────────────────────────────────
 // Optimal segment lengths per model (stay within native max while keeping coherent shots)
 const OPTIMAL_SEGMENT_DURATION = {
-    'seedance-2.0': 10,
-    'seedance-2.0-fast': 10,
+    'seedance-2.0': 15,
+    'seedance-2.0-fast': 15,
     'kling-3.0': 12,
     'kling-3.0-o': 10,
     'veo-3.1': 8,
