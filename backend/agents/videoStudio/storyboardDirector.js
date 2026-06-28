@@ -256,14 +256,14 @@ SECTION 3 — CUT PLAN (THE STORYBOARD)
 Write the exact shot list for ONE continuous video of ${duration} seconds.
 Cuts are camera angles / shot changes within the video — NOT separate videos.
 ${duration > 60 
-    ? `DENSITY (MANDATORY): Since this is a long-form video of ${duration} seconds, you MUST write exactly ${Math.ceil(duration / 10)} scenes (cuts) in your cuts[] array to fit within the AI output token limit. Each cut MUST have a duration of EXACTLY 10 seconds (e.g. for a 350-second video, you must output exactly 35 cuts, each with a duration of exactly 10). Do not write more or fewer cuts, and do not make cuts longer or shorter than 10 seconds.`
+    ? `DENSITY (MANDATORY): Since this is a long-form video of ${duration} seconds, you MUST write exactly ${Math.ceil(duration / 15)} scenes (cuts) in your cuts[] array to fit within the AI output token limit. Each cut MUST have a duration of EXACTLY 15 seconds (e.g. for a 360-second video, you must output exactly 24 cuts, each with a duration of exactly 15). Do not write more or fewer cuts, and do not make cuts longer or shorter than 15 seconds.`
     : `DENSITY (MANDATORY): Minimum 1 cut per 3 seconds. A ${duration}s video MUST have AT LEAST ${Math.ceil(duration / 3)} cuts. Target ${Math.ceil(duration / 3)} to ${Math.ceil(duration / 2)} cuts. Each cut should be 2–4 seconds for high commercial energy. Never let any single cut exceed 5 seconds unless it is a special slow-motion or reveal moment.`
 }
 
 Each cut must have:
 - id: sequential number starting at 1
 - lens: cinematic lens spec (e.g. "40mm anamorphic", "100mm macro", "85mm prime", "24mm wide-angle", "85mm portrait")
-- duration: exact seconds for this cut (integer, min ${MIN_SHOT_DURATION}s, max ${duration > 60 ? 10 : 5}s for normal cuts, up to ${duration > 60 ? 10 : MAX_SHOT_DURATION}s only for special reveal/slow-motion)
+- duration: exact seconds for this cut (integer, min ${MIN_SHOT_DURATION}s, max ${duration > 60 ? 15 : 5}s for normal cuts, up to ${duration > 60 ? 15 : MAX_SHOT_DURATION}s only for special reveal/slow-motion)
 - move: camera movement (STEADICAM | DOLLY-IN | DOLLY-OUT | RACK-FOCUS | ARC | PULL-OUT | CRANE | HANDHELD | STATIC | WHIP-PAN | PUSH-IN | MATCH-CUT | TILT-UP | TILT-DOWN | ORBIT)
 - shot: shot type (WIDE | MEDIUM | CLOSE-UP | EXTREME-CLOSE-UP | INSERT | MACRO | TWO-SHOT | OVER-SHOULDER | POV | ESTABLISHING | LOW-ANGLE | HIGH-ANGLE | DUTCH-TILT)
 - scene: 1 vivid, active-voice sentence — what is VISUALLY HAPPENING right now: use strong motion verbs (slices / pours / emerges / spins / glows / drifts / explodes / contracts / reveals / bursts). E.g. "The amber liquid pours in slow motion into the crystal glass, creating rippling reflections." Not: "Presenter picks up product."
@@ -283,7 +283,7 @@ Each cut must have:
 RULES FOR CUTS:
 - Durations must SUM exactly to ${duration}s
 ${duration > 60
-    ? `- EXACTLY ${Math.ceil(duration / 10)} cuts are required in the cuts[] array — this is a hard constraint, not a suggestion. Each cut MUST be exactly 10 seconds.`
+    ? `- EXACTLY ${Math.ceil(duration / 15)} cuts are required in the cuts[] array — this is a hard constraint, not a suggestion. Each cut MUST be exactly 15 seconds.`
     : `- MINIMUM ${Math.ceil(duration / 3)} CUTS REQUIRED — this is a hard constraint, not a suggestion.`
 }
 ${narrativeArcGuide}
