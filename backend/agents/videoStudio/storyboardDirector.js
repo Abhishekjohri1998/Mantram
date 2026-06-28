@@ -88,6 +88,45 @@ function buildCharacterReferenceBlock(avatarNames = []) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// CONTENT TYPE AUTO-DETECTION
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Auto-detect content type from brief + video prompt + brand context.
+ * Returns: 'devotional' | 'music_video' | 'documentary' | 'product_ad'
+ */
+function detectContentType(brief = '', videoPrompt = '', brandContext = '') {
+    const combined = `${brief} ${videoPrompt} ${brandContext}`.toLowerCase();
+
+    const devotionalSignals = [
+        'devotional', 'bhajan', 'mantra', 'prayer', 'temple', 'god', 'goddess',
+        'spiritual', 'sacred', 'divine', 'worship', 'pooja', 'puja', 'aarti',
+        'krishna', 'shiva', 'rama', 'durga', 'lakshmi', 'ganesh', 'hanuman',
+        'religious', 'holy', 'faith', 'meditation', 'kirtan', 'guru',
+        'stotra', 'chalisa', 'stuti', 'vandana',
+    ];
+    const musicVideoSignals = [
+        'music video', 'song', 'track', 'album', 'artist', 'singer', 'band',
+        'lyric', 'chorus', 'verse', 'bridge', 'hook', 'beat', 'melody',
+        'single', 'music', 'audio', 'soundtrack',
+    ];
+    const documentarySignals = [
+        'documentary', 'brand story', 'brand film', 'company story', 'journey',
+        'behind the scenes', 'origin story', 'brand documentary', 'mission',
+    ];
+
+    const devotionalScore  = devotionalSignals.filter(w => combined.includes(w)).length;
+    const musicScore       = musicVideoSignals.filter(w => combined.includes(w)).length;
+    const docScore         = documentarySignals.filter(w => combined.includes(w)).length;
+
+    if (devotionalScore >= 2) return 'devotional';
+    if (devotionalScore >= 1 && musicScore >= 1) return 'devotional';
+    if (musicScore >= 2) return 'music_video';
+    if (docScore >= 2) return 'documentary';
+    return 'product_ad';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // SYSTEM PROMPT — Professional 4-Section Storyboard Director
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -103,23 +142,13 @@ function buildStoryboardDirectorPrompt({
     includeBranding = true,
     cuts = [],
     avatarNames = [],
+    contentType = 'product_ad', // 'product_ad' | 'music_video' | 'devotional' | 'documentary'
 }) {
-    // Dynamic cut density scaling to prevent token limit truncation/timeout on long-form videos
-    let targetSecsPerCut = 3;
-    if (duration > 180) {
-        targetSecsPerCut = 8;
-    } else if (duration > 90) {
-        targetSecsPerCut = 6;
-    } else if (duration > 45) {
-        targetSecsPerCut = 4.5;
-    }
-    const minCuts = Math.max(5, Math.ceil(duration / targetSecsPerCut));
-    const maxCuts = Math.max(8, Math.ceil(duration / Math.max(2, targetSecsPerCut - 1)));
-    const cutDurationRange = duration > 60 ? '3–8 seconds' : '2–4 seconds';
-    const singleCutMax = duration > 60 ? 10 : 5;
-
     const logoTagInstruction = (includeBranding && logoUrl)
         ? `\n- <<<image_logo>>> = brand logo — describe it as: "${logoDescription || 'brand logo'}".`
+        : '';
+    const logoPromptInstruction = (includeBranding && logoUrl)
+        ? `\n- Brand logo: Whenever the logo appears in the grid panels or footer, reference it as "the brand logo (<<<image_logo>>>)".`
         : '';
 
     const brandDNASection = includeBranding
@@ -137,6 +166,75 @@ No brand data injected (branding toggle is OFF). Use premium cinematic style thr
     const charRefBlock = buildCharacterReferenceBlock(avatarNames);
     const panelCount = Math.min(Math.max(cuts.length, 5), 8);
 
+    // ── Content-type-aware narrative arc and environment strategy ──────────────
+    const isDevotional  = contentType === 'devotional';
+    const isMusicVideo  = contentType === 'music_video';
+    const isDocumentary = contentType === 'documentary';
+    const isProductAd   = contentType === 'product_ad';
+
+    // Narrative arc per content type
+    const narrativeArcGuide = isDevotional
+        ? `SPIRITUAL NARRATIVE ARC (MANDATORY): Follow this devotional emotional journey across ALL cuts:
+  AWAKENING (first 15%) → DEVOTION (next 20%) → PRAYER & RITUAL (next 25%) → TRANSCENDENCE (next 25%) → DIVINE PEACE / RESOLVE (final 15%)
+  Every cut must advance this arc. Never stay in the same emotional phase for more than 3 consecutive cuts.`
+        : isMusicVideo
+        ? `MUSIC VIDEO NARRATIVE ARC (MANDATORY): Follow the song structure:
+  INTRO / HOOK (first 10%) → VERSE 1 (next 20%) → PRE-CHORUS (5%) → CHORUS (15%) → VERSE 2 (next 15%) → CHORUS REPRISE (10%) → BRIDGE / CLIMAX (15%) → OUTRO (10%)
+  Each cut must carry a phase tag in its scene field: [INTRO] / [VERSE 1] / [CHORUS] / etc.`
+        : isDocumentary
+        ? `DOCUMENTARY NARRATIVE ARC (MANDATORY): Follow a journalistic story structure:
+  ESTABLISH THE WORLD (first 15%) → INTRODUCE THE SUBJECT (next 20%) → CONFLICT / CHALLENGE (next 25%) → TURNING POINT (next 20%) → RESOLUTION / IMPACT (final 20%)
+  Each cut must feel like a chapter in the real story.`
+        : `COMMERCIAL NARRATIVE ARC (MANDATORY): COLD OPEN (intrigue) → BUILD (environment, character) → REVEAL (product hero moment) → DETAIL (macro features) → EMOTION (presenter or lifestyle) → RESOLVE (CTA/brand close)`;
+
+    // Environment strategy per content type
+    const environmentSection = (isDevotional || isMusicVideo) && duration > 60
+        ? `═══════════════════════════════════════════════════════
+SECTION 2 — ENVIRONMENTS / LOCATIONS (MULTIPLE)
+═══════════════════════════════════════════════════════
+This is a long-form ${isDevotional ? 'devotional' : 'music'} video. Define 3–5 DISTINCT environments/locations that the narrative will travel through. Each environment corresponds to a different emotional phase of the story.
+
+Output an "environments" array (not a single environmentFingerprint). Example structure:
+- Environment 1 (AWAKENING phase): description of opening sacred/natural location
+- Environment 2 (DEVOTION phase): description of a devotional space — temple, altar, river ghat
+- Environment 3 (PRAYER/RITUAL phase): close intimate sacred space — prayer hall, lamp-lit room
+- Environment 4 (TRANSCENDENCE phase): open sky, mountaintop, vast sacred landscape
+- Environment 5 (RESOLVE/PEACE phase): serene, quiet, golden-hour closing environment
+
+Each cut in your cuts[] MUST include an "environment" field that references which of these environments it takes place in (by number or name). The camera travels between these locations as the story progresses.`
+        : `═══════════════════════════════════════════════════════
+SECTION 2 — ENVIRONMENT / SET DESIGN
+═══════════════════════════════════════════════════════
+Define ONE environment (set) that all cuts take place in:
+- environmentFingerprint: a single evocative description of the set (e.g. "marble café counter; steam-lit espresso machine; tall street-facing window with soft morning light")
+This environment NEVER changes across cuts. The camera moves through it.`;
+
+    // Cut rules per content type
+    const cutSpecificRules = isDevotional
+        ? `- Each cut MUST show the spiritual narrative progressing — no two consecutive cuts should be emotionally identical
+- Include devotional gestures: folded hands, eyes closed in prayer, lighting diyas, offering flowers, ringing bells, prostrating
+- Feature sacred objects: diyas, incense, marigold garlands, sacred vessels, holy books, idols
+- Include nature as metaphor: flowing river = continuity of faith, rising sun = divine light, lotus = purity
+- Camera movements should feel contemplative and deliberate: slow STEADICAM through a temple, TILT-UP to reveal a deity, DOLLY-OUT from prayer to reveal landscape
+- AVOID: commercial product shots, talking-head close-ups, product labels, brand CTA, presenter "demonstrating" something
+- The character's emotional journey (devotion → surrender → peace) must be visible in their face and posture across cuts`
+        : isMusicVideo
+        ? `- Each cut must visually sync with the PHASE TAG in its scene field ([VERSE 1], [CHORUS], etc.)
+- High energy during chorus: fast WHIP-PAN transitions, DUTCH-TILT, kinetic handheld camera
+- Emotional verse moments: slow DOLLY-IN, RACK-FOCUS from environment to face, gentle STEADICAM
+- Feature the artist performing, plus narrative storytelling cuts intercut with performance
+- AVOID: static talking head close-ups for more than 2 consecutive cuts`
+        : isDocumentary
+        ? `- Cuts should feel observational and authentic — handheld for intimacy, wide for context
+- Mix interview-style framing with B-roll landscape, environment, and detail shots
+- Feature real environments, real objects, real moments — no artificial product hero shots
+- AVOID: product labels, CTA overlays, commercial aesthetic`
+        : `- The product must be visually featured in at least one INSERT/MACRO cut and one LIFESTYLE/IN-USE cut
+- Feature at least one TWO-SHOT or GROUP SHOT with multiple characters interacting
+- INJECT at least one unexpected, visually striking angle (e.g. extreme low-angle looking up at product, Dutch tilt energy shot, kinetic rack-focus from environment to product)
+- Preserve the product's original design, shape, color shades, and branding details faithfully in all scene descriptions and framePrompts. Do NOT simplify, stylize, or modify any physical product attributes or color values.
+- AVOID boring talking head or moving head close-ups. Presenters/models must be shown as a proper moving person explaining while actively doing something in the scene (e.g., typing on a laptop, gesturing dynamically at a screen, pointing, walking through the studio set, demonstrating the product, or interacting with props/environments) to ensure it looks very natural.`;
+
     return `You are an award-winning Ad Film Director and Cinematographer building a professional pre-production storyboard package. Your output is a structured JSON document — NOT a description of a grid image.
 
 The storyboard package has 4 sections, exactly like a real agency pre-production document:
@@ -150,30 +248,22 @@ Define the visual identity that must stay consistent across every frame:
 - materialNotes: the physical materials present in the scene (e.g. "polished marble, walnut wood, brushed brass, ceramic glaze, steam condensation")
 ${logoTagInstruction}
 
-${brandDNASection}
-
-${charRefBlock}
-
-═══════════════════════════════════════════════════════
-SECTION 2 — ENVIRONMENT / SET DESIGN
-═══════════════════════════════════════════════════════
-Define ONE environment (set) that all cuts take place in:
-- environmentFingerprint: a single evocative description of the set (e.g. "marble café counter; steam-lit espresso machine; tall street-facing window with soft morning light")
-This environment NEVER changes across cuts. The camera moves through it.
+${environmentSection}
 
 ═══════════════════════════════════════════════════════
 SECTION 3 — CUT PLAN (THE STORYBOARD)
 ═══════════════════════════════════════════════════════
 Write the exact shot list for ONE continuous video of ${duration} seconds.
 Cuts are camera angles / shot changes within the video — NOT separate videos.
-DENSITY (MANDATORY): Minimum 1 cut per ${targetSecsPerCut} seconds. A ${duration}s video MUST have AT LEAST ${minCuts} cuts.
-Target ${minCuts} to ${maxCuts} cuts. Each cut should be ${cutDurationRange} for optimal pacing and flow.
-More cuts = more visual energy = better engagement. Never let any single cut exceed ${singleCutMax} seconds unless it is a special slow-motion or reveal moment.
+${duration > 60 
+    ? `DENSITY (MANDATORY): Since this is a long-form video of ${duration} seconds, you MUST write exactly ${Math.ceil(duration / 10)} scenes (cuts) in your cuts[] array to fit within the AI output token limit. Each cut MUST have a duration of EXACTLY 10 seconds (e.g. for a 350-second video, you must output exactly 35 cuts, each with a duration of exactly 10). Do not write more or fewer cuts, and do not make cuts longer or shorter than 10 seconds.`
+    : `DENSITY (MANDATORY): Minimum 1 cut per 3 seconds. A ${duration}s video MUST have AT LEAST ${Math.ceil(duration / 3)} cuts. Target ${Math.ceil(duration / 3)} to ${Math.ceil(duration / 2)} cuts. Each cut should be 2–4 seconds for high commercial energy. Never let any single cut exceed 5 seconds unless it is a special slow-motion or reveal moment.`
+}
 
 Each cut must have:
 - id: sequential number starting at 1
 - lens: cinematic lens spec (e.g. "40mm anamorphic", "100mm macro", "85mm prime", "24mm wide-angle", "85mm portrait")
-- duration: exact seconds for this cut (integer, min ${MIN_SHOT_DURATION}s, max ${Math.min(singleCutMax, MAX_SHOT_DURATION)}s for normal cuts, up to ${MAX_SHOT_DURATION}s only for special reveal/slow-motion)
+- duration: exact seconds for this cut (integer, min ${MIN_SHOT_DURATION}s, max ${duration > 60 ? 10 : 5}s for normal cuts, up to ${duration > 60 ? 10 : MAX_SHOT_DURATION}s only for special reveal/slow-motion)
 - move: camera movement (STEADICAM | DOLLY-IN | DOLLY-OUT | RACK-FOCUS | ARC | PULL-OUT | CRANE | HANDHELD | STATIC | WHIP-PAN | PUSH-IN | MATCH-CUT | TILT-UP | TILT-DOWN | ORBIT)
 - shot: shot type (WIDE | MEDIUM | CLOSE-UP | EXTREME-CLOSE-UP | INSERT | MACRO | TWO-SHOT | OVER-SHOULDER | POV | ESTABLISHING | LOW-ANGLE | HIGH-ANGLE | DUTCH-TILT)
 - scene: 1 vivid, active-voice sentence — what is VISUALLY HAPPENING right now: use strong motion verbs (slices / pours / emerges / spins / glows / drifts / explodes / contracts / reveals / bursts). E.g. "The amber liquid pours in slow motion into the crystal glass, creating rippling reflections." Not: "Presenter picks up product."
@@ -192,18 +282,17 @@ Each cut must have:
 
 RULES FOR CUTS:
 - Durations must SUM exactly to ${duration}s
-- MINIMUM ${minCuts} CUTS REQUIRED — this is a hard constraint, not a suggestion
-- Follow a natural cinematic arc: COLD OPEN (intrigue) → BUILD (environment, character) → REVEAL (product hero moment) → DETAIL (macro features) → EMOTION (presenter or lifestyle) → RESOLVE (CTA/brand close)
+${duration > 60
+    ? `- EXACTLY ${Math.ceil(duration / 10)} cuts are required in the cuts[] array — this is a hard constraint, not a suggestion. Each cut MUST be exactly 10 seconds.`
+    : `- MINIMUM ${Math.ceil(duration / 3)} CUTS REQUIRED — this is a hard constraint, not a suggestion.`
+}
+${narrativeArcGuide}
 - USE ALL THESE SHOT TYPES across your cuts — rotate them for visual variety:
-  ECU/MACRO (product detail) → WS (environment) → MCU (character) → CU (emotion/face) → INSERT (product + hands) → OTS (interaction) → WS/CTA (close)
+  WIDE (environment) → CLOSE-UP (emotion/face) → MEDIUM (character action) → INSERT/MACRO (detail) → ESTABLISHING/TWO-SHOT (context)
   NO two consecutive cuts may use the same shot type.
-- Use professional lens + shot combinations (wide angle for establishing, macro/insert for product details, close-up for emotion, whip-pan for energy transitions)
-- The product must be visually featured in at least one INSERT/MACRO cut and one LIFESTYLE/IN-USE cut
+- Use professional lens + shot combinations (wide angle for establishing, macro/insert for detail, close-up for emotion, whip-pan for energy transitions)
 - If multiple characters are provided, DISTRIBUTE them across cuts — do not show all characters in every cut. Build ensemble storytelling: different characters carry different narrative beats.
-- Feature at least one TWO-SHOT or GROUP SHOT with multiple characters interacting
-- INJECT at least one unexpected, visually striking angle (e.g. extreme low-angle looking up at product, Dutch tilt energy shot, kinetic rack-focus from environment to product)
-- Preserve the product's original design, shape, color shades, and branding details faithfully in all scene descriptions and framePrompts. Do NOT simplify, stylize, or modify any physical product attributes or color values. The brand colors/color palette must ONLY be used for the environment, background, or UI elements, and must NEVER be applied to recolor or color-shift the product itself.
-- AVOID boring talking head or moving head close-ups. Presenters/models must be shown as a proper moving person explaining while actively doing something in the scene (e.g., typing on a laptop, gesturing dynamically at a screen, pointing, walking through the studio set, demonstrating the product, or interacting with props/environments) to ensure it looks very natural.
+${cutSpecificRules}
 
 ═══════════════════════════════════════════════════════
 SECTION 4 — LIGHTING / MOOD / STYLE
@@ -407,71 +496,10 @@ function parseStoryboardOutput(rawText, targetDuration) {
     try {
         plan = JSON.parse(cleaned);
     } catch (e) {
-        // ── JSON Repair Pipeline ─────────────────────────────────
-        console.warn(`[Storyboard Parse] Initial parse failed: ${e.message}. Attempting repair...`);
-        
-        // Extract the outermost JSON object
-        let jsonStr = cleaned;
         const jsonMatch = cleaned.match(/\{[\s\S]+\}/);
-        if (jsonMatch) jsonStr = jsonMatch[0];
-
-        // 1. Remove trailing commas before } or ]
-        jsonStr = jsonStr.replace(/,\s*([\]}])/g, '$1');
-        
-        // 2. Remove only truly invalid control characters (NOT newlines/tabs — those are valid JSON whitespace)
-        jsonStr = jsonStr.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
-
-        // 3. Fix truncated JSON — close unclosed brackets/braces
-        let openBraces = 0, openBrackets = 0;
-        let inString = false, escaped = false;
-        for (const ch of jsonStr) {
-            if (escaped) { escaped = false; continue; }
-            if (ch === '\\') { escaped = true; continue; }
-            if (ch === '"') { inString = !inString; continue; }
-            if (inString) continue;
-            if (ch === '{') openBraces++;
-            if (ch === '}') openBraces--;
-            if (ch === '[') openBrackets++;
-            if (ch === ']') openBrackets--;
-        }
-
-        // 4. If truncated mid-string, find the last complete key-value pair and close from there
-        if (inString) {
-            const lastCompleteQuote = jsonStr.lastIndexOf('",');
-            const lastCompleteQuote2 = jsonStr.lastIndexOf('"}');
-            const lastCompleteQuote3 = jsonStr.lastIndexOf('"]');
-            const cutPoint = Math.max(lastCompleteQuote, lastCompleteQuote2, lastCompleteQuote3);
-            if (cutPoint > 0) {
-                jsonStr = jsonStr.substring(0, cutPoint + 1);
-                // Recount braces after truncation
-                openBraces = 0; openBrackets = 0;
-                inString = false; escaped = false;
-                for (const ch of jsonStr) {
-                    if (escaped) { escaped = false; continue; }
-                    if (ch === '\\') { escaped = true; continue; }
-                    if (ch === '"') { inString = !inString; continue; }
-                    if (inString) continue;
-                    if (ch === '{') openBraces++;
-                    if (ch === '}') openBraces--;
-                    if (ch === '[') openBrackets++;
-                    if (ch === ']') openBrackets--;
-                }
-            }
-        }
-
-        // Remove trailing comma before closing
-        jsonStr = jsonStr.replace(/,\s*$/, '');
-        // Close any unclosed brackets/braces (order matters: ] before })
-        for (let i = 0; i < openBrackets; i++) jsonStr += ']';
-        for (let i = 0; i < openBraces; i++) jsonStr += '}';
-        // Clean trailing commas again after closing
-        jsonStr = jsonStr.replace(/,\s*([\]}])/g, '$1');
-
-        try {
-            plan = JSON.parse(jsonStr);
-            console.log(`[Storyboard Parse] ✅ JSON repair succeeded`);
-        } catch (e2) {
-            console.error(`[Storyboard Parse] ❌ Repair failed: ${e2.message}. Raw (first 500): ${jsonStr.substring(0, 500)}`);
+        if (jsonMatch) {
+            plan = JSON.parse(jsonMatch[0]);
+        } else {
             throw new Error(`Failed to parse storyboard JSON: ${e.message}`);
         }
     }
@@ -505,54 +533,13 @@ function parseStoryboardOutput(rawText, targetDuration) {
         const cutsTotal = plan.cuts.reduce((sum, c) => sum + c.duration, 0);
         plan.totalDuration = cutsTotal;
 
-        // If there's a duration mismatch, distribute it safely without creating extremely long segments
+        // If there's a duration mismatch, scale the last cut to fix it
         if (cutsTotal !== targetDuration && plan.cuts.length > 0) {
-            let diff = targetDuration - cutsTotal;
-            if (diff > 0) {
-                // 1. First pass: distribute extra duration across existing cuts up to 8s max per cut
-                for (let i = plan.cuts.length - 1; i >= 0 && diff > 0; i--) {
-                    const currentDur = plan.cuts[i].duration;
-                    const canAdd = Math.min(8 - currentDur, diff);
-                    if (canAdd > 0) {
-                        plan.cuts[i].duration += canAdd;
-                        diff -= canAdd;
-                    }
-                }
-                // 2. Second pass: if still remaining duration, append new cuts using the style of the last cut
-                let lastCut = plan.cuts[plan.cuts.length - 1];
-                let nextId = plan.cuts.length + 1;
-                while (diff > 0) {
-                    const newDur = Math.min(4, diff);
-                    plan.cuts.push({
-                        ...lastCut,
-                        id: nextId++,
-                        duration: newDur,
-                        scene: `${lastCut.scene} (continuation)`,
-                        framePrompt: `${lastCut.framePrompt} (maintaining exact visual continuity, shot continuation)`,
-                    });
-                    diff -= newDur;
-                }
-            } else if (diff < 0) {
-                // Shrink cuts to fit target duration (min 2 seconds per cut)
-                let shrinkRemaining = Math.abs(diff);
-                for (let i = plan.cuts.length - 1; i >= 0 && shrinkRemaining > 0; i--) {
-                    const currentDur = plan.cuts[i].duration;
-                    const canSubtract = Math.min(currentDur - MIN_SHOT_DURATION, shrinkRemaining);
-                    if (canSubtract > 0) {
-                        plan.cuts[i].duration -= canSubtract;
-                        shrinkRemaining -= canSubtract;
-                    }
-                }
-                // If still too long, remove cuts from the end
-                while (shrinkRemaining > 0 && plan.cuts.length > 1) {
-                    const removed = plan.cuts.pop();
-                    shrinkRemaining -= removed.duration;
-                }
-                // Force the last remaining cut to fit exactly
-                if (shrinkRemaining !== 0) {
-                    plan.cuts[plan.cuts.length - 1].duration = Math.max(MIN_SHOT_DURATION, plan.cuts[plan.cuts.length - 1].duration - shrinkRemaining);
-                }
-            }
+            const diff = targetDuration - cutsTotal;
+            plan.cuts[plan.cuts.length - 1].duration = Math.max(
+                MIN_SHOT_DURATION,
+                plan.cuts[plan.cuts.length - 1].duration + diff
+            );
             plan.totalDuration = plan.cuts.reduce((sum, c) => sum + c.duration, 0);
         }
     } else {
@@ -631,6 +618,10 @@ export async function runStoryboardDirector({
     const { brand, brandContext } = await loadBrandContext(brandId);
     console.log(`[Storyboard Director] Brand context: ${brandContext?.length || 0} chars (injecting=${includeBranding})`);
 
+    // Auto-detect content type from brief + brand context
+    const contentType = detectContentType(brief || '', productFeatures || '', brandContext || '');
+    console.log(`[Storyboard Director] Content type detected: ${contentType}`);
+
     const logoUrl = brand?.dna?.logo?.url || null;
     const logoDescription = brand?.dna?.logo?.metadata?.visionDescription || '';
     const brandName = brand?.name || 'the brand';
@@ -662,6 +653,7 @@ export async function runStoryboardDirector({
         includeBranding,
         cuts: heuristicCuts,
         avatarNames,
+        contentType,
     });
 
     const userPrompt = buildUserPrompt({
@@ -696,15 +688,8 @@ export async function runStoryboardDirector({
 
     // 5. Call Agent (multimodal)
     // Scale token budget with duration — each cut needs ~180 tokens (id+lens+duration+move+shot+scene+framePrompt+voiceover).
-    let targetSecsPerCut = 3;
-    if (duration > 180) {
-        targetSecsPerCut = 8;
-    } else if (duration > 90) {
-        targetSecsPerCut = 6;
-    } else if (duration > 45) {
-        targetSecsPerCut = 4.5;
-    }
-    const expectedCuts = Math.max(5, Math.ceil(duration / targetSecsPerCut));
+    // A 300s video targeting 1 cut/3s = 100 cuts = ~18,000 tokens. Give 20% headroom.
+    const expectedCuts = Math.ceil(duration / 3); // min density = 1 cut/3s
     const tokensPerCut = 180;
     const scaledTokens = Math.min(32000, Math.max(8000, Math.ceil(expectedCuts * tokensPerCut * 1.2)));
     console.log(`[Storyboard Director] Token budget: ${scaledTokens} (${expectedCuts} cuts × ${tokensPerCut} tokens × 1.2 headroom)`);
@@ -715,7 +700,7 @@ export async function runStoryboardDirector({
             systemPrompt,
             userPrompt,
             imageUrls,
-            { temperature: 0.7, maxTokens: scaledTokens, returnRaw: true, provider: directorModel, timeoutMs: 600000 }
+            { temperature: 0.7, maxTokens: scaledTokens, returnRaw: true, provider: directorModel }
         );
         if (!rawOutput || typeof rawOutput !== 'string' || rawOutput.error) {
             throw new Error(rawOutput?.error || 'Empty or invalid response from LLM');
@@ -731,7 +716,7 @@ export async function runStoryboardDirector({
     } catch (parseErr) {
         console.error(`[Storyboard Director] Parse failed, retrying...`);
         const retrySystem = systemPrompt + '\n\nCRITICAL: Your previous output could not be parsed as JSON. Return ONLY raw JSON, zero other text.';
-        rawOutput = await callMultimodalAgent(retrySystem, userPrompt, imageUrls, { temperature: 0.4, maxTokens: scaledTokens, returnRaw: true, provider: directorModel, timeoutMs: 600000 });
+        rawOutput = await callMultimodalAgent(retrySystem, userPrompt, imageUrls, { temperature: 0.4, maxTokens: 8000, returnRaw: true, provider: directorModel });
         if (!rawOutput || typeof rawOutput !== 'string' || rawOutput.error) {
             throw new Error(`Storyboard Director (${directorModel}) retry failed: ${rawOutput?.error || 'Empty or invalid response'}`);
         }
