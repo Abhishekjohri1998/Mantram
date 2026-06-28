@@ -15,11 +15,11 @@ export class AnthropicProvider extends BaseProvider {
     _mapModelForProvider(modelId) {
         // Map internal aliases to native Anthropic model IDs
         const claudeMap = {
-            'claude-sonnet-4-6':            'claude-3-7-sonnet-20250219',
-            'claude-sonnet-4-20250514':     'claude-3-7-sonnet-20250219',
+            'claude-sonnet-4-6':            'claude-3-5-sonnet-20241022',
+            'claude-sonnet-4-20250514':     'claude-3-5-sonnet-20241022',
             'claude-haiku-4-20250514':      'claude-3-5-haiku-20241022',
             'claude-haiku-4.5-20251001':    'claude-3-5-haiku-20241022',
-            'claude-sonnet-4.5-20250929':   'claude-3-7-sonnet-20250219',
+            'claude-sonnet-4.5-20250929':   'claude-3-5-sonnet-20241022',
             'claude-opus-4-20250514':       'claude-3-opus-20240229',
             'claude-opus-4.1-20250805':     'claude-3-opus-20240229',
             'claude-3-opus-20240229':       'claude-3-opus-20240229',
@@ -27,7 +27,7 @@ export class AnthropicProvider extends BaseProvider {
         };
         // fallback to standard known latest sonnet if it starts with claude-sonnet
         if (!claudeMap[modelId] && modelId.startsWith('claude-sonnet')) {
-            return 'claude-3-7-sonnet-20250219';
+            return 'claude-3-5-sonnet-20241022';
         }
         return claudeMap[modelId] || modelId;
     }
