@@ -324,62 +324,73 @@ function generateFallbackScenes({ sceneCount, durations, arcScenes, language, pr
  * When structuredPlan is missing, fall back to LLM decomposition.
  */
 /**
- * Procedurally expand segment cuts if there are fewer than 5 cuts.
- * Cycles through camera angles, moves, and lens profiles to maintain commercial pacing.
+ * Procedurally expand segment cuts to at least 5 per segment.
+ * Each of the 5 sub-cuts gets a GENUINELY DISTINCT framePrompt built for its shot type —
+ * not just the same base text with a modifier appended (which Seedance collapses into the same visual).
  */
 function ensureMinCutsPerSegment(cuts, duration) {
     if (cuts.length >= 5) return cuts;
 
     const targetCount = 5;
-    const subDuration = Math.round((duration / targetCount) * 100) / 100; // clean float precision
+    const subDuration = Math.round((duration / targetCount) * 10) / 10;
 
-    const SHOT_ROTATION = ['WIDE', 'CLOSE-UP', 'MEDIUM', 'INSERT', 'ESTABLISHING', 'TWO-SHOT', 'MACRO'];
-    const MOVE_ROTATION = ['STEADICAM', 'DOLLY-IN', 'STATIC', 'PUSH-IN', 'ARC', 'RACK-FOCUS', 'ORBIT'];
-    const LENS_ROTATION = ['24mm wide-angle', '85mm portrait', '50mm prime', '100mm macro', '35mm anamorphic'];
+    // Find the "dominant" cut — the one that covers the most of this segment's timeline
+    const dominant = cuts.reduce((best, c) => (c.duration > best.duration ? c : best), cuts[0]);
+    const baseScene       = dominant.scene || 'Cinematic visual scene';
+    const baseEnvironment = dominant.environment || '';
+    const charRef         = '@image2'; // character reference tag
 
-    const expandedCuts = [];
-    let currentCutIdx = 0;
+    // 5 distinct shot archetypes — each gets a unique visual construction
+    const shotArchetypes = [
+        {
+            shot: 'WIDE',
+            move: 'STEADICAM',
+            lens: '24mm wide-angle',
+            buildPrompt: (scene, env) =>
+                `Wide establishing shot, 24mm anamorphic lens, full depth of field. ${env ? `Environment: ${env}. ` : ''}${scene}. Camera glides slowly through the scene, revealing scale and atmosphere. Warm cinematic lighting, foreground elements frame the shot. ${charRef} visible in the middle distance.`,
+        },
+        {
+            shot: 'CLOSE-UP',
+            move: 'DOLLY-IN',
+            lens: '85mm portrait',
+            buildPrompt: (scene, env) =>
+                `85mm portrait lens, shallow depth of field, creamy bokeh background. Close-up on ${charRef}'s face — eyes, expression, emotion. ${scene}. Warm key light on face, subtle rim light separating subject from background. Slow dolly-in to heighten emotional intimacy.`,
+        },
+        {
+            shot: 'MEDIUM',
+            move: 'STATIC',
+            lens: '50mm prime',
+            buildPrompt: (scene, env) =>
+                `50mm prime, medium shot framing ${charRef} from waist up. ${scene}. ${env ? `Set: ${env}. ` : ''}Character actively engaged — hands visible and moving, posture purposeful. Soft fill light from camera-left. Natural background slightly defocused.`,
+        },
+        {
+            shot: 'MACRO',
+            move: 'PUSH-IN',
+            lens: '100mm macro',
+            buildPrompt: (scene, env) =>
+                `100mm macro lens, extreme close-up detail shot. Razor-sharp foreground detail — texture, surface, gesture, sacred object, or product label. ${scene}. Bokeh background with soft ambient light. Gentle push-in reveals intricate detail. No character faces — pure visual texture and tactile detail.`,
+        },
+        {
+            shot: 'ESTABLISHING',
+            move: 'ARC',
+            lens: '35mm anamorphic',
+            buildPrompt: (scene, env) =>
+                `35mm anamorphic, slight arc camera movement revealing the wider scene context. ${env ? `Location: ${env}. ` : ''}${scene}. ${charRef} integrated into the environment. Cinematic wide-angle barrel distortion, cool rim light, natural ambient fill. Establishes relationship between character and surroundings.`,
+        },
+    ];
 
-    for (let i = 0; i < targetCount; i++) {
-        const timeOffset = i * subDuration;
-        let originalCut = cuts[currentCutIdx] || cuts[cuts.length - 1];
-
-        let tempSum = 0;
-        for (let j = 0; j < cuts.length; j++) {
-            tempSum += cuts[j].duration;
-            if (timeOffset < tempSum) {
-                originalCut = cuts[j];
-                currentCutIdx = j;
-                break;
-            }
-        }
-
-        const shotType = SHOT_ROTATION[i % SHOT_ROTATION.length];
-        const cameraMove = MOVE_ROTATION[i % MOVE_ROTATION.length];
-        const lensSpec = LENS_ROTATION[i % LENS_ROTATION.length];
-
-        let visualModifier = '';
-        if (shotType === 'INSERT' || shotType === 'MACRO') {
-            visualModifier = ' Focus closely on the product design and labels.';
-        } else if (shotType === 'CLOSE-UP') {
-            visualModifier = " Focus on the presenter's face and expression.";
-        } else if (shotType === 'WIDE' || shotType === 'ESTABLISHING') {
-            visualModifier = ' Show the surrounding cafe/studio set and background depth.';
-        }
-
-        expandedCuts.push({
-            ...originalCut,
-            id: `${originalCut.id || 1}_sub${i + 1}`,
-            duration: subDuration,
-            shot: shotType,
-            move: cameraMove,
-            lens: lensSpec,
-            framePrompt: originalCut.framePrompt ? `${originalCut.framePrompt}${visualModifier}` : originalCut.scene,
-            scene: originalCut.scene || `Scene shot ${i + 1}`,
-        });
-    }
-
-    return expandedCuts;
+    return shotArchetypes.map((archetype, i) => ({
+        ...dominant,
+        id: `${dominant.id || 1}_sub${i + 1}`,
+        duration: subDuration,
+        shot: archetype.shot,
+        move: archetype.move,
+        lens: archetype.lens,
+        framePrompt: archetype.buildPrompt(baseScene, baseEnvironment),
+        scene: dominant.scene || `Scene shot ${i + 1}`,
+        voiceover: i === 0 ? (dominant.voiceover || '') : '', // only first sub-cut carries voiceover
+        dialogue:  i === 0 ? (dominant.dialogue || '') : '',
+    }));
 }
 
 export async function planStoryboardScenes({

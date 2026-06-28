@@ -652,6 +652,9 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
         if (validVideos.length === 0) {
             throw new Error('No video segments were generated successfully.');
         }
+        if (validVideos.length < actualSegCount * 0.5) {
+            console.warn(`[SB LongForm ${jobId}] ⚠️ Only ${validVideos.length}/${actualSegCount} segments succeeded — final video will be shorter than requested.`);
+        }
 
         if (job.cancelled) throw new Error('Cancelled by user');
 
@@ -680,30 +683,48 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
         const stitchedPath = await _stitchWithCrossfade(tmpDir, segmentPaths, params.format, validDurations, jobId);
         _setProgress(jobId, 'STITCHING', 'Stitch complete', 50);
 
+        // Validate stitchedPath before proceeding — FFmpeg can silently fail and produce an empty file
+        if (!stitchedPath || !fs.existsSync(stitchedPath) || fs.statSync(stitchedPath).size === 0) {
+            throw new Error('FFmpeg stitching produced an empty or missing output file.');
+        }
+
         if (job.cancelled) throw new Error('Cancelled by user');
 
+        // Audio mux — always fall back cleanly to stitchedPath if anything fails
         let finalPath = stitchedPath;
         if (params.refAudio) {
-            _setProgress(jobId, 'STITCHING', 'Mixing brief audio ref...', 60);
+            _setProgress(jobId, 'STITCHING', 'Mixing audio track...', 60);
             try {
-                console.log(`[SB LongForm ${jobId}] 🎧 Mixing brief audio ref: ${params.refAudio}`);
+                console.log(`[SB LongForm ${jobId}] 🎧 Mixing audio track: ${params.refAudio}`);
                 const refAudioLocalPath = path.join(tmpDir, 'brief-audio-ref.mp3');
                 const signedRefAudio = await getSignedUrlIfNeeded(params.refAudio);
                 const audioResp = await fetch(signedRefAudio);
-                if (!audioResp.ok) throw new Error(`HTTP ${audioResp.status} downloading brief audio`);
-                fs.writeFileSync(refAudioLocalPath, Buffer.from(await audioResp.arrayBuffer()));
+                if (!audioResp.ok) throw new Error(`HTTP ${audioResp.status} downloading audio track`);
+                const audioBuffer = Buffer.from(await audioResp.arrayBuffer());
+                if (audioBuffer.length === 0) throw new Error('Downloaded audio track is empty');
+                fs.writeFileSync(refAudioLocalPath, audioBuffer);
 
                 const { mixAudioAndMux } = await import('../../utils/ffmpegUtils.js');
-                finalPath = await mixAudioAndMux(stitchedPath, refAudioLocalPath, null, tmpDir);
-                console.log(`[SB LongForm ${jobId}] 🎧 Audio brief successfully mixed: ${finalPath}`);
+                const mixedPath = await mixAudioAndMux(stitchedPath, refAudioLocalPath, null, tmpDir);
+
+                // Only accept the mixed result if it exists and has content
+                if (mixedPath && fs.existsSync(mixedPath) && fs.statSync(mixedPath).size > 0) {
+                    finalPath = mixedPath;
+                    console.log(`[SB LongForm ${jobId}] 🎧 Audio track successfully mixed: ${finalPath}`);
+                } else {
+                    throw new Error('Audio mux produced empty output');
+                }
             } catch (mixErr) {
-                console.error(`[SB LongForm ${jobId}] ⚠️ Failed to mix brief audio: ${mixErr.message}`);
-                finalPath = stitchedPath;
+                console.error(`[SB LongForm ${jobId}] ⚠️ Audio mix failed (${mixErr.message}) — using silent stitched video as final output`);
+                finalPath = stitchedPath; // explicit reassignment — always safe
             }
         }
 
         _setProgress(jobId, 'STITCHING', 'Uploading to S3...', 75);
 
+        if (!fs.existsSync(finalPath) || fs.statSync(finalPath).size === 0) {
+            throw new Error(`Final video file is missing or empty: ${finalPath}`);
+        }
         const finalBuffer = fs.readFileSync(finalPath);
         const s3Key = `storyboard/longform/${params.projectId || jobId}/final-${Date.now()}.mp4`;
         const videoUrl = await uploadToS3(finalBuffer, s3Key, 'video/mp4');

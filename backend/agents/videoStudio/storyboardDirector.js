@@ -88,6 +88,45 @@ function buildCharacterReferenceBlock(avatarNames = []) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// CONTENT TYPE AUTO-DETECTION
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Auto-detect content type from brief + video prompt + brand context.
+ * Returns: 'devotional' | 'music_video' | 'documentary' | 'product_ad'
+ */
+function detectContentType(brief = '', videoPrompt = '', brandContext = '') {
+    const combined = `${brief} ${videoPrompt} ${brandContext}`.toLowerCase();
+
+    const devotionalSignals = [
+        'devotional', 'bhajan', 'mantra', 'prayer', 'temple', 'god', 'goddess',
+        'spiritual', 'sacred', 'divine', 'worship', 'pooja', 'puja', 'aarti',
+        'krishna', 'shiva', 'rama', 'durga', 'lakshmi', 'ganesh', 'hanuman',
+        'religious', 'holy', 'faith', 'meditation', 'kirtan', 'guru',
+        'stotra', 'chalisa', 'stuti', 'vandana',
+    ];
+    const musicVideoSignals = [
+        'music video', 'song', 'track', 'album', 'artist', 'singer', 'band',
+        'lyric', 'chorus', 'verse', 'bridge', 'hook', 'beat', 'melody',
+        'single', 'music', 'audio', 'soundtrack',
+    ];
+    const documentarySignals = [
+        'documentary', 'brand story', 'brand film', 'company story', 'journey',
+        'behind the scenes', 'origin story', 'brand documentary', 'mission',
+    ];
+
+    const devotionalScore  = devotionalSignals.filter(w => combined.includes(w)).length;
+    const musicScore       = musicVideoSignals.filter(w => combined.includes(w)).length;
+    const docScore         = documentarySignals.filter(w => combined.includes(w)).length;
+
+    if (devotionalScore >= 2) return 'devotional';
+    if (devotionalScore >= 1 && musicScore >= 1) return 'devotional';
+    if (musicScore >= 2) return 'music_video';
+    if (docScore >= 2) return 'documentary';
+    return 'product_ad';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // SYSTEM PROMPT — Professional 4-Section Storyboard Director
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -103,6 +142,7 @@ function buildStoryboardDirectorPrompt({
     includeBranding = true,
     cuts = [],
     avatarNames = [],
+    contentType = 'product_ad', // 'product_ad' | 'music_video' | 'devotional' | 'documentary'
 }) {
     const logoTagInstruction = (includeBranding && logoUrl)
         ? `\n- <<<image_logo>>> = brand logo — describe it as: "${logoDescription || 'brand logo'}".`
@@ -126,6 +166,75 @@ No brand data injected (branding toggle is OFF). Use premium cinematic style thr
     const charRefBlock = buildCharacterReferenceBlock(avatarNames);
     const panelCount = Math.min(Math.max(cuts.length, 5), 8);
 
+    // ── Content-type-aware narrative arc and environment strategy ──────────────
+    const isDevotional  = contentType === 'devotional';
+    const isMusicVideo  = contentType === 'music_video';
+    const isDocumentary = contentType === 'documentary';
+    const isProductAd   = contentType === 'product_ad';
+
+    // Narrative arc per content type
+    const narrativeArcGuide = isDevotional
+        ? `SPIRITUAL NARRATIVE ARC (MANDATORY): Follow this devotional emotional journey across ALL cuts:
+  AWAKENING (first 15%) → DEVOTION (next 20%) → PRAYER & RITUAL (next 25%) → TRANSCENDENCE (next 25%) → DIVINE PEACE / RESOLVE (final 15%)
+  Every cut must advance this arc. Never stay in the same emotional phase for more than 3 consecutive cuts.`
+        : isMusicVideo
+        ? `MUSIC VIDEO NARRATIVE ARC (MANDATORY): Follow the song structure:
+  INTRO / HOOK (first 10%) → VERSE 1 (next 20%) → PRE-CHORUS (5%) → CHORUS (15%) → VERSE 2 (next 15%) → CHORUS REPRISE (10%) → BRIDGE / CLIMAX (15%) → OUTRO (10%)
+  Each cut must carry a phase tag in its scene field: [INTRO] / [VERSE 1] / [CHORUS] / etc.`
+        : isDocumentary
+        ? `DOCUMENTARY NARRATIVE ARC (MANDATORY): Follow a journalistic story structure:
+  ESTABLISH THE WORLD (first 15%) → INTRODUCE THE SUBJECT (next 20%) → CONFLICT / CHALLENGE (next 25%) → TURNING POINT (next 20%) → RESOLUTION / IMPACT (final 20%)
+  Each cut must feel like a chapter in the real story.`
+        : `COMMERCIAL NARRATIVE ARC (MANDATORY): COLD OPEN (intrigue) → BUILD (environment, character) → REVEAL (product hero moment) → DETAIL (macro features) → EMOTION (presenter or lifestyle) → RESOLVE (CTA/brand close)`;
+
+    // Environment strategy per content type
+    const environmentSection = (isDevotional || isMusicVideo) && duration > 60
+        ? `═══════════════════════════════════════════════════════
+SECTION 2 — ENVIRONMENTS / LOCATIONS (MULTIPLE)
+═══════════════════════════════════════════════════════
+This is a long-form ${isDevotional ? 'devotional' : 'music'} video. Define 3–5 DISTINCT environments/locations that the narrative will travel through. Each environment corresponds to a different emotional phase of the story.
+
+Output an "environments" array (not a single environmentFingerprint). Example structure:
+- Environment 1 (AWAKENING phase): description of opening sacred/natural location
+- Environment 2 (DEVOTION phase): description of a devotional space — temple, altar, river ghat
+- Environment 3 (PRAYER/RITUAL phase): close intimate sacred space — prayer hall, lamp-lit room
+- Environment 4 (TRANSCENDENCE phase): open sky, mountaintop, vast sacred landscape
+- Environment 5 (RESOLVE/PEACE phase): serene, quiet, golden-hour closing environment
+
+Each cut in your cuts[] MUST include an "environment" field that references which of these environments it takes place in (by number or name). The camera travels between these locations as the story progresses.`
+        : `═══════════════════════════════════════════════════════
+SECTION 2 — ENVIRONMENT / SET DESIGN
+═══════════════════════════════════════════════════════
+Define ONE environment (set) that all cuts take place in:
+- environmentFingerprint: a single evocative description of the set (e.g. "marble café counter; steam-lit espresso machine; tall street-facing window with soft morning light")
+This environment NEVER changes across cuts. The camera moves through it.`;
+
+    // Cut rules per content type
+    const cutSpecificRules = isDevotional
+        ? `- Each cut MUST show the spiritual narrative progressing — no two consecutive cuts should be emotionally identical
+- Include devotional gestures: folded hands, eyes closed in prayer, lighting diyas, offering flowers, ringing bells, prostrating
+- Feature sacred objects: diyas, incense, marigold garlands, sacred vessels, holy books, idols
+- Include nature as metaphor: flowing river = continuity of faith, rising sun = divine light, lotus = purity
+- Camera movements should feel contemplative and deliberate: slow STEADICAM through a temple, TILT-UP to reveal a deity, DOLLY-OUT from prayer to reveal landscape
+- AVOID: commercial product shots, talking-head close-ups, product labels, brand CTA, presenter "demonstrating" something
+- The character's emotional journey (devotion → surrender → peace) must be visible in their face and posture across cuts`
+        : isMusicVideo
+        ? `- Each cut must visually sync with the PHASE TAG in its scene field ([VERSE 1], [CHORUS], etc.)
+- High energy during chorus: fast WHIP-PAN transitions, DUTCH-TILT, kinetic handheld camera
+- Emotional verse moments: slow DOLLY-IN, RACK-FOCUS from environment to face, gentle STEADICAM
+- Feature the artist performing, plus narrative storytelling cuts intercut with performance
+- AVOID: static talking head close-ups for more than 2 consecutive cuts`
+        : isDocumentary
+        ? `- Cuts should feel observational and authentic — handheld for intimacy, wide for context
+- Mix interview-style framing with B-roll landscape, environment, and detail shots
+- Feature real environments, real objects, real moments — no artificial product hero shots
+- AVOID: product labels, CTA overlays, commercial aesthetic`
+        : `- The product must be visually featured in at least one INSERT/MACRO cut and one LIFESTYLE/IN-USE cut
+- Feature at least one TWO-SHOT or GROUP SHOT with multiple characters interacting
+- INJECT at least one unexpected, visually striking angle (e.g. extreme low-angle looking up at product, Dutch tilt energy shot, kinetic rack-focus from environment to product)
+- Preserve the product's original design, shape, color shades, and branding details faithfully in all scene descriptions and framePrompts. Do NOT simplify, stylize, or modify any physical product attributes or color values.
+- AVOID boring talking head or moving head close-ups. Presenters/models must be shown as a proper moving person explaining while actively doing something in the scene (e.g., typing on a laptop, gesturing dynamically at a screen, pointing, walking through the studio set, demonstrating the product, or interacting with props/environments) to ensure it looks very natural.`;
+
     return `You are an award-winning Ad Film Director and Cinematographer building a professional pre-production storyboard package. Your output is a structured JSON document — NOT a description of a grid image.
 
 The storyboard package has 4 sections, exactly like a real agency pre-production document:
@@ -139,12 +248,7 @@ Define the visual identity that must stay consistent across every frame:
 - materialNotes: the physical materials present in the scene (e.g. "polished marble, walnut wood, brushed brass, ceramic glaze, steam condensation")
 ${logoTagInstruction}
 
-═══════════════════════════════════════════════════════
-SECTION 2 — ENVIRONMENT / SET DESIGN
-═══════════════════════════════════════════════════════
-Define ONE environment (set) that all cuts take place in:
-- environmentFingerprint: a single evocative description of the set (e.g. "marble café counter; steam-lit espresso machine; tall street-facing window with soft morning light")
-This environment NEVER changes across cuts. The camera moves through it.
+${environmentSection}
 
 ═══════════════════════════════════════════════════════
 SECTION 3 — CUT PLAN (THE STORYBOARD)
@@ -182,17 +286,13 @@ ${duration > 60
     ? `- EXACTLY ${Math.ceil(duration / 10)} cuts are required in the cuts[] array — this is a hard constraint, not a suggestion. Each cut MUST be exactly 10 seconds.`
     : `- MINIMUM ${Math.ceil(duration / 3)} CUTS REQUIRED — this is a hard constraint, not a suggestion.`
 }
-- Follow a natural cinematic arc: COLD OPEN (intrigue) → BUILD (environment, character) → REVEAL (product hero moment) → DETAIL (macro features) → EMOTION (presenter or lifestyle) → RESOLVE (CTA/brand close)
+${narrativeArcGuide}
 - USE ALL THESE SHOT TYPES across your cuts — rotate them for visual variety:
-  ECU/MACRO (product detail) → WS (environment) → MCU (character) → CU (emotion/face) → INSERT (product + hands) → OTS (interaction) → WS/CTA (close)
+  WIDE (environment) → CLOSE-UP (emotion/face) → MEDIUM (character action) → INSERT/MACRO (detail) → ESTABLISHING/TWO-SHOT (context)
   NO two consecutive cuts may use the same shot type.
-- Use professional lens + shot combinations (wide angle for establishing, macro/insert for product details, close-up for emotion, whip-pan for energy transitions)
-- The product must be visually featured in at least one INSERT/MACRO cut and one LIFESTYLE/IN-USE cut
+- Use professional lens + shot combinations (wide angle for establishing, macro/insert for detail, close-up for emotion, whip-pan for energy transitions)
 - If multiple characters are provided, DISTRIBUTE them across cuts — do not show all characters in every cut. Build ensemble storytelling: different characters carry different narrative beats.
-- Feature at least one TWO-SHOT or GROUP SHOT with multiple characters interacting
-- INJECT at least one unexpected, visually striking angle (e.g. extreme low-angle looking up at product, Dutch tilt energy shot, kinetic rack-focus from environment to product)
-- Preserve the product's original design, shape, color shades, and branding details faithfully in all scene descriptions and framePrompts. Do NOT simplify, stylize, or modify any physical product attributes or color values. The brand colors/color palette must ONLY be used for the environment, background, or UI elements, and must NEVER be applied to recolor or color-shift the product itself.
-- AVOID boring talking head or moving head close-ups. Presenters/models must be shown as a proper moving person explaining while actively doing something in the scene (e.g., typing on a laptop, gesturing dynamically at a screen, pointing, walking through the studio set, demonstrating the product, or interacting with props/environments) to ensure it looks very natural.
+${cutSpecificRules}
 
 ═══════════════════════════════════════════════════════
 SECTION 4 — LIGHTING / MOOD / STYLE
@@ -518,6 +618,10 @@ export async function runStoryboardDirector({
     const { brand, brandContext } = await loadBrandContext(brandId);
     console.log(`[Storyboard Director] Brand context: ${brandContext?.length || 0} chars (injecting=${includeBranding})`);
 
+    // Auto-detect content type from brief + brand context
+    const contentType = detectContentType(brief || '', productFeatures || '', brandContext || '');
+    console.log(`[Storyboard Director] Content type detected: ${contentType}`);
+
     const logoUrl = brand?.dna?.logo?.url || null;
     const logoDescription = brand?.dna?.logo?.metadata?.visionDescription || '';
     const brandName = brand?.name || 'the brand';
@@ -549,6 +653,7 @@ export async function runStoryboardDirector({
         includeBranding,
         cuts: heuristicCuts,
         avatarNames,
+        contentType,
     });
 
     const userPrompt = buildUserPrompt({
