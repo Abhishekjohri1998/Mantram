@@ -38,8 +38,10 @@ import {
     extractLastFrameToS3,
 } from '../../utils/ffmpegUtils.js';
 import { uploadToS3, getSignedUrlIfNeeded } from '../../utils/s3.js';
+import { ConcurrencyLimiter } from '../../utils/concurrencyLimiter.js';
 
 const execFileAsync = promisify(execFile);
+const atlasLimiter = new ConcurrencyLimiter(2); // Max 2 concurrent Atlas API generations to prevent 429 rate limit/concurrency blocks
 
 // ── Segment sizing constants ─────────────────────────────────────────────────
 const OPTIMAL_SEGMENT_DURATION = 15; // seconds — keeps each Seedance task well within its 15s limit
@@ -513,43 +515,52 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
                     let cutVideoUrl = null;
                     let lastErr = null;
 
-                    // In-place retry logic for robust parallel task execution
+                    // In-place retry logic with paced rate-limiting and concurrency control
                     for (let attempt = 1; attempt <= 2; attempt++) {
                         try {
-                            let genResult;
-                            if (params.model === 'gemini-flash' || params.model === 'gemini-omni-flash') {
-                                genResult = await submitGeminiFlashVideoGeneration({
-                                    prompt: finalCutPrompt,
-                                    imageUrl: cutFirstFrameUrl,
-                                    duration: requestedDuration,
-                                    aspectRatio: params.format,
-                                    resolution: params.resolution,
-                                    referenceImages: segmentRefs.slice(0, 6),
-                                    customCharacterNames: avatarNames,
-                                });
-                            } else {
-                                genResult = await submitAtlasCloudVideoGeneration({
-                                    model: params.model,
-                                    prompt: finalCutPrompt,
-                                    imageUrl: cutFirstFrameUrl,
-                                    duration: requestedDuration,
-                                    aspectRatio: params.format,
-                                    generateAudio: false,
-                                    referenceImages: segmentRefs.slice(0, 6),
-                                    qualityMode,
-                                    resolution: params.resolution,
-                                    imageRole: 'mixed',
-                                    customCharacterNames: avatarNames,
-                                });
+                            // Space out concurrent submissions by 1.2s to prevent request-per-second rate limit spikes
+                            await new Promise(r => setTimeout(r, cutIdx * 1200));
+
+                            // Throttle concurrent active tasks to respect provider limits
+                            await atlasLimiter.acquire();
+                            try {
+                                let genResult;
+                                if (params.model === 'gemini-flash' || params.model === 'gemini-omni-flash') {
+                                    genResult = await submitGeminiFlashVideoGeneration({
+                                        prompt: finalCutPrompt,
+                                        imageUrl: cutFirstFrameUrl,
+                                        duration: requestedDuration,
+                                        aspectRatio: params.format,
+                                        resolution: params.resolution,
+                                        referenceImages: segmentRefs.slice(0, 6),
+                                        customCharacterNames: avatarNames,
+                                    });
+                                } else {
+                                    genResult = await submitAtlasCloudVideoGeneration({
+                                        model: params.model,
+                                        prompt: finalCutPrompt,
+                                        imageUrl: cutFirstFrameUrl,
+                                        duration: requestedDuration,
+                                        aspectRatio: params.format,
+                                        generateAudio: false,
+                                        referenceImages: segmentRefs.slice(0, 6),
+                                        qualityMode,
+                                        resolution: params.resolution,
+                                        imageRole: 'mixed',
+                                        customCharacterNames: avatarNames,
+                                    });
+                                }
+                                cutVideoUrl = await _pollSegment(genResult, jobId, i, actualSegCount);
+                                break;
+                            } finally {
+                                atlasLimiter.release();
                             }
-                            cutVideoUrl = await _pollSegment(genResult, jobId, i, actualSegCount);
-                            break;
                         } catch (e) {
                             lastErr = e;
                             console.warn(`[SB LongForm ${jobId}] Cut ${cutIdx+1} of seg ${i+1} attempt ${attempt} failed: ${e.message}`);
                             if (attempt === 1) {
-                                console.log(`[SB LongForm ${jobId}] Retrying cut ${cutIdx+1}...`);
-                                await new Promise(r => setTimeout(r, 2000));
+                                console.log(`[SB LongForm ${jobId}] Retrying cut ${cutIdx+1} after cool-down...`);
+                                await new Promise(r => setTimeout(r, 4000));
                             }
                         }
                     }
