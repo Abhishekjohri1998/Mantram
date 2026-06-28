@@ -606,19 +606,20 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
                 results.sort((a, b) => a.index - b.index);
                 const sortedCutPaths = results.map(r => r.trimmedCutPath);
 
-                // Stitch all trimmed cuts into one segment video file
+                // Stitch all trimmed cuts into one segment video file using filter_complex concat.
+                // This avoids silent timestamp and keyframe glitches inherent to the copy-mode concat demuxer.
                 const segmentLocalPath = path.join(tmpDir, `segment-${i+1}.mp4`);
-                const concatListPath = path.join(tmpDir, `seg-${i+1}-concat.txt`);
-                const concatContent = sortedCutPaths.map(p => `file '${p}'`).join('\n');
-                fs.writeFileSync(concatListPath, concatContent, 'utf8');
-
+                console.log(`[SB LongForm ${jobId}] Concat-stitching ${sortedCutPaths.length} cuts into Segment ${i+1} video via filter_complex`);
+                
+                const concatFilter = sortedCutPaths.map((_, idx) => `[${idx}:v][${idx}:a]`).join('') + `concat=n=${sortedCutPaths.length}:v=1:a=1[vout][aout]`;
+                const inputs = sortedCutPaths.flatMap(p => ['-i', p]);
+                
                 await execFileAsync(ffmpegPath, [
-                    '-y',
-                    '-f', 'concat',
-                    '-safe', '0',
-                    '-i', concatListPath,
-                    '-c:v', 'copy',
-                    '-c:a', 'copy',
+                    '-y', ...inputs,
+                    '-filter_complex', concatFilter,
+                    '-map', '[vout]', '-map', '[aout]',
+                    '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
+                    '-c:a', 'aac', '-b:a', '192k',
                     '-movflags', '+faststart',
                     segmentLocalPath,
                 ], { timeout: 120000 });
@@ -653,7 +654,6 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
 
                 // Clean up files
                 sortedCutPaths.forEach(p => { try { fs.unlinkSync(p); } catch {} });
-                try { fs.unlinkSync(concatListPath); } catch {}
                 try { fs.unlinkSync(segmentLocalPath); } catch {}
 
             } else {
