@@ -339,56 +339,11 @@ export async function laozhangImageGenerate(prompt, { model = 'gemini-3.1-flash-
     console.log(`🖼️  [ImageGen] model=${model}, size=${size}, timeout=${timeoutMs/1000}s`);
     console.log(`   📝 prompt (first 200): ${prompt?.substring(0, 200)}...`);
 
-    // ── Strategy: Atlas Cloud is the ONLY proxy — no LaoZhang ──
-    if (isAtlasImageAvailable()) {
-        try {
-            return await _atlasImageGenerate(prompt, { model, size });
-        } catch (atlasErr) {
-            console.warn(`⚠️ [Atlas Image] Failed: ${atlasErr.message}. Falling back to native Gemini/Vertex...`);
-        }
+    // Atlas Cloud is the ONLY provider — no fallback
+    if (!isAtlasImageAvailable()) {
+        throw new Error('[ImageGen] ATLASCLOUD_API_KEY is not configured. Cannot generate image.');
     }
-
-    // ── Native Gemini / Vertex fallback ──
-    try {
-        const { generateImageWithVertex } = await import('../../services/vertexImage.js');
-        const credsVar = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-        let credsExist = false;
-        try {
-            const { existsSync } = await import('fs');
-            if (credsVar && existsSync(credsVar)) credsExist = true;
-        } catch (e) {}
-        const devKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
-        if (!credsExist && !devKey) {
-            throw new Error("No Gemini API key or GCP credentials configured.");
-        }
-
-        const arMap = {
-            '1024x1024': '1:1', '1344x768': '16:9', '768x1344': '9:16',
-            '896x1120': '4:5', '896x1184': '3:4', '1184x896': '4:3',
-            '1248x832': '3:2', '832x1248': '2:3'
-        };
-        const aspectRatio = arMap[size] || '1:1';
-        const activeModel = 'imagen-3.0-generate-002';
-        const parts = [{ text: prompt }];
-
-        const data = await generateImageWithVertex(parts, activeModel, 0.4, { aspectRatio, imageSize: '1K' });
-        const resParts = data.candidates?.[0]?.content?.parts || [];
-        let fallbackImageUrl = null;
-        for (const part of resParts) {
-            if (part.inlineData?.mimeType?.startsWith('image/')) {
-                fallbackImageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-                break;
-            }
-        }
-        if (!fallbackImageUrl) throw new Error('Vertex Imagen returned no image');
-
-        const finalUrl = await ensureS3Url(fallbackImageUrl, 'studio/vertex-image');
-        console.log(`✅ [Vertex-Fallback] Image generated via Imagen 3: ${finalUrl.substring(0, 80)}...`);
-        return { imageUrl: finalUrl, model: activeModel, provider: 'vertex' };
-    } catch (vxErr) {
-        console.error(`❌ [ImageGen] All providers failed. Vertex: ${vxErr.message}`);
-        throw new Error(`Image generation failed: All providers exhausted. ${vxErr.message}`);
-    }
+    return await _atlasImageGenerate(prompt, { model, size });
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -513,9 +468,8 @@ export async function laozhangGptImageWithRefs(prompt, imageUrls = [], { model =
         }
     }
 
-    // All providers failed — fall back to Gemini multimodal
-    console.warn(`   ⚠️ [GPT-Image-2+Refs] All /images/edits providers failed — falling back to Gemini multimodal`);
-    return laozhangMultimodalImageGenerate(prompt, imageUrls, { model: 'gemini-3.1-flash-image-preview', size });
+    // All edits providers failed — no fallback, throw with a clear message
+    throw new Error(`GPT Image 2 /images/edits failed for all providers. Last error is logged above. refBuffer=${Math.round(refBuffer.length / 1024)}KB.`);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -618,71 +572,8 @@ export async function laozhangMultimodalImageGenerate(prompt, imageUrls = [], { 
         console.log(`✅ [${providerName}-Multimodal] Image generated with ${imageUrls.length} refs (${isBase64 ? 'base64' : 'URL'})${finalUrl !== imageUrl ? ' -> Uploaded to S3' : ''}: ${finalUrl.substring(0, 80)}...`);
         return { imageUrl: finalUrl, model, provider: useAtlas ? 'atlascloud' : 'laozhang' };
     } catch (err) {
-        console.warn(`[LaoZhang-Multimodal] ⚠️ Generation failed: ${err.message}. Trying direct Gemini/Vertex fallback...`);
-        try {
-            const { generateImageWithVertex } = await import('../../services/vertexImage.js');
-            // Check if key is available
-            const credsVar = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-            let credsExist = false;
-            try {
-                const { existsSync } = await import('fs');
-                if (credsVar && existsSync(credsVar)) credsExist = true;
-            } catch (e) {}
-            const devKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
-            if (!credsExist && !devKey) {
-                throw new Error("No direct Gemini API key or GCP credentials configured.");
-            }
-
-            // Map size string (e.g. "1024x1024") to closest aspect ratio
-            const arMap = {
-                '1024x1024': '1:1', '1344x768': '16:9', '768x1344': '9:16', '896x1120': '4:5', '896x1184': '3:4', '1184x896': '4:3', '1248x832': '3:2', '832x1248': '2:3'
-            };
-            const aspectRatio = arMap[size] || '1:1';
-
-            // Build content parts with reference images
-            const parts = [];
-            const { downloadBuffer } = await import('./storyboardFrames.js');
-            for (const url of imageUrls) {
-                if (!url) continue;
-                if (url.startsWith('data:')) {
-                    const match = url.match(/^data:([^;]+);base64,(.+)$/);
-                    if (match) {
-                        parts.push({ inlineData: { mimeType: match[1], data: match[2] } });
-                    }
-                } else if (url.startsWith('http')) {
-                    try {
-                        const { buffer, mimeType } = await downloadBuffer(url);
-                        parts.push({ inlineData: { mimeType, data: buffer.toString('base64') } });
-                    } catch (e) {
-                        console.warn(`[LaoZhang-Multimodal Fallback] Failed to pre-download image: ${e.message}`);
-                    }
-                }
-            }
-
-            // Text prompt last (Gemini requirement)
-            parts.push({ text: prompt });
-
-            const activeModel = 'gemini-3.1-flash-image-preview'; // flash preview supports reference images
-            const data = await generateImageWithVertex(parts, activeModel, 0.4, { aspectRatio });
-            
-            const resParts = data.candidates?.[0]?.content?.parts || [];
-            let fallbackImageUrl = null;
-            for (const part of resParts) {
-                if (part.inlineData?.mimeType?.startsWith('image/')) {
-                    fallbackImageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-                    break;
-                }
-            }
-
-            if (!fallbackImageUrl) throw new Error('Gemini fallback returned no image in response');
-            
-            const finalUrl = await ensureS3Url(fallbackImageUrl, 'studio/gemini-fallback');
-            console.log(`✅ [LaoZhang-Multimodal] Fallback succeeded (S3): ${finalUrl.substring(0, 80)}...`);
-            return { imageUrl: finalUrl, model: activeModel, provider: 'gemini' };
-        } catch (fallbackErr) {
-            console.error(`[LaoZhang-Multimodal] ❌ Direct Gemini fallback failed: ${fallbackErr.message}`);
-            throw err; // throw original LaoZhang error
-        }
+        console.error(`[LaoZhang-Multimodal] ❌ Image generation failed: ${err.message}`);
+        throw err; // no fallback — re-throw the original Atlas error
     }
 }
 

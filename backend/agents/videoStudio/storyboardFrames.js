@@ -196,71 +196,29 @@ export async function generateStoryboardPoster(
     console.log(`  raw buffers: product=${rawProductBuffers.length}, avatars=${allRawAvatarBuffers.length}, logo=${!!rawLogoBuffer}, refs=${rawRefBuffers.length}`);
     console.log(`  Prompt (first 120): ${finalPrompt.substring(0, 120)}...`);
 
-    const PRIMARY_TIMEOUT_MS = 90000;   // 90s — accommodates heavy multi-reference grid rendering
-    const FALLBACK_TIMEOUT_MS = 120000; // 120s — fallback model timeout
+    const TIMEOUT_MS = 180000; // 180s — no fallback, fail loudly if primary model fails
 
     if (useNanoBanana) {
-        try {
-            const result = await generateWithNanoBanana(
-                finalPrompt, ar,
-                rawProductBuffers, null, productImageUrls, null,
-                PRIMARY_TIMEOUT_MS, imageSize, logoUrl, rawLogoBuffer,
-                allRawAvatarBuffers, allAvatarUrls, avatarNames,
-                rawRefBuffers, refImageUrls,
-            );
-            if (result) return result;
-            throw new Error(`NanoBanana returned null or empty result.`);
-        } catch (bananaErr) {
-            console.error(`[SB Poster] ❌ NanoBanana execution failed: ${bananaErr.message}`);
-            throw new Error(`NanoBanana image generation failed: ${bananaErr.message}`);
-        }
-    }
-
-    let result = null;
-    let gptImage2Err = null;
-    try {
-        result = await generateWithGptImage2(
+        const result = await generateWithNanoBanana(
             finalPrompt, ar,
             rawProductBuffers, null, productImageUrls, null,
-            PRIMARY_TIMEOUT_MS, logoUrl, rawLogoBuffer,
+            TIMEOUT_MS, imageSize, logoUrl, rawLogoBuffer,
             allRawAvatarBuffers, allAvatarUrls, avatarNames,
             rawRefBuffers, refImageUrls,
         );
-    } catch (err) {
-        gptImage2Err = err;
+        if (!result) throw new Error('NanoBanana (Gemini Vertex) returned an empty image response.');
+        return result;
     }
 
-    if (!result) {
-        console.warn(`[SB Poster] ⚠️ GPT Image 2 generation failed ${gptImage2Err ? `(${gptImage2Err.message})` : ''}. Trying fallback to NanoBanana (Gemini Vertex)...`);
-        
-        // Ensure credentials/key check before fallback
-        const credsVar = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-        let credsExist = false;
-        try {
-            if (credsVar && fs.existsSync(credsVar)) {
-                credsExist = true;
-            }
-        } catch (e) {}
-        const devKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
-
-        if (credsExist || devKey) {
-            try {
-                result = await generateWithNanoBanana(
-                    finalPrompt, ar,
-                    rawProductBuffers, null, productImageUrls, null,
-                    FALLBACK_TIMEOUT_MS, imageSize, logoUrl, rawLogoBuffer,
-                    allRawAvatarBuffers, allAvatarUrls, avatarNames,
-                    rawRefBuffers, refImageUrls,
-                );
-            } catch (bananaErr) {
-                console.error(`[SB Poster] ❌ Fallback to NanoBanana failed: ${bananaErr.message}`);
-                throw new Error(`GPT Image 2 failed ${gptImage2Err ? `(${gptImage2Err.message})` : ''}, and fallback to NanoBanana also failed: ${bananaErr.message}`);
-            }
-        } else {
-            throw new Error(`GPT Image 2 failed ${gptImage2Err ? `(${gptImage2Err.message})` : ''}, and no fallback credentials (GEMINI_API_KEY or GOOGLE_APPLICATION_CREDENTIALS) are configured.`);
-        }
-    }
-
+    // GPT-Image-2 path — NO FALLBACK to NanoBanana, fail immediately with the real error
+    const result = await generateWithGptImage2(
+        finalPrompt, ar,
+        rawProductBuffers, null, productImageUrls, null,
+        TIMEOUT_MS, logoUrl, rawLogoBuffer,
+        allRawAvatarBuffers, allAvatarUrls, avatarNames,
+        rawRefBuffers, refImageUrls,
+    );
+    if (!result) throw new Error('GPT Image 2 returned an empty image response.');
     return result;
 }
 
@@ -413,7 +371,7 @@ async function generateWithGptImage2(
 
     } catch (err) {
         console.error(`[SB Poster][GPT-Image-2] ❌ FAILED: ${err.message}`);
-        return null;
+        throw err; // no fallback — re-throw so caller sees the real error
     }
 }
 
@@ -553,7 +511,7 @@ async function generateWithNanoBanana(
 
     } catch (err) {
         console.error(`[SB Poster][NanoBanana] ❌ FAILED: ${err.message}`);
-        return null;
+        throw err; // no fallback — re-throw so caller sees the real error
     }
 }
 
@@ -652,6 +610,6 @@ IMPORTANT: The model/director will use this ONLY to maintain facial identity con
 
     } catch (err) {
         console.error(`[Char Ref Sheet] ❌ Failed: ${err.message}`);
-        return null;
+        throw new Error(`Character reference sheet generation failed: ${err.message}`);
     }
 }
