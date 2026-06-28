@@ -635,7 +635,7 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
                 ], { timeout: 120000 });
 
                 const segBuffer = fs.readFileSync(segmentLocalPath);
-                const segS3Key = `storyboard/longform/${projectId || jobId}/seg-${i+1}-${Date.now()}.mp4`;
+                const segS3Key = `storyboard/longform/${params.projectId || jobId}/seg-${i+1}-${Date.now()}.mp4`;
                 const segmentS3Url = await uploadToS3(segBuffer, segS3Key, 'video/mp4');
 
                 segmentVideoUrls[i] = segmentS3Url;
