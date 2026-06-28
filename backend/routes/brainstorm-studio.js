@@ -2684,13 +2684,17 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
     // ── STAGE 2: Execute Action ─────────────────────────────────────────────
 
     if (action === 'ask_question' || action === 'general_chat') {
+      console.log(`[fidato-chat] Executing streamWords for action: ${action}`);
       await streamWords(res, fidatoResponse);
+      console.log(`[fidato-chat] Finished streamWords, saving message...`);
       await saveFidatoMsg(fidatoResponse, { questionOptions: questionOptions || undefined });
+      console.log(`[fidato-chat] Message saved. Emitting 'done' event...`);
       sseEvent(res, {
         type: 'done',
         sessionState: newSessionState,
         questionOptions: questionOptions || null,
       });
+      console.log(`[fidato-chat] 'done' event emitted.`);
 
     } else if (action === 'generate_ideas') {
       const preMsg = preGenerationMessage || "Okay, I have enough to work with! Give me a moment to cook up some ideas 🔥";
@@ -2900,6 +2904,7 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
       try { await session.save(); } catch (e) { console.warn('[fidato-chat] Session save failed:', e.message); }
     }
 
+    console.log(`[fidato-chat] Calling res.end() for action: ${action}`);
     res.end();
   } catch (err) {
     console.error('fidato-chat error:', err);
