@@ -557,14 +557,27 @@ export async function planStoryboardScenes({
                 ? 'CLOSING SEGMENT — emotional peak, hard cut to product hero, brand name/tagline in final 2 seconds ONLY.'
                 : `CONTINUATION SEGMENT ${i + 1}/${totalSegs} — maintain exact visual continuity from previous segment. No brand CTA.`;
 
-            // Assemble full Seedance-native prompt — target 1800-2200 chars
+            // Build trimmed background metadata to ensure the shot list is never truncated.
+            let trimmedEnv = environment || 'Professional studio environment';
+            if (trimmedEnv.length > 250) {
+                trimmedEnv = trimmedEnv.substring(0, 250).trim() + '...';
+            }
+            let trimmedStyle = cinemaRules || 'Hyperrealistic cinematic live-action. Sharp focus. Shallow depth of field.';
+            if (trimmedStyle.length > 150) {
+                trimmedStyle = trimmedStyle.substring(0, 150).trim() + '...';
+            }
+            let trimmedMaterials = materialNotes || '';
+            if (trimmedMaterials.length > 100) {
+                trimmedMaterials = trimmedMaterials.substring(0, 100).trim() + '...';
+            }
+
             const promptParts = [
                 charPreamble.trim(),
-                `STYLE: ${cinemaRules || 'Hyperrealistic cinematic live-action. Sharp focus. Shallow depth of field. Natural motion blur on fast moves.'}`,
-                `COLOR PALETTE: ${paletteNames || 'See reference'} (${palette}). Apply palette to lighting and set design — never recolor the product itself.`,
-                materialNotes ? `MATERIALS: ${materialNotes}` : null,
-                `ENVIRONMENT: ${environment}`,
-                `MOOD: ${moodKeywords || 'Premium, cinematic, engaging'}. Arc: ${emotionalArc || 'build tension then reveal'}.`,
+                `STYLE: ${trimmedStyle}`,
+                `COLOR PALETTE: ${paletteNames || 'See reference'} (${palette}).`,
+                trimmedMaterials ? `MATERIALS: ${trimmedMaterials}` : null,
+                `ENVIRONMENT: ${trimmedEnv}`,
+                `MOOD: ${moodKeywords || 'Premium, cinematic'}.`,
                 isNonEnglish ? `LANGUAGE: All dialogue and voiceover MUST be in ${language} script/characters.` : null,
                 '',
                 shotLines,
@@ -574,20 +587,34 @@ export async function planStoryboardScenes({
                 '4K ultra HD, cinematic detail, sharp clarity, natural textures, stable picture.',
             ].filter(p => p !== null).join('\n');
 
-            // Enforce ~2200 char Seedance sweet spot — truncate gracefully, keep quality suffix
-            const SEEDANCE_MAX_CHARS = 2200;
             let visualPrompt = promptParts;
+            const SEEDANCE_MAX_CHARS = 2200;
             if (visualPrompt.length > SEEDANCE_MAX_CHARS) {
-                const truncated = visualPrompt.substring(0, SEEDANCE_MAX_CHARS);
-                const lastPeriod  = truncated.lastIndexOf('.');
-                const lastNewline = truncated.lastIndexOf('\n');
-                const breakPoint  = Math.max(lastPeriod, lastNewline);
-                visualPrompt = breakPoint > SEEDANCE_MAX_CHARS * 0.7
-                    ? truncated.substring(0, breakPoint + 1).trim()
-                    : truncated.trim();
-                // Always keep quality suffix
-                if (!visualPrompt.includes('4K ultra HD')) {
-                    visualPrompt += '\n4K ultra HD, cinematic detail, sharp clarity, stable picture.';
+                // If still over the limit, trim the environment further to preserve the shotLines
+                const diff = visualPrompt.length - SEEDANCE_MAX_CHARS;
+                if (trimmedEnv.length > diff + 50) {
+                    trimmedEnv = trimmedEnv.substring(0, trimmedEnv.length - diff - 5).trim() + '...';
+                    visualPrompt = [
+                        charPreamble.trim(),
+                        `STYLE: ${trimmedStyle}`,
+                        `COLOR PALETTE: ${paletteNames || 'See reference'} (${palette}).`,
+                        trimmedMaterials ? `MATERIALS: ${trimmedMaterials}` : null,
+                        `ENVIRONMENT: ${trimmedEnv}`,
+                        `MOOD: ${moodKeywords || 'Premium, cinematic'}.`,
+                        isNonEnglish ? `LANGUAGE: All dialogue and voiceover MUST be in ${language} script/characters.` : null,
+                        '',
+                        shotLines,
+                        '',
+                        segPositionNote,
+                        `Total segment: ${seg.duration}s. Hard cuts between shots — no dissolves. Reference all provided @image tags for character and product visual consistency.`,
+                        '4K ultra HD, cinematic detail, sharp clarity, natural textures, stable picture.',
+                    ].filter(p => p !== null).join('\n');
+                } else {
+                    // Absolute fallback: truncate at the end
+                    visualPrompt = visualPrompt.substring(0, SEEDANCE_MAX_CHARS);
+                    if (!visualPrompt.includes('4K ultra HD')) {
+                        visualPrompt += '\n4K ultra HD, cinematic detail, sharp clarity, stable picture.';
+                    }
                 }
             }
 

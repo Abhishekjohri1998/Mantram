@@ -455,292 +455,90 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
         for (let i = 0; i < actualSegCount; i++) {
             if (job.cancelled) throw new Error('Cancelled by user');
 
-            const segmentCuts = scenes[i]?.cutsInSegment || [];
-            
-            if (segmentCuts.length > 0) {
-                console.log(`[SB LongForm ${jobId}] 🎬 Segment ${i+1}/${actualSegCount} has ${segmentCuts.length} cuts. Generating each cut in parallel...`);
-                job.segmentStatuses[i] = { status: 'generating', progress: 0, cuts: segmentCuts.length, completedCuts: 0 };
-                _setProgress(jobId, 'GENERATING',
-                    `Segment ${i+1}/${actualSegCount} — generating ${segmentCuts.length} cuts in parallel...`,
-                    (completedCount / actualSegCount) * 100,
-                );
+            job.segmentStatuses[i] = { status: 'generating', progress: 0 };
+            _setProgress(jobId, 'GENERATING',
+                `Segment ${i+1}/${actualSegCount} — ${sceneDurations[i]}s`,
+                (completedCount / actualSegCount) * 100,
+            );
 
-                const posterStyleRef = signedImageUrl ? [{ url: signedImageUrl, role: 'style_reference' }] : [];
-                const segmentRefs = [...posterStyleRef, ...finalReferenceImages];
+            const segmentFirstFrameUrlRaw = i === 0 ? signedFirstFrameUrl : null;
+            const segmentFirstFrameUrl = segmentFirstFrameUrlRaw ? await getSignedUrlIfNeeded(segmentFirstFrameUrlRaw) : null;
+            const posterStyleRef = signedImageUrl ? [{ url: signedImageUrl, role: 'style_reference' }] : [];
+            const segmentRefs = [...posterStyleRef, ...finalReferenceImages];
 
-                // Map and submit all cuts in parallel
-                const cutPromises = segmentCuts.map(async (cut, cutIdx) => {
-                    const palette = (params.structuredPlan?.colorPalette || []).join(', ');
-                    const paletteNames = (params.structuredPlan?.paletteNames || []).join(', ');
-                    const moodKeywords = (params.structuredPlan?.moodKeywords || []).join(', ');
-                    const cinemaRules = params.structuredPlan?.cinematographyRules || '';
-                    const environment = cut.environment || params.structuredPlan?.environmentFingerprint || 'Professional studio environment with cinematic lighting';
-                    const materialNotes = params.structuredPlan?.materialNotes || '';
-                    const emotionalArc = params.structuredPlan?.emotionalArc || '';
-                    const charPreamble = avatarNames.length > 0
-                        ? `CHARACTERS: ${avatarNames.map(n => `"${n}"`).join(', ')}. Lock: exact face, hair colour, skin tone per reference sheet. Wardrobe follows per-shot costume description.\n`
-                        : '';
-                    const isNonEnglish = dialogueLanguage.toLowerCase() !== 'english';
+            const isLast = i === actualSegCount - 1;
+            const positionHint = i === 0
+                ? 'This is the OPENING segment — establish the visual world and hook the viewer immediately.'
+                : isLast && includeBranding
+                ? 'This is the FINAL segment — end with a single brand closing shot in the last few seconds ONLY.'
+                : isLast && !includeBranding
+                ? 'This is the FINAL segment — end with a strong cinematic close.'
+                : `This is a CONTINUATION segment.`;
 
-                    const cutPromptParts = [
-                        charPreamble.trim(),
-                        `STYLE: ${cinemaRules || 'Hyperrealistic cinematic live-action. Sharp focus. Shallow depth of field. Natural motion blur on fast moves.'}`,
-                        `COLOR PALETTE: ${paletteNames || 'See reference'} (${palette}). Apply palette to lighting and set design — never recolor the product itself.`,
-                        materialNotes ? `MATERIALS: ${materialNotes}` : null,
-                        `ENVIRONMENT: ${environment}`,
-                        `MOOD: ${moodKeywords || 'Premium, cinematic, engaging'}. Arc: ${emotionalArc || 'build tension then reveal'}.`,
-                        isNonEnglish ? `LANGUAGE: All dialogue and voiceover MUST be in ${dialogueLanguage} script/characters.` : null,
-                        '',
-                        `SHOT [${cut.shot || 'MEDIUM'}, ${cut.lens || '50mm'} ${cut.move || 'STEADICAM'}]: ${cut.framePrompt || cut.scene}`,
-                        '',
-                        `Reference all provided @image tags for character and product visual consistency.`,
-                        '4K ultra HD, cinematic detail, sharp clarity, natural textures, stable picture.',
-                    ].filter(p => p !== null).join('\n');
+            const scenePrompt = scenes[i]?.visualPrompt || params.videoPrompt;
+            const segPromptRaw = `${charIdentityPreamble}${scenePrompt}\n\n${positionHint}\nSegment ${i+1} of ${actualSegCount}.`;
 
-                    let finalCutPrompt = cutPromptParts;
-                    if (finalCutPrompt.length > 2200) {
-                        finalCutPrompt = finalCutPrompt.substring(0, 2200);
-                        if (!finalCutPrompt.includes('4K ultra HD')) finalCutPrompt += '\n4K ultra HD, cinematic detail, sharp clarity, stable picture.';
-                    }
+            let segPrompt = segPromptRaw;
+            if (segPrompt.length > 2600) {
+                segPrompt = segPrompt.substring(0, 2600);
+                if (!segPrompt.includes('4K ultra HD')) segPrompt += '\n4K ultra HD, cinematic detail, sharp clarity, stable picture.';
+            }
 
-                    // First frame for opening cut of the opening segment
-                    const cutFirstFrameUrl = (i === 0 && cutIdx === 0) ? signedFirstFrameUrl : null;
-                    const qualityMode = params.model === 'seedance-2.0' ? 'quality' : 'fast';
+            const qualityMode = params.model === 'seedance-2.0' ? 'quality' : 'fast';
 
-                    // Seedance minimum is 4 seconds. Request 4s and trim to target (e.g. 2s or 3s)
-                    const requestedDuration = Math.max(4, cut.duration);
-
-                    let cutVideoUrl = null;
-                    let lastErr = null;
-
-                    // In-place retry logic for robust parallel task execution
-                    for (let attempt = 1; attempt <= 2; attempt++) {
-                        try {
-                            let genResult;
-                            if (params.model === 'gemini-flash' || params.model === 'gemini-omni-flash') {
-                                genResult = await submitGeminiFlashVideoGeneration({
-                                    prompt: finalCutPrompt,
-                                    imageUrl: cutFirstFrameUrl,
-                                    duration: requestedDuration,
-                                    aspectRatio: params.format,
-                                    resolution: params.resolution,
-                                    referenceImages: segmentRefs.slice(0, 6),
-                                    customCharacterNames: avatarNames,
-                                });
-                            } else {
-                                genResult = await submitAtlasCloudVideoGeneration({
-                                    model: params.model,
-                                    prompt: finalCutPrompt,
-                                    imageUrl: cutFirstFrameUrl,
-                                    duration: requestedDuration,
-                                    aspectRatio: params.format,
-                                    generateAudio: false,
-                                    referenceImages: segmentRefs.slice(0, 6),
-                                    qualityMode,
-                                    resolution: params.resolution,
-                                    imageRole: 'mixed',
-                                    customCharacterNames: avatarNames,
-                                });
-                            }
-                            cutVideoUrl = await _pollSegment(genResult, jobId, i, actualSegCount);
-                            break;
-                        } catch (e) {
-                            lastErr = e;
-                            console.warn(`[SB LongForm ${jobId}] Cut ${cutIdx+1} of seg ${i+1} attempt ${attempt} failed: ${e.message}`);
-                            if (attempt === 1) {
-                                console.log(`[SB LongForm ${jobId}] Retrying cut ${cutIdx+1}...`);
-                                await new Promise(r => setTimeout(r, 2000));
-                            }
-                        }
-                    }
-
-                    if (!cutVideoUrl) {
-                        throw new Error(`Cut ${cutIdx+1} of segment ${i+1} failed after 2 attempts: ${lastErr?.message}`);
-                    }
-
-                    // Download to temp path
-                    const localCutPath = path.join(tmpDir, `seg-${i+1}-cut-${cutIdx+1}-raw.mp4`);
-                    const resp = await fetch(cutVideoUrl);
-                    if (!resp.ok) throw new Error(`Failed to download cut ${cutIdx+1} video: ${resp.status}`);
-                    fs.writeFileSync(localCutPath, Buffer.from(await resp.arrayBuffer()));
-
-                    // Trim and normalize the cut clip to planned duration
-                    const trimmedCutPath = path.join(tmpDir, `seg-${i+1}-cut-${cutIdx+1}-trimmed.mp4`);
-                    const [w, h] = params.format === '16:9' ? [1920, 1080]
-                        : params.format === '1:1'  ? [1080, 1080]
-                        : [1080, 1920];
-
-                    await execFileAsync(ffmpegPath, [
-                        '-y', '-i', localCutPath,
-                        '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo',
-                        '-t', String(cut.duration),
-                        '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p`,
-                        '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
-                        '-c:a', 'aac', '-b:a', '192k', '-ac', '2', '-ar', '48000',
-                        '-map', '0:v:0', '-map', '1:a:0',
-                        '-shortest',
-                        '-movflags', '+faststart',
-                        trimmedCutPath,
-                    ], { timeout: 60000 });
-
-                    try { fs.unlinkSync(localCutPath); } catch {}
-
-                    // Update local progress metrics safely
-                    const currentStatus = job.segmentStatuses[i] || {};
-                    const nextCompleted = (currentStatus.completedCuts || 0) + 1;
-                    job.segmentStatuses[i] = {
-                        ...currentStatus,
-                        completedCuts: nextCompleted,
-                        progress: Math.round((nextCompleted / segmentCuts.length) * 100),
-                    };
-
-                    _setProgress(jobId, 'GENERATING',
-                        `Segment ${i+1}/${actualSegCount} (${nextCompleted}/${segmentCuts.length} cuts complete)`,
-                        ((completedCount + (nextCompleted / segmentCuts.length)) / actualSegCount) * 100
-                    );
-
-                    return { trimmedCutPath, index: cutIdx };
+            let genResult;
+            if (params.model === 'gemini-flash' || params.model === 'gemini-omni-flash') {
+                genResult = await submitGeminiFlashVideoGeneration({
+                    prompt: segPrompt,
+                    imageUrl: segmentFirstFrameUrl,
+                    duration: sceneDurations[i],
+                    aspectRatio: params.format,
+                    resolution: params.resolution,
+                    referenceImages: segmentRefs.slice(0, 6),
+                    customCharacterNames: avatarNames,
                 });
-
-                const results = await Promise.all(cutPromises);
-                results.sort((a, b) => a.index - b.index);
-                const sortedCutPaths = results.map(r => r.trimmedCutPath);
-
-                // Stitch all trimmed cuts into one segment video file
-                const segmentLocalPath = path.join(tmpDir, `segment-${i+1}.mp4`);
-                const concatListPath = path.join(tmpDir, `seg-${i+1}-concat.txt`);
-                const concatContent = sortedCutPaths.map(p => `file '${p}'`).join('\n');
-                fs.writeFileSync(concatListPath, concatContent, 'utf8');
-
-                await execFileAsync(ffmpegPath, [
-                    '-y',
-                    '-f', 'concat',
-                    '-safe', '0',
-                    '-i', concatListPath,
-                    '-c:v', 'copy',
-                    '-c:a', 'copy',
-                    '-movflags', '+faststart',
-                    segmentLocalPath,
-                ], { timeout: 120000 });
-
-                const segBuffer = fs.readFileSync(segmentLocalPath);
-                const segS3Key = `storyboard/longform/${projectId || jobId}/seg-${i+1}-${Date.now()}.mp4`;
-                const segmentS3Url = await uploadToS3(segBuffer, segS3Key, 'video/mp4');
-
-                segmentVideoUrls[i] = segmentS3Url;
-                job.segmentStatuses[i] = {
-                    status: 'completed', progress: 100, videoUrl: segmentS3Url,
-                    prompt: scenes[i].visualPrompt,
-                    duration: sceneDurations[i],
-                };
-                completedCount++;
-
-                _setProgress(jobId, 'GENERATING',
-                    `${completedCount}/${actualSegCount} segments done`,
-                    (completedCount / actualSegCount) * 100,
-                );
-
-                if (params.projectId) {
-                    try {
-                        const mongoose = (await import('mongoose')).default;
-                        const VideoProject = mongoose.model('VideoProject');
-                        await VideoProject.findByIdAndUpdate(params.projectId, {
-                            [`storyboard.segmentUrls.${i}`]: segmentS3Url,
-                            [`storyboard.segmentPrompts.${i}`]: scenes[i].visualPrompt,
-                        });
-                    } catch (e) { console.warn(`[SB LongForm ${jobId}] ⚠️ Failed to persist seg ${i+1}: ${e.message}`); }
-                }
-
-                // Clean up files
-                sortedCutPaths.forEach(p => { try { fs.unlinkSync(p); } catch {} });
-                try { fs.unlinkSync(concatListPath); } catch {}
-                try { fs.unlinkSync(segmentLocalPath); } catch {}
-
             } else {
-                // Fallback: generate segment as a single video if no cuts are defined
-                job.segmentStatuses[i] = { status: 'generating', progress: 0 };
-                _setProgress(jobId, 'GENERATING',
-                    `Segment ${i+1}/${actualSegCount} — ${sceneDurations[i]}s`,
-                    (completedCount / actualSegCount) * 100,
-                );
-
-                const segmentFirstFrameUrlRaw = i === 0 ? signedFirstFrameUrl : null;
-                const segmentFirstFrameUrl = segmentFirstFrameUrlRaw ? await getSignedUrlIfNeeded(segmentFirstFrameUrlRaw) : null;
-                const posterStyleRef = signedImageUrl ? [{ url: signedImageUrl, role: 'style_reference' }] : [];
-                const segmentRefs = [...posterStyleRef, ...finalReferenceImages];
-
-                const isLast = i === actualSegCount - 1;
-                const positionHint = i === 0
-                    ? 'This is the OPENING segment — establish the visual world and hook the viewer immediately.'
-                    : isLast && includeBranding
-                    ? 'This is the FINAL segment — end with a single brand closing shot in the last few seconds ONLY.'
-                    : isLast && !includeBranding
-                    ? 'This is the FINAL segment — end with a strong cinematic close.'
-                    : `This is a CONTINUATION segment.`;
-
-                const scenePrompt = scenes[i]?.visualPrompt || params.videoPrompt;
-                const segPromptRaw = `${charIdentityPreamble}${scenePrompt}\n\n${positionHint}\nSegment ${i+1} of ${actualSegCount}.`;
-
-                let segPrompt = segPromptRaw;
-                if (segPrompt.length > 2600) {
-                    segPrompt = segPrompt.substring(0, 2600);
-                    if (!segPrompt.includes('4K ultra HD')) segPrompt += '\n4K ultra HD, cinematic detail, sharp clarity, stable picture.';
-                }
-
-                const qualityMode = params.model === 'seedance-2.0' ? 'quality' : 'fast';
-
-                let genResult;
-                if (params.model === 'gemini-flash' || params.model === 'gemini-omni-flash') {
-                    genResult = await submitGeminiFlashVideoGeneration({
-                        prompt: segPrompt,
-                        imageUrl: segmentFirstFrameUrl,
-                        duration: sceneDurations[i],
-                        aspectRatio: params.format,
-                        resolution: params.resolution,
-                        referenceImages: segmentRefs.slice(0, 6),
-                        customCharacterNames: avatarNames,
-                    });
-                } else {
-                    genResult = await submitAtlasCloudVideoGeneration({
-                        model: params.model,
-                        prompt: segPrompt,
-                        imageUrl: segmentFirstFrameUrl,
-                        duration: sceneDurations[i],
-                        aspectRatio: params.format,
-                        generateAudio: false,
-                        referenceImages: segmentRefs.slice(0, 6),
-                        qualityMode,
-                        resolution: params.resolution,
-                        imageRole: 'mixed',
-                        customCharacterNames: avatarNames,
-                    });
-                }
-
-                const videoUrl = await _pollSegment(genResult, jobId, i, actualSegCount);
-
-                const segPromptUsed = scenes[i]?.visualPrompt || params.videoPrompt || '';
-                segmentVideoUrls[i] = videoUrl;
-                job.segmentStatuses[i] = {
-                    status: 'completed', progress: 100, videoUrl,
-                    prompt: segPromptUsed,
+                genResult = await submitAtlasCloudVideoGeneration({
+                    model: params.model,
+                    prompt: segPrompt,
+                    imageUrl: segmentFirstFrameUrl,
                     duration: sceneDurations[i],
-                };
-                completedCount++;
+                    aspectRatio: params.format,
+                    generateAudio: false,
+                    referenceImages: segmentRefs.slice(0, 6),
+                    qualityMode,
+                    resolution: params.resolution,
+                    imageRole: 'mixed',
+                    customCharacterNames: avatarNames,
+                });
+            }
 
-                _setProgress(jobId, 'GENERATING',
-                    `${completedCount}/${actualSegCount} segments done`,
-                    (completedCount / actualSegCount) * 100,
-                );
+            const videoUrl = await _pollSegment(genResult, jobId, i, actualSegCount);
 
-                if (params.projectId) {
-                    try {
-                        const mongoose = (await import('mongoose')).default;
-                        const VideoProject = mongoose.model('VideoProject');
-                        await VideoProject.findByIdAndUpdate(params.projectId, {
-                            [`storyboard.segmentUrls.${i}`]: videoUrl,
-                            [`storyboard.segmentPrompts.${i}`]: segPromptUsed,
-                        });
-                    } catch (e) { console.warn(`[SB LongForm ${jobId}] Failed to persist seg ${i+1}: ${e.message}`); }
+            const segPromptUsed = scenes[i]?.visualPrompt || params.videoPrompt || '';
+            segmentVideoUrls[i] = videoUrl;
+            job.segmentStatuses[i] = {
+                status: 'completed', progress: 100, videoUrl,
+                prompt: segPromptUsed,
+                duration: sceneDurations[i],
+            };
+            completedCount++;
+
+            _setProgress(jobId, 'GENERATING',
+                `${completedCount}/${actualSegCount} segments done`,
+                (completedCount / actualSegCount) * 100,
+            );
+
+            if (params.projectId) {
+                try {
+                    const mongoose = (await import('mongoose')).default;
+                    const VideoProject = mongoose.model('VideoProject');
+                    await VideoProject.findByIdAndUpdate(params.projectId, {
+                        [`storyboard.segmentUrls.${i}`]: videoUrl,
+                        [`storyboard.segmentPrompts.${i}`]: segPromptUsed,
+                    });
+                } catch (e) {
+                    console.warn(`[SB LongForm ${jobId}] Failed to persist seg ${i+1}: ${e.message}`);
                 }
             }
         }

@@ -98,6 +98,37 @@ const DEITY_PHRASE_MAP = [
     [/\bSaraswati\b/gi,                           'the wisdom deity figure'],
     [/\bParvati\b/gi,                             'the goddess figure'],
     [/\bRama\b/gi,                                'the royal figure'],
+    // Indian historical and religious figures causing regional safety blocks
+    [/\bSwami\s+Sampurnanand\s+Saraswati\b/gi,    'the revered guide figure'],
+    [/\bSwami\s+Dayanand\s+Saraswati\b/gi,        'the revered guide figure'],
+    [/\bSwami\b/gi,                               'revered guide'],
+    [/\bYogi\b/gi,                                'ascetic meditating figure'],
+    [/\bYogis\b/gi,                               'ascetics meditating'],
+    [/\byogi\b/gi,                                'ascetic meditating figure'],
+    [/\byogis\b/gi,                               'ascetics meditating'],
+];
+
+// Trademarked / Copyrighted brands and events that trigger safety filters on ByteDance/Seedance
+const TRADEMARK_PHRASE_MAP = [
+    [/\bFIFA\s+World\s+Cup\b/gi,                 'the global football championship'],
+    [/\bFIFA\b/gi,                                'international football association'],
+    [/\bWorld\s+Cup\b/gi,                         'international sports tournament'],
+    [/\bOlympics\b/gi,                            'global athletic games'],
+    [/\bOlympic\s+Games\b/gi,                     'global athletic games'],
+    [/\bSuper\s+Bowl\b/gi,                        'the major football championship'],
+    [/\bNFL\b/gi,                                 'the professional football league'],
+    [/\bNBA\b/gi,                                 'the professional basketball league'],
+    [/\bChatGPT\b/gi,                             'the conversational AI'],
+    [/\bchat\s+gpt\b/gi,                          'the conversational AI'],
+    [/\bOpenAI\b/gi,                              'the AI lab'],
+    [/\bCoca-Cola\b/gi,                           'a cola soda drink'],
+    [/\bCoca\s+Cola\b/gi,                         'a cola soda drink'],
+    [/\bCoke\b/gi,                                'soda drink'],
+    [/\bPepsi\b/gi,                               'soda drink'],
+    [/\bApple\s+Watch\b/gi,                       'a premium smartwatch'],
+    [/\biPhone\b/gi,                              'a premium smartphone'],
+    [/\biPad\b/gi,                                'a tablet device'],
+    [/\bMacBook\b/gi,                             'a premium laptop'],
 ];
 
 // Seedance-specific: broad sensitive concept phrases that rarely generate without violations
@@ -126,6 +157,16 @@ const SENSITIVE_PHRASE_MAP = [
     [/\bin\s+(?:deep|fervent)\s+meditation\b/gi,  'in calm focus'],
     [/\bidol\b/gi,                                'carved stone figure'],
     [/\blingam\b/gi,                              'stone sculpture'],
+    // Indian names, practices, and pilgrimage towns triggering regional blocks
+    [/\bMulshankar\b/gi,                          'the young seeker'],
+    [/\bmulshankar\b/gi,                          'the young seeker'],
+    [/\bSanyasi\b/gi,                             'monk in saffron robes'],
+    [/\bsanyasi\b/gi,                             'monk in saffron robes'],
+    [/\bYoga\b/gi,                                'meditation exercises'],
+    [/\byoga\b/gi,                                'meditation exercises'],
+    [/\bHaridwar\b/gi,                            'an ancient river town'],
+    [/\bAhmedabad\b/gi,                           'an ancient city'],
+    [/\bKashi\b/gi,                               'an ancient sacred city'],
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -221,6 +262,17 @@ export function sanitizePromptForProvider(prompt, provider = 'default', imageCou
     }
     if (sensitiveReplacementCount > 0) {
         warnings.push(`RC#7: Sensitive phrase mapping applied (${sensitiveReplacementCount} substitutions)`);
+    }
+
+    // ── Step 0c: Apply trademark/copyright sanitization ─────────────────────
+    let trademarkReplacementCount = 0;
+    for (const [pattern, replacement] of TRADEMARK_PHRASE_MAP) {
+        const before = p;
+        p = p.replace(pattern, replacement);
+        if (p !== before) trademarkReplacementCount++;
+    }
+    if (trademarkReplacementCount > 0) {
+        warnings.push(`Trademark/copyright content sanitized (${trademarkReplacementCount} substitutions) to comply with safety filters`);
     }
 
     // ── Step 1: Apply fashion-safe multi-word phrase replacements ────────────
@@ -387,6 +439,10 @@ export function sanitizeRawText(text) {
     }
     // Apply sensitive phrase map (RC#7)
     for (const [pattern, replacement] of SENSITIVE_PHRASE_MAP) {
+        p = p.replace(pattern, replacement);
+    }
+    // Apply trademark phrase map
+    for (const [pattern, replacement] of TRADEMARK_PHRASE_MAP) {
         p = p.replace(pattern, replacement);
     }
     // Apply hard violence/nudity ban
