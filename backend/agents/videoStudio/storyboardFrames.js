@@ -326,7 +326,7 @@ async function generateWithGptImage2(
             fd.append('model', modelId);
             fd.append('prompt', finalPrompt);
             fd.append('size', size);
-            fd.append('quality', 'high');
+            fd.append('quality', 'standard'); // 'high' takes too long and causes 504 timeouts on proxies
             fd.append('n', '1');
             fd.append('response_format', 'b64_json');
             
@@ -346,14 +346,15 @@ async function generateWithGptImage2(
             response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ model: modelId, prompt: finalPrompt, size, quality: 'high', n: 1, response_format: 'b64_json' }),
+                body: JSON.stringify({ model: modelId, prompt: finalPrompt, size, quality: 'standard', n: 1, response_format: 'b64_json' }),
                 signal: AbortSignal.timeout(TIMEOUT_MS),
             });
         }
 
         if (!response.ok) {
             const errText = await response.text();
-            throw new Error(`LaoZhang ${response.status}: ${errText.substring(0, 300)}`);
+            const proxyName = isAtlas ? 'AtlasCloud' : 'LaoZhang';
+            throw new Error(`${proxyName} ${response.status}: ${errText.substring(0, 300)}`);
         }
 
         const data = await response.json();
