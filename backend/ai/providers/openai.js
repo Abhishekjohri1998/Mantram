@@ -199,7 +199,8 @@ export class OpenAIProvider extends BaseProvider {
 
         const lzKeyAvailable = !!this.lzApiKey;
         const atlasKeyAvailable = !!process.env.ATLASCLOUD_API_KEY;
-        const useLaoZhang = process.env.OPENAI_USE_LZ === 'true' || (process.env.OPENAI_USE_LZ !== 'false' && isGptImageModel && lzKeyAvailable);
+        // Default to Atlas Cloud for image generation (LaoZhang has no balance)
+        const useLaoZhang = process.env.OPENAI_USE_LZ === 'true';
         const useAtlas = !useLaoZhang && isGptImageModel && atlasKeyAvailable;
 
         let apiKey = useLaoZhang
@@ -228,18 +229,52 @@ export class OpenAIProvider extends BaseProvider {
             }
         }
 
-        const response = await fetch(`${baseUrl}/images/generations`, fetchOptions({
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify(body),
-        }));
+        let data;
+        let fetchError = null;
 
-        const data = await response.json();
-        if (!response.ok || data.error) {
-            throw new Error(`OpenAI Image Error [${response.status}]: ${data.error?.message || JSON.stringify(data).substring(0, 200)}`);
+        const makeRequest = async (url, key) => {
+            const res = await fetch(`${url}/images/generations`, fetchOptions({
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${key}`,
+                },
+                body: JSON.stringify(body),
+            }));
+
+            let parsed;
+            try {
+                parsed = await res.json();
+            } catch (e) {
+                const text = await res.text();
+                throw new Error(`Invalid JSON [${res.status}]: ${text.substring(0, 100).replace(/\n/g, ' ')}`);
+            }
+
+            if (!res.ok || parsed.error) {
+                throw new Error(`OpenAI Image Error [${res.status}]: ${parsed.error?.message || JSON.stringify(parsed).substring(0, 200)}`);
+            }
+            return parsed;
+        };
+
+        try {
+            data = await makeRequest(baseUrl, apiKey);
+        } catch (err) {
+            fetchError = err;
+            if (useLaoZhang && atlasKeyAvailable) {
+                console.warn(`   ⚠️ LaoZhang Image failed (${err.message}). Retrying on Atlas Cloud...`);
+                baseUrl = process.env.ATLASCLOUD_BASE_URL || 'https://api.atlascloud.ai/v1';
+                apiKey = process.env.ATLASCLOUD_API_KEY;
+                try {
+                    data = await makeRequest(baseUrl, apiKey);
+                    fetchError = null; // Cleared on successful fallback
+                } catch (fallbackErr) {
+                    fetchError = fallbackErr;
+                }
+            }
+        }
+
+        if (fetchError) {
+            throw fetchError;
         }
 
         const item = data.data?.[0];
@@ -295,11 +330,15 @@ export class OpenAIProvider extends BaseProvider {
             }
         }
 
-        // ── Always use LaoZhang proxy for /images/edits (native OpenAI doesn't support gpt-image edits) ──
-        const editApiKey = this.lzApiKey || this.apiKey;
-        const editBaseUrl = this.lzApiKey ? this.lzBaseUrl : this.baseUrl;
-        if (!editApiKey) throw new Error('No API key for image edit — set LAOZHANG_API_KEY or OPENAI_API_KEY');
-        console.log(`   📡 Sending to: ${editBaseUrl}/images/edits (${this.lzApiKey ? 'LaoZhang' : 'Direct OpenAI'})`);
+        // Route /images/edits to Atlas Cloud by default (LaoZhang has no balance)
+        const useLaoZhang = process.env.OPENAI_USE_LZ === 'true';
+        const atlasKeyAvailable = !!process.env.ATLASCLOUD_API_KEY;
+        
+        const editApiKey = useLaoZhang ? this.lzApiKey : (atlasKeyAvailable ? process.env.ATLASCLOUD_API_KEY : this.apiKey);
+        const editBaseUrl = useLaoZhang ? this.lzBaseUrl : (atlasKeyAvailable ? (process.env.ATLASCLOUD_BASE_URL || 'https://api.atlascloud.ai/v1') : this.baseUrl);
+        
+        if (!editApiKey) throw new Error('No API key for image edit — set ATLASCLOUD_API_KEY or OPENAI_API_KEY');
+        console.log(`   📡 Sending to: ${editBaseUrl}/images/edits`);
 
         const response = await fetch(`${editBaseUrl}/images/edits`, fetchOptions({
             method: 'POST',
