@@ -47,8 +47,8 @@ const DEITY_PHRASE_MAP = [
     [/\bShiva\s+Lingam\b/gi,                      'a carved stone idol'],
     [/\bshiva\s+lingam\b/gi,                      'a carved stone idol'],
     [/\bstone\s+Shiva\s+Lingam\b/gi,              'an ancient stone sculpture'],
-    [/\bLord\s+Shiva\b/gi,                        'the ancient deity figure'],
-    [/\bLord\s+Ganesha\b/gi,                      'the elephant-headed deity figure'],
+    [/\bLord\s+Shiva\b/gi,                        'the ancient venerated figure'],
+    [/\bLord\s+Ganesha\b/gi,                      'the elephant-headed figure'],
     [/\bLord\s+Vishnu\b/gi,                       'the divine figure in royal blue'],
     [/\bLord\s+Krishna\b/gi,                      'the flute-playing figure in blue'],
     [/\bLord\s+Ram\b/gi,                          'the royal archer figure'],
@@ -86,16 +86,16 @@ const DEITY_PHRASE_MAP = [
     [/\bsacred\s+temple\b/gi,                     'an ancient stone chamber'],
     [/\bmarigold\s+(?:flower\s+)?offerings\b/gi,  'marigold flower arrangements'],
     // Deity names (single-word, after phrases)
-    [/\bShiva\b/gi,                               'the deity figure'],
+    [/\bShiva\b/gi,                               'the venerated figure'],
     [/\bGanesha\b/gi,                             'the elephant-headed figure'],
     [/\bVishnu\b/gi,                              'the divine figure'],
     [/\bKrishna\b/gi,                             'the flute-playing figure'],
     [/\bHanuman\b/gi,                             'the devoted figure'],
     [/\bDurga\b/gi,                               'the warrior goddess figure'],
     [/\bKali\b/gi,                                'the goddess figure'],
-    [/\bBrahma\b/gi,                              'the creator deity figure'],
-    [/\bLakshmi\b/gi,                             'the prosperity deity figure'],
-    [/\bSaraswati\b/gi,                           'the wisdom deity figure'],
+    [/\bBrahma\b/gi,                              'the creator figure'],
+    [/\bLakshmi\b/gi,                             'the prosperity figure'],
+    [/\bSaraswati\b/gi,                           'the wisdom figure'],
     [/\bParvati\b/gi,                             'the goddess figure'],
     [/\bRama\b/gi,                                'the royal figure'],
     // Indian historical and religious figures causing regional safety blocks
@@ -106,6 +106,22 @@ const DEITY_PHRASE_MAP = [
     [/\bYogis\b/gi,                               'ascetics meditating'],
     [/\byogi\b/gi,                                'ascetic meditating figure'],
     [/\byogis\b/gi,                               'ascetics meditating'],
+    // Shivling and general temple/sacred terms
+    [/\bShivlings?\b/gi,                          'a carved stone sculpture'],
+    [/\bshivlings?\b/gi,                          'a carved stone sculpture'],
+    [/\bShivalings?\b/gi,                         'a carved stone sculpture'],
+    [/\bshivalings?\b/gi,                         'a carved stone sculpture'],
+    [/\bShiva\s+Lingams?\b/gi,                    'a carved stone sculpture'],
+    [/\bshiva\s+lingams?\b/gi,                    'a carved stone sculpture'],
+    [/\bstone\s+Shiva\s+Lingams?\b/gi,            'an ancient stone sculpture'],
+    [/\btemples?\b/gi,                            'stone chamber'],
+    [/\bsacred\b/gi,                              'ceremonial'],
+    [/\bgurus?\b/gi,                              'revered guide'],
+    [/\bashrams?\b/gi,                            'peaceful sanctuary'],
+    [/\bdevotional\b/gi,                          'contemplative'],
+    [/\bdevotion\b/gi,                            'focused dedication'],
+    [/\bprayers?\b/gi,                            'meditation'],
+    [/\bpraying\b/gi,                             'meditating'],
 ];
 
 // Trademarked / Copyrighted brands and events that trigger safety filters on ByteDance/Seedance
@@ -155,8 +171,8 @@ const SENSITIVE_PHRASE_MAP = [
     [/\bfervent\s+prayer\b/gi,                    'quiet meditation'],
     [/\bdeep\s+meditation\b/gi,                   'calm focus'],
     [/\bin\s+(?:deep|fervent)\s+meditation\b/gi,  'in calm focus'],
-    [/\bidol\b/gi,                                'carved stone figure'],
-    [/\blingam\b/gi,                              'stone sculpture'],
+    [/\bidols?\b/gi,                              'carved stone figure'],
+    [/\blingams?\b/gi,                            'stone sculpture'],
     // Indian names, practices, and pilgrimage towns triggering regional blocks
     [/\bMulshankar\b/gi,                          'the young seeker'],
     [/\bmulshankar\b/gi,                          'the young seeker'],
@@ -167,6 +183,9 @@ const SENSITIVE_PHRASE_MAP = [
     [/\bHaridwar\b/gi,                            'an ancient river town'],
     [/\bAhmedabad\b/gi,                           'an ancient city'],
     [/\bKashi\b/gi,                               'an ancient sacred city'],
+    // General deity terms to replace any leftover triggers
+    [/\bdeities\b/gi,                             'venerated figures'],
+    [/\bdeity\b/gi,                               'venerated figure'],
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────

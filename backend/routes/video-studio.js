@@ -9613,7 +9613,7 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
         const RESOLUTION_TO_IMAGESIZE = { '480p': '1K', '720p': '1K', '1080p': '1K', '2k': '2K', '4k': '4K' };
         const imageSizeForModel = RESOLUTION_TO_IMAGESIZE[resolution] || '2K';
 
-        const totalDuration = Math.max(5, Math.min(300, parseInt(duration) || 30));
+        const totalDuration = Math.max(5, Math.min(600, parseInt(duration) || 30));
 
         // ══════ DIAGNOSTIC LOGGING ══════
         console.log(`\n🔍 [Storyboard Create] ══ INCOMING REQUEST DUMP ══`);
