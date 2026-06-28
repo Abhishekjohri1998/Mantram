@@ -237,6 +237,12 @@ async function generateWithGptImage2(
     const modelId = 'gpt-image-2';
 
     const refBuffers = [];
+    
+    // Truncate overly long prompts to prevent DALL-E 3 from exceeding 120s processing time and hitting proxy timeouts
+    if (finalPrompt.length > 800) {
+        finalPrompt = finalPrompt.substring(0, 800) + '...';
+        console.log(`[SB Poster][GPT-Image-2] ✂️ Prompt truncated to 800 chars to avoid 120s proxy timeout.`);
+    }
 
     // 1. Collect Product Image (first only to avoid slot confusion)
     if (rawProductBuffers.length > 0) {
