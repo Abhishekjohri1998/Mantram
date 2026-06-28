@@ -325,72 +325,136 @@ function generateFallbackScenes({ sceneCount, durations, arcScenes, language, pr
  */
 /**
  * Procedurally expand segment cuts to at least 5 per segment.
- * Each of the 5 sub-cuts gets a GENUINELY DISTINCT framePrompt built for its shot type —
- * not just the same base text with a modifier appended (which Seedance collapses into the same visual).
+ * Each sub-cut is DRIVEN BY THE ACTUAL SCENE CONTENT — not hardcoded shot archetypes.
+ * Shot A mirrors the director's own framing for the dominant action.
+ * Shot B tightens on character emotion.
+ * Shot C is a contextual B-roll of a real visual element extracted from the scene text.
+ * Shot D shifts to a contrasting angle/perspective of the same action.
+ * Shot E widens to close the scene beat.
  */
 function ensureMinCutsPerSegment(cuts, duration) {
     if (cuts.length >= 5) return cuts;
 
-    const targetCount = 5;
-    const subDuration = Math.round((duration / targetCount) * 10) / 10;
+    const subDuration = Math.round((duration / 5) * 10) / 10;
 
-    // Find the "dominant" cut — the one that covers the most of this segment's timeline
+    // Use the dominant cut as the scene anchor
     const dominant = cuts.reduce((best, c) => (c.duration > best.duration ? c : best), cuts[0]);
-    const baseScene       = dominant.scene || 'Cinematic visual scene';
-    const baseEnvironment = dominant.environment || '';
-    const charRef         = '@image2'; // character reference tag
+    const baseScene  = dominant.scene  || 'Cinematic visual scene';
+    const baseFrame  = dominant.framePrompt || dominant.scene || '';
+    const env        = dominant.environment || '';
+    const domShot    = dominant.shot  || 'MEDIUM';
+    const domMove    = dominant.move  || 'STEADICAM';
+    const domLens    = dominant.lens  || '50mm prime';
+    const charRef    = '@image2';
 
-    // 5 distinct shot archetypes — each gets a unique visual construction
-    const shotArchetypes = [
+    // Derive B-roll subject from the actual scene text — looks for real visual elements
+    const brollSubject = extractBrollSubject(baseFrame, env);
+
+    // Contrasting angle: if director picked a low angle, shift to high, and vice-versa
+    const contrastShot = domShot === 'LOW-ANGLE'   ? 'HIGH-ANGLE'
+                       : domShot === 'HIGH-ANGLE'   ? 'LOW-ANGLE'
+                       : domShot === 'WIDE'         ? 'CLOSE-UP'
+                       : domShot === 'CLOSE-UP'     ? 'WIDE'
+                       : domShot === 'ESTABLISHING' ? 'CLOSE-UP'
+                       : 'MEDIUM';
+    const contrastMove = ['STEADICAM', 'STATIC', 'DOLLY-IN', 'DOLLY-OUT', 'ARC']
+                            .find(m => m !== domMove) || 'ARC';
+
+    const variations = [
+        // A — Primary action: mirrors the director's own framing, preserves their intent
         {
-            shot: 'WIDE',
-            move: 'STEADICAM',
-            lens: '24mm wide-angle',
-            buildPrompt: (scene, env) =>
-                `Wide establishing shot, 24mm anamorphic lens, full depth of field. ${env ? `Environment: ${env}. ` : ''}${scene}. Camera glides slowly through the scene, revealing scale and atmosphere. Warm cinematic lighting, foreground elements frame the shot. ${charRef} visible in the middle distance.`,
+            shot: domShot,
+            move: domMove,
+            lens: domLens,
+            framePrompt: `${baseFrame}${env ? ` Set: ${env}.` : ''} ${charRef} in frame — scene as directed.`,
         },
+        // B — Emotional close-up: tighten onto the character's face / gesture / reaction
         {
             shot: 'CLOSE-UP',
             move: 'DOLLY-IN',
             lens: '85mm portrait',
-            buildPrompt: (scene, env) =>
-                `85mm portrait lens, shallow depth of field, creamy bokeh background. Close-up on ${charRef}'s face — eyes, expression, emotion. ${scene}. Warm key light on face, subtle rim light separating subject from background. Slow dolly-in to heighten emotional intimacy.`,
+            framePrompt: `85mm portrait lens, shallow depth of field. Close-up on ${charRef} — face, eyes, expression conveying emotion as ${baseScene.replace(/\.$/, '').toLowerCase()}. Warm key light, soft rim light, creamy bokeh background.`,
         },
+        // C — Contextual B-roll: a real visual element from this specific scene/environment
         {
-            shot: 'MEDIUM',
+            shot: 'INSERT',
             move: 'STATIC',
-            lens: '50mm prime',
-            buildPrompt: (scene, env) =>
-                `50mm prime, medium shot framing ${charRef} from waist up. ${scene}. ${env ? `Set: ${env}. ` : ''}Character actively engaged — hands visible and moving, posture purposeful. Soft fill light from camera-left. Natural background slightly defocused.`,
-        },
-        {
-            shot: 'MACRO',
-            move: 'PUSH-IN',
             lens: '100mm macro',
-            buildPrompt: (scene, env) =>
-                `100mm macro lens, extreme close-up detail shot. Razor-sharp foreground detail — texture, surface, gesture, sacred object, or product label. ${scene}. Bokeh background with soft ambient light. Gentle push-in reveals intricate detail. No character faces — pure visual texture and tactile detail.`,
+            framePrompt: `B-roll insert — ${brollSubject}. 100mm macro lens, extreme close-up, razor-sharp foreground detail, bokeh background. Natural or ambient light picking out texture and surface. No character faces in frame — pure visual element.`,
         },
+        // D — Perspective contrast: opposite angle of the same action for visual variety
         {
-            shot: 'ESTABLISHING',
-            move: 'ARC',
+            shot: contrastShot,
+            move: contrastMove,
+            lens: '50mm prime',
+            framePrompt: `${contrastShot.toLowerCase().replace('-', ' ')} perspective — ${baseScene.replace(/\.$/, '').toLowerCase()}. ${env ? `Location: ${env}.` : ''} ${charRef} repositioned in frame. 50mm prime, ${contrastMove.toLowerCase()} camera movement, cinematic depth.`,
+        },
+        // E — Scene resolution: wider pull-out closing this beat before the next scene
+        {
+            shot: 'WIDE',
+            move: 'PULL-OUT',
             lens: '35mm anamorphic',
-            buildPrompt: (scene, env) =>
-                `35mm anamorphic, slight arc camera movement revealing the wider scene context. ${env ? `Location: ${env}. ` : ''}${scene}. ${charRef} integrated into the environment. Cinematic wide-angle barrel distortion, cool rim light, natural ambient fill. Establishes relationship between character and surroundings.`,
+            framePrompt: `Wide pull-out closing this scene beat — ${baseScene.replace(/\.$/, '').toLowerCase()}. ${env || 'Location'} fully revealed. 35mm anamorphic, natural ambient light, full depth of field, foreground to background.`,
         },
     ];
 
-    return shotArchetypes.map((archetype, i) => ({
+    return variations.map((v, i) => ({
         ...dominant,
         id: `${dominant.id || 1}_sub${i + 1}`,
         duration: subDuration,
-        shot: archetype.shot,
-        move: archetype.move,
-        lens: archetype.lens,
-        framePrompt: archetype.buildPrompt(baseScene, baseEnvironment),
+        shot: v.shot,
+        move: v.move,
+        lens: v.lens,
+        framePrompt: v.framePrompt,
         scene: dominant.scene || `Scene shot ${i + 1}`,
-        voiceover: i === 0 ? (dominant.voiceover || '') : '', // only first sub-cut carries voiceover
-        dialogue:  i === 0 ? (dominant.dialogue || '') : '',
+        voiceover: i === 0 ? (dominant.voiceover || '') : '', // voiceover on primary shot only
+        dialogue:  i === 0 ? (dominant.dialogue  || '') : '',
     }));
+}
+
+/**
+ * Extract a contextual B-roll subject from the scene's framePrompt and environment text.
+ * Looks for real visual elements mentioned in the content — sacred objects for devotional,
+ * nature elements for music videos, product details for ads, etc.
+ * Falls back to an environmental texture shot if no specific element is found.
+ */
+function extractBrollSubject(framePrompt = '', environment = '') {
+    const text = `${framePrompt} ${environment}`.toLowerCase();
+
+    // Ordered from most specific to least — stops at first match
+    const patterns = [
+        // Sacred / devotional
+        { match: ['diya', 'diye', 'diyas'],        label: 'a diya oil lamp — flame flickering, warm golden light, melted wax pooling around the wick' },
+        { match: ['incense', 'agarbatti'],          label: 'incense stick — thin smoke curling upward in slow motion, soft glow at the tip' },
+        { match: ['lotus', 'kamal'],                label: 'lotus flower — petals opening, water drops beading on the surface, soft morning light' },
+        { match: ['petal', 'flower', 'phool'],      label: 'flower petals — scattered on a surface, colours vivid, gentle texture in macro detail' },
+        { match: ['bell', 'ghanta'],                label: 'temple bell — close-up of worn brass surface, rope swinging softly' },
+        { match: ['garland', 'maala'],              label: 'marigold garland — individual flowers close-up, orange and yellow petals in sharp detail' },
+        { match: ['idol', 'murti', 'deity', 'god'], label: 'sacred idol — close-up of intricate carved detail, gold and stone surface, ambient lamp light' },
+        { match: ['flame', 'fire', 'aarti'],        label: 'flame — close-up of dancing fire, sparks micro-detail, warm orange light' },
+        { match: ['river', 'ganga', 'water', 'nadi'], label: 'flowing water — river surface, light refracting on ripples, movement and stillness' },
+        { match: ['leaf', 'tree', 'forest', 'jungle'], label: 'leaves — macro of a single leaf, light filtering through, vein texture' },
+        { match: ['mountain', 'hill', 'pahad'],     label: 'mountain landscape — mist, rock texture, scale and silence' },
+        { match: ['sky', 'cloud', 'dawn', 'sunset', 'sunrise'], label: 'sky — clouds moving, light gradient, atmospheric colour' },
+        { match: ['hand', 'hath', 'finger'],        label: 'hands — close-up of palms, gesture, texture, light catching the skin' },
+        { match: ['eye', 'aankh'],                  label: 'eyes — extreme close-up, iris detail, emotion, reflection in the pupil' },
+        // Product / commercial
+        { match: ['label', 'bottle', 'packaging'],  label: 'product label — macro detail, typography, surface finish, light reflection' },
+        { match: ['product', 'logo'],               label: 'product surface — close-up texture, material quality, brand mark detail' },
+        { match: ['fabric', 'cloth', 'texture'],    label: 'fabric texture — weave detail, colour, surface light interaction' },
+        // Generic light/atmosphere
+        { match: ['light', 'glow', 'shimmer', 'glimmer', 'golden'], label: 'light — bokeh particles, rays, atmospheric haze in slow motion' },
+    ];
+
+    for (const { match, label } of patterns) {
+        if (match.some(keyword => text.includes(keyword))) return label;
+    }
+
+    // Fallback: generic environmental B-roll derived from environment description
+    if (environment) {
+        return `environmental detail from ${environment} — surface texture, ambient light, atmosphere`;
+    }
+    return 'ambient environmental texture — surface, light, and atmosphere in macro detail';
 }
 
 export async function planStoryboardScenes({
