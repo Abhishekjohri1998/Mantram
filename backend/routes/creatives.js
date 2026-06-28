@@ -1481,15 +1481,22 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
     // Direct OpenAI does not remap modelId now.
     const isGptImageModel = modelId === 'gpt-image-1' || modelId === 'gpt-image-2';
     const lzKeyAvailable = !!process.env.LAOZHANG_API_KEY;
+    const atlasKeyAvailable = !!process.env.ATLASCLOUD_API_KEY;
     const useLaoZhang = process.env.OPENAI_USE_LZ === 'true' || (process.env.OPENAI_USE_LZ !== 'false' && isGptImageModel && lzKeyAvailable);
+    const useAtlas = !useLaoZhang && isGptImageModel && atlasKeyAvailable;
+
     const apiKey = useLaoZhang
         ? (process.env.LAOZHANG_API_KEY)
+        : useAtlas
+        ? (process.env.ATLASCLOUD_API_KEY)
         : (process.env.OPENAI_API_KEY);
     const baseUrl = useLaoZhang
         ? (process.env.LAOZHANG_BASE_URL || 'https://api.laozhang.ai/v1')
+        : useAtlas
+        ? (process.env.ATLASCLOUD_BASE_URL || 'https://api.atlascloud.ai/v1')
         : 'https://api.openai.com/v1';
 
-    if (!apiKey) throw new Error(`OpenAI API key not configured (${useLaoZhang ? 'LAOZHANG_API_KEY' : 'OPENAI_API_KEY'})`);
+    if (!apiKey) throw new Error(`OpenAI API key not configured (${useLaoZhang ? 'LAOZHANG_API_KEY' : useAtlas ? 'ATLASCLOUD_API_KEY' : 'OPENAI_API_KEY'})`);
 
     // ── Map aspect ratio → nearest supported image size ──
     // We map portrait and landscape ratios to their native equivalents to prevent text cropping downstream.
@@ -1576,7 +1583,7 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
     const endpoint = useEditsEndpoint ? 'images/edits' : 'images/generations';
 
     let mappedModelId = modelId;
-    if (!useLaoZhang && (mappedModelId === 'gpt-image-2' || mappedModelId === 'gpt-image-1')) {
+    if (!useLaoZhang && !useAtlas && (mappedModelId === 'gpt-image-2' || mappedModelId === 'gpt-image-1')) {
         mappedModelId = 'dall-e-3';
     }
 

@@ -198,11 +198,22 @@ export class OpenAIProvider extends BaseProvider {
         }
 
         const lzKeyAvailable = !!this.lzApiKey;
+        const atlasKeyAvailable = !!process.env.ATLASCLOUD_API_KEY;
         const useLaoZhang = process.env.OPENAI_USE_LZ === 'true' || (process.env.OPENAI_USE_LZ !== 'false' && isGptImageModel && lzKeyAvailable);
-        let apiKey = useLaoZhang ? this.lzApiKey : this.apiKey;
-        let baseUrl = useLaoZhang ? this.lzBaseUrl : this.baseUrl;
+        const useAtlas = !useLaoZhang && isGptImageModel && atlasKeyAvailable;
 
-        if (!useLaoZhang && (modelId === 'gpt-image-2' || modelId === 'gpt-image-1')) {
+        let apiKey = useLaoZhang
+            ? this.lzApiKey
+            : useAtlas
+            ? process.env.ATLASCLOUD_API_KEY
+            : this.apiKey;
+        let baseUrl = useLaoZhang
+            ? this.lzBaseUrl
+            : useAtlas
+            ? (process.env.ATLASCLOUD_BASE_URL || 'https://api.atlascloud.ai/v1')
+            : this.baseUrl;
+
+        if (!useLaoZhang && !useAtlas && (modelId === 'gpt-image-2' || modelId === 'gpt-image-1')) {
             modelId = 'dall-e-3';
             body.model = 'dall-e-3';
         }
