@@ -98,6 +98,14 @@ const DEITY_PHRASE_MAP = [
     [/\bSaraswati\b/gi,                           'the wisdom deity figure'],
     [/\bParvati\b/gi,                             'the goddess figure'],
     [/\bRama\b/gi,                                'the royal figure'],
+    // Indian historical and religious figures causing regional safety blocks
+    [/\bSwami\s+Sampurnanand\s+Saraswati\b/gi,    'the revered guide figure'],
+    [/\bSwami\s+Dayanand\s+Saraswati\b/gi,        'the revered guide figure'],
+    [/\bSwami\b/gi,                               'revered guide'],
+    [/\bYogi\b/gi,                                'ascetic meditating figure'],
+    [/\bYogis\b/gi,                               'ascetics meditating'],
+    [/\byogi\b/gi,                                'ascetic meditating figure'],
+    [/\byogis\b/gi,                               'ascetics meditating'],
 ];
 
 // Trademarked / Copyrighted brands and events that trigger safety filters on ByteDance/Seedance
@@ -149,6 +157,16 @@ const SENSITIVE_PHRASE_MAP = [
     [/\bin\s+(?:deep|fervent)\s+meditation\b/gi,  'in calm focus'],
     [/\bidol\b/gi,                                'carved stone figure'],
     [/\blingam\b/gi,                              'stone sculpture'],
+    // Indian names, practices, and pilgrimage towns triggering regional blocks
+    [/\bMulshankar\b/gi,                          'the young seeker'],
+    [/\bmulshankar\b/gi,                          'the young seeker'],
+    [/\bSanyasi\b/gi,                             'monk in saffron robes'],
+    [/\bsanyasi\b/gi,                             'monk in saffron robes'],
+    [/\bYoga\b/gi,                                'meditation exercises'],
+    [/\byoga\b/gi,                                'meditation exercises'],
+    [/\bHaridwar\b/gi,                            'an ancient river town'],
+    [/\bAhmedabad\b/gi,                           'an ancient city'],
+    [/\bKashi\b/gi,                               'an ancient sacred city'],
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
