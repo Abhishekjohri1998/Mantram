@@ -41,8 +41,17 @@ class ModelRouter {
         }
 
         // Register all providers — they self-check if API key exists
-        // ── Gemini: Native Gemini first (if key exists) → Atlas Cloud fallback → Laozhang fallback ──
-        if (providerConfigs.gemini?.apiKey) {
+        // ── Gemini: Atlas Cloud first (if key exists) → Native Gemini fallback → Laozhang fallback ──
+        if (providerConfigs.atlascloud?.apiKey) {
+            console.log('🔄 Routing Gemini through Atlas Cloud (OpenAI format)');
+            const geminiAtlasProvider = new OpenAIProvider({
+                apiKey: providerConfigs.atlascloud.apiKey,
+                defaultModel: 'google/' + (config.ai.defaultGeminiModel || 'gemini-2.5-pro'),
+            });
+            geminiAtlasProvider.name = 'gemini';
+            geminiAtlasProvider.baseUrl = providerConfigs.atlascloud.baseUrl;
+            this.providers.gemini = geminiAtlasProvider;
+        } else if (providerConfigs.gemini?.apiKey) {
             console.log('🔄 Routing Gemini directly via Native Google API');
             this.providers.gemini = new GeminiProvider({
                 apiKey: providerConfigs.gemini.apiKey,
@@ -54,15 +63,6 @@ class ModelRouter {
                 gcpLocation: providerConfigs.gemini?.gcpLocation,
                 googleApplicationCredentials: providerConfigs.gemini?.googleApplicationCredentials,
             });
-        } else if (providerConfigs.atlascloud?.apiKey) {
-            console.log('🔄 Routing Gemini through Atlas Cloud (OpenAI format)');
-            const geminiAtlasProvider = new OpenAIProvider({
-                apiKey: providerConfigs.atlascloud.apiKey,
-                defaultModel: 'google/' + (config.ai.defaultGeminiModel || 'gemini-2.5-pro'),
-            });
-            geminiAtlasProvider.name = 'gemini';
-            geminiAtlasProvider.baseUrl = providerConfigs.atlascloud.baseUrl;
-            this.providers.gemini = geminiAtlasProvider;
         } else if (providerConfigs.laozhang?.apiKey) {
             console.log('🔄 Routing Gemini through Laozhang (OpenAI format)');
             const geminiLzProvider = new OpenAIProvider({
