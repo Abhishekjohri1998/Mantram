@@ -232,7 +232,8 @@ async function generateWithGptImage2(
     allRawAvatarBuffers = [], allAvatarUrls = [], avatarNames = [],
     rawRefBuffers = [], refImageUrls = [],
 ) {
-    const size = AR_TO_SIZE[ar] || '1792x1024';
+    // AtlasCloud proxy has bugs with 1792x1024, so we force 1024x1024 for stability
+    const size = '1024x1024';
     const modelId = 'gpt-image-2';
 
     const refBuffers = [];
@@ -325,7 +326,7 @@ async function generateWithGptImage2(
             const fd = new FormData();
             fd.append('model', modelId);
             fd.append('prompt', finalPrompt);
-            fd.append('size', '1024x1024'); // AtlasCloud proxy rejects 1792x1024 unless 'high' quality is used, which causes 504 timeouts
+            fd.append('size', size);
             fd.append('n', '1');
             fd.append('response_format', 'b64_json');
             
@@ -345,7 +346,7 @@ async function generateWithGptImage2(
             response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ model: modelId, prompt: finalPrompt, size: '1024x1024', n: 1, response_format: 'b64_json' }),
+                body: JSON.stringify({ model: modelId, prompt: finalPrompt, size, n: 1, response_format: 'b64_json' }),
                 signal: AbortSignal.timeout(TIMEOUT_MS),
             });
         }
