@@ -700,7 +700,7 @@ export async function runStoryboardDirector({
             systemPrompt,
             userPrompt,
             imageUrls,
-            { temperature: 0.7, maxTokens: scaledTokens, returnRaw: true, provider: directorModel }
+            { temperature: 0.7, maxTokens: scaledTokens, returnRaw: true, provider: directorModel, timeoutMs: 600000 }
         );
         if (!rawOutput || typeof rawOutput !== 'string' || rawOutput.error) {
             throw new Error(rawOutput?.error || 'Empty or invalid response from LLM');
@@ -716,7 +716,7 @@ export async function runStoryboardDirector({
     } catch (parseErr) {
         console.error(`[Storyboard Director] Parse failed, retrying...`);
         const retrySystem = systemPrompt + '\n\nCRITICAL: Your previous output could not be parsed as JSON. Return ONLY raw JSON, zero other text.';
-        rawOutput = await callMultimodalAgent(retrySystem, userPrompt, imageUrls, { temperature: 0.4, maxTokens: 8000, returnRaw: true, provider: directorModel });
+        rawOutput = await callMultimodalAgent(retrySystem, userPrompt, imageUrls, { temperature: 0.4, maxTokens: 8000, returnRaw: true, provider: directorModel, timeoutMs: 600000 });
         if (!rawOutput || typeof rawOutput !== 'string' || rawOutput.error) {
             throw new Error(`Storyboard Director (${directorModel}) retry failed: ${rawOutput?.error || 'Empty or invalid response'}`);
         }
