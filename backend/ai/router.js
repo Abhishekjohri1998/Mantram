@@ -18,7 +18,7 @@ class ModelRouter {
         // Structure: { providerName: { count, firstSeen, lastSeen } }
         this._recentErrors = {};
         // Max time (ms) a single provider API call is allowed before aborting
-        this.PER_CALL_TIMEOUT_MS = 45_000; // 45 seconds (increased from 12s to give reasoning models time to think)
+        this.PER_CALL_TIMEOUT_MS = 180_000; // 180 seconds (3 minutes) to ensure heavy Claude generations do not time out
         this._initProviders();
     }
 

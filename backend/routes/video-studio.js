@@ -6473,47 +6473,30 @@ OUTPUT FORMAT: Seedance 2 video generation (text-to-video / image-to-video)
 
 Write the animation prompt now. Be the motion graphics director the brand deserves.`;
 
-        // Use Atlas Cloud (OpenAI-compatible) for Claude — cheaper + no ANTHROPIC_API_KEY dependency
-        const atlasKey = process.env.ATLASCLOUD_API_KEY || anthropicKey;
-        const atlasBase = process.env.ATLASCLOUD_BASE_URL || 'https://api.atlascloud.ai/v1';
-        const isAtlas = !!process.env.ATLASCLOUD_API_KEY;
-
         const claudeResp = await fetch(
-            isAtlas ? `${atlasBase}/chat/completions` : 'https://api.anthropic.com/v1/messages',
+            'https://api.anthropic.com/v1/messages',
             {
                 method: 'POST',
-                headers: isAtlas
-                    ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${atlasKey}` }
-                    : { 'Content-Type': 'application/json', 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01' },
-                body: JSON.stringify(isAtlas
-                    ? {
-                        model: 'anthropic/claude-sonnet-4.6',
-                        max_tokens: 1024,
-                        temperature,
-                        messages: [
-                            { role: 'system', content: systemPrompt },
-                            { role: 'user', content: userMessage },
-                        ],
-                    }
-                    : {
-                        model: 'claude-sonnet-4-6',
-                        max_tokens: 1024,
-                        temperature,
-                        system: systemPrompt,
-                        messages: [{ role: 'user', content: userMessage }],
-                    }
-                ),
-                signal: AbortSignal.timeout(45_000),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': anthropicKey,
+                    'anthropic-version': '2023-06-01',
+                },
+                body: JSON.stringify({
+                    model: 'claude-3-5-sonnet-20241022',
+                    max_tokens: 1024,
+                    temperature,
+                    system: systemPrompt,
+                    messages: [{ role: 'user', content: userMessage }],
+                }),
+                signal: AbortSignal.timeout(60_000),
             }
         );
 
         const claudeData = await claudeResp.json();
         if (claudeData.error) throw new Error(claudeData.error.message);
 
-        const motionPrompt = (isAtlas
-            ? claudeData.choices?.[0]?.message?.content
-            : claudeData.content?.[0]?.text
-        )?.trim() || '';
+        const motionPrompt = claudeData.content?.[0]?.text?.trim() || '';
         if (!motionPrompt) throw new Error('Claude returned empty prompt');
 
         console.log(`[Motion Graphics] Claude prompt generated: ${motionPrompt.length} chars, style=${styleId}`);
