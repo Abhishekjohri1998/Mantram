@@ -1583,9 +1583,6 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
     const endpoint = useEditsEndpoint ? 'images/edits' : 'images/generations';
 
     let mappedModelId = modelId;
-    if (!useLaoZhang && !useAtlas && (mappedModelId === 'gpt-image-2' || mappedModelId === 'gpt-image-1')) {
-        mappedModelId = 'dall-e-3';
-    }
 
     let finalImageSize = imageSize;
     let customDimensions = null;

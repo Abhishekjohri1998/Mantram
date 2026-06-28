@@ -212,12 +212,6 @@ export class OpenAIProvider extends BaseProvider {
             : useAtlas
             ? (process.env.ATLASCLOUD_BASE_URL || 'https://api.atlascloud.ai/v1')
             : this.baseUrl;
-
-        if (!useLaoZhang && !useAtlas && (modelId === 'gpt-image-2' || modelId === 'gpt-image-1')) {
-            modelId = 'dall-e-3';
-            body.model = 'dall-e-3';
-        }
-
         if (quality === 'high' || quality === 'hd') {
             body.quality = 'hd';
         }
