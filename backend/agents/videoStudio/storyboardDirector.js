@@ -256,7 +256,7 @@ SECTION 3 — CUT PLAN (THE STORYBOARD)
 Write the exact shot list for ONE continuous video of ${duration} seconds.
 Cuts are camera angles / shot changes within the video — NOT separate videos.
 ${duration > 60 
-    ? `DENSITY (MANDATORY): Since this is a long-form video of ${duration} seconds, you MUST write exactly ${Math.ceil(duration / 15)} scenes (cuts) in your cuts[] array to fit within the AI output token limit. Each cut MUST have a duration of EXACTLY 15 seconds (e.g. for a 360-second video, you must output exactly 24 cuts, each with a duration of exactly 15). Do not write more or fewer cuts, and do not make cuts longer or shorter than 15 seconds.`
+    ? `DENSITY (MANDATORY): Since this is a long-form video of ${duration} seconds, you MUST write between ${Math.ceil(duration / 12)} and ${Math.ceil(duration / 10)} scenes (cuts) in your cuts[] array to fit within the AI output token limit. The durations of the cuts must sum exactly to ${duration} seconds, with most cuts being 10 to 12 seconds long.`
     : `DENSITY (MANDATORY): Minimum 1 cut per 3 seconds. A ${duration}s video MUST have AT LEAST ${Math.ceil(duration / 3)} cuts. Target ${Math.ceil(duration / 3)} to ${Math.ceil(duration / 2)} cuts. Each cut should be 2–4 seconds for high commercial energy. Never let any single cut exceed 5 seconds unless it is a special slow-motion or reveal moment.`
 }
 
@@ -283,7 +283,7 @@ Each cut must have:
 RULES FOR CUTS:
 - Durations must SUM exactly to ${duration}s
 ${duration > 60
-    ? `- EXACTLY ${Math.ceil(duration / 15)} cuts are required in the cuts[] array — this is a hard constraint, not a suggestion. Each cut MUST be exactly 15 seconds.`
+    ? `- BETWEEN ${Math.ceil(duration / 12)} AND ${Math.ceil(duration / 10)} CUTS ARE REQUIRED in the cuts[] array — this is a hard constraint, not a suggestion. The cuts must sum exactly to ${duration}s.`
     : `- MINIMUM ${Math.ceil(duration / 3)} CUTS REQUIRED — this is a hard constraint, not a suggestion.`
 }
 ${narrativeArcGuide}
