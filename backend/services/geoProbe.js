@@ -174,9 +174,8 @@ async function probeOpenAI(prompt, signal = null) {
 }
 
 async function probeClaude(prompt, signal = null) {
-    const atlasKey = process.env.ATLASCLOUD_API_KEY;
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
-    if (!atlasKey && !anthropicKey) return null;
+    if (!anthropicKey) return null;
     const controller = new AbortController();
     try { setMaxListeners(30, controller.signal); } catch (e) {}
     const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT);
