@@ -1481,7 +1481,7 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
     // Direct OpenAI does not remap modelId now.
     const isGptImageModel = modelId === 'gpt-image-1' || modelId === 'gpt-image-2';
     const lzKeyAvailable = !!process.env.LAOZHANG_API_KEY;
-    const useLaoZhang = process.env.OPENAI_USE_LZ === 'true' || (isGptImageModel && lzKeyAvailable);
+    const useLaoZhang = process.env.OPENAI_USE_LZ === 'true' || (process.env.OPENAI_USE_LZ !== 'false' && isGptImageModel && lzKeyAvailable);
     const apiKey = useLaoZhang
         ? (process.env.LAOZHANG_API_KEY)
         : (process.env.OPENAI_API_KEY);
@@ -1576,8 +1576,8 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
     const endpoint = useEditsEndpoint ? 'images/edits' : 'images/generations';
 
     let mappedModelId = modelId;
-    if (mappedModelId === 'dall-e-3') {
-        throw new Error('DALL-E 3 is a deprecated model and cannot be used.');
+    if (!useLaoZhang && (mappedModelId === 'gpt-image-2' || mappedModelId === 'gpt-image-1')) {
+        mappedModelId = 'dall-e-3';
     }
 
     let finalImageSize = imageSize;

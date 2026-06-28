@@ -167,9 +167,6 @@ export class OpenAIProvider extends BaseProvider {
     async generateImage({ prompt, size = '1024x1024', model, quality, aspectRatio, imageParts, image_url }) {
         let modelId = model || this.config.defaultImageModel || 'gpt-image-2';
         if (modelId === 'nanobanana') modelId = 'gpt-image-2'; // NanoBanana is an alias for gpt-image-2
-        if (modelId === 'dall-e-3') {
-            throw new Error('DALL-E 3 is a deprecated model and cannot be used.');
-        }
 
         const isGptImageModel = modelId === 'gpt-image-2' || modelId === 'gpt-image-1';
 
@@ -201,9 +198,14 @@ export class OpenAIProvider extends BaseProvider {
         }
 
         const lzKeyAvailable = !!this.lzApiKey;
-        const useLaoZhang = process.env.OPENAI_USE_LZ === 'true' || (isGptImageModel && lzKeyAvailable);
-        const apiKey = useLaoZhang ? this.lzApiKey : this.apiKey;
-        const baseUrl = useLaoZhang ? this.lzBaseUrl : this.baseUrl;
+        const useLaoZhang = process.env.OPENAI_USE_LZ === 'true' || (process.env.OPENAI_USE_LZ !== 'false' && isGptImageModel && lzKeyAvailable);
+        let apiKey = useLaoZhang ? this.lzApiKey : this.apiKey;
+        let baseUrl = useLaoZhang ? this.lzBaseUrl : this.baseUrl;
+
+        if (!useLaoZhang && (modelId === 'gpt-image-2' || modelId === 'gpt-image-1')) {
+            modelId = 'dall-e-3';
+            body.model = 'dall-e-3';
+        }
 
         if (quality === 'high' || quality === 'hd') {
             body.quality = 'hd';
