@@ -295,6 +295,7 @@ class ModelRouter {
      */
     async generateText(params, preferences = {}) {
         let provider = this.getTextProvider(preferences);
+        let activeParams = params;
 
         // If primary is in cooldown, find next best available
         if (provider.cooldownUntil && Date.now() < provider.cooldownUntil) {
@@ -302,6 +303,9 @@ class ModelRouter {
             const fallback = this._getFallback(provider.name, 'text');
             if (fallback) {
                 provider = fallback;
+                // Strip the model ID so the fallback uses its own default model
+                const { model: _, ...strippedParams } = params;
+                activeParams = strippedParams;
             }
         }
 
@@ -313,7 +317,7 @@ class ModelRouter {
         const dynamicTimeout = preferences.timeoutMs || this._calcTimeout(params.maxTokens);
 
         try {
-            const result = await this._withTimeout(provider.generateText(params), provider.name, dynamicTimeout);
+            const result = await this._withTimeout(provider.generateText(activeParams), provider.name, dynamicTimeout);
             if (!result || !result.text || !result.text.trim()) {
                 throw new Error(`Model returned an empty response (likely blocked by safety/recitation filters or rate limits).`);
             }
@@ -444,6 +448,7 @@ class ModelRouter {
     async analyzeText(params, preferences = {}) {
         const resolvedPrefs = { provider: params.provider, ...preferences };
         let provider = this.getTextProvider(resolvedPrefs);
+        let activeParams = params;
 
         // If primary is in cooldown, find next best available
         if (provider.cooldownUntil && Date.now() < provider.cooldownUntil) {
@@ -451,6 +456,9 @@ class ModelRouter {
             const fallback = this._getFallback(provider.name, 'text');
             if (fallback) {
                 provider = fallback;
+                // Strip the model ID so the fallback uses its own default model
+                const { model: _, ...strippedParams } = params;
+                activeParams = strippedParams;
             }
         }
 
@@ -458,7 +466,7 @@ class ModelRouter {
         let lastError = null;
 
         try {
-            return await this._withTimeout(provider.analyzeText(params), provider.name);
+            return await this._withTimeout(provider.analyzeText(activeParams), provider.name);
         } catch (error) {
             lastError = error;
             const isQuotaError = this._testQuotaError(error);
@@ -495,7 +503,10 @@ class ModelRouter {
                 try {
                     triedProviders.add(fallback.name);
                     console.log(`Trying fallback provider for analyzeText: ${fallback.name}`);
-                    const result = await this._withTimeout(fallback.analyzeText(params), fallback.name);
+                    
+                    // Strip the model ID so the fallback uses its own default model
+                    const { model: _, ...fallbackParams } = params;
+                    const result = await this._withTimeout(fallback.analyzeText(fallbackParams), fallback.name);
                     this._resetErrors(fallback.name);
                     return result;
                 } catch (fallbackError) {

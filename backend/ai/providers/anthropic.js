@@ -12,8 +12,29 @@ export class AnthropicProvider extends BaseProvider {
         this.baseUrl = 'https://api.anthropic.com/v1';
     }
 
+    _mapModelForProvider(modelId) {
+        // Map internal aliases to native Anthropic model IDs
+        const claudeMap = {
+            'claude-sonnet-4-6':            'claude-3-7-sonnet-20250219',
+            'claude-sonnet-4-20250514':     'claude-3-7-sonnet-20250219',
+            'claude-haiku-4-20250514':      'claude-3-5-haiku-20241022',
+            'claude-haiku-4.5-20251001':    'claude-3-5-haiku-20241022',
+            'claude-sonnet-4.5-20250929':   'claude-3-7-sonnet-20250219',
+            'claude-opus-4-20250514':       'claude-3-opus-20240229',
+            'claude-opus-4.1-20250805':     'claude-3-opus-20240229',
+            'claude-3-opus-20240229':       'claude-3-opus-20240229',
+            'claude-3-5-haiku-20241022':    'claude-3-5-haiku-20241022',
+        };
+        // fallback to standard known latest sonnet if it starts with claude-sonnet
+        if (!claudeMap[modelId] && modelId.startsWith('claude-sonnet')) {
+            return 'claude-3-7-sonnet-20250219';
+        }
+        return claudeMap[modelId] || modelId;
+    }
+
     async generateText({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 2048, model }) {
-        const modelId = model || this.config.defaultModel || 'claude-sonnet-4-6';
+        const rawModelId = model || this.config.defaultModel || 'claude-sonnet-4-6';
+        const modelId = this._mapModelForProvider(rawModelId);
 
         const startTime = Date.now();
         const response = await fetch(`${this.baseUrl}/messages`, fetchOptions({
@@ -71,7 +92,8 @@ export class AnthropicProvider extends BaseProvider {
      * Returns both the text response and the array of tool calls made.
      */
     async generateWithTools({ systemPrompt, userPrompt, tools, toolHandlers = {}, temperature = 0.5, maxTokens = 4096, model }) {
-        const modelId = model || this.config.defaultModel || 'claude-sonnet-4-6';
+        const rawModelId = model || this.config.defaultModel || 'claude-sonnet-4-6';
+        const modelId = this._mapModelForProvider(rawModelId);
 
         const startTime = Date.now();
 
