@@ -1674,7 +1674,11 @@ Respond in STRICT JSON:
 
 // ── SSE helpers ───────────────────────────────────────────────────────────────
 function sseEvent(res, data) {
-  try { res.write(`data: ${JSON.stringify(data)}\n\n`); } catch {}
+  try { 
+    res.write(`data: ${JSON.stringify(data)}\n\n`); 
+  } catch (err) {
+    console.error('[fidato-chat] sseEvent write error:', err.message);
+  }
 }
 
 async function streamWords(res, text, delayMs = 5) {
