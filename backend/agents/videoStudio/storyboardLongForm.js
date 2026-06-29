@@ -233,6 +233,7 @@ async function _runPipeline(jobId, params) {
         let avatarUrls = params.avatarUrls || [];
         let avatarNames = params.avatarNames || [];
         let refImageUrls = params.refImageUrls || [];
+        let existingSegmentUrls = {};
 
         if (params.projectId) {
             try {
@@ -247,6 +248,18 @@ async function _runPipeline(jobId, params) {
                         }
                         if (project.storyboard.voiceoverScript && !voiceoverScript) {
                             voiceoverScript = project.storyboard.voiceoverScript;
+                        }
+                        if (project.storyboard.segmentUrls) {
+                            const map = project.storyboard.segmentUrls;
+                            if (map instanceof Map) {
+                                for (const [k, v] of map.entries()) {
+                                    existingSegmentUrls[k] = v;
+                                }
+                            } else if (map && typeof map === 'object') {
+                                for (const k of Object.keys(map)) {
+                                    existingSegmentUrls[k] = map[k];
+                                }
+                            }
                         }
                     }
                     // Load multi-avatar data from DB (stored by /storyboard/create)
@@ -350,23 +363,7 @@ async function _runPipeline(jobId, params) {
         // what to lock (face/hair/skin only), and that wardrobe comes from the scene text.
         // Reference order in every segment: @image1=firstFrame, @image2=poster, @image3=charSheet
         // (product refs come after charSheet if > 1 product image).
-        const charRefTag = charSheetRef.length > 0 ? '@image3' : null;
-        const charIdentityPreamble = (charSheetRef.length > 0 && avatarNames.length > 0)
-            ? `CHARACTER IDENTITY LOCK (apply to ALL cuts in this segment):
-${charRefTag} = CHARACTER REFERENCE SHEET showing: ${avatarNames.map(n => `"${n}"`).join(', ')}
-• LOCK for each character: face shape, facial features, hair colour/style, skin tone, eye colour.
-• DO NOT lock wardrobe — each character wears the costume/attire described in their cut line below.
-• Never swap or blend character faces.
-
-`
-            : avatarNames.length > 0
-            ? `CHARACTER IDENTITY LOCK:
-Characters in this video: ${avatarNames.map(n => `"${n}"`).join(', ')}.
-Maintain exact face, hair colour, skin tone for each character across all cuts.
-Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
-
-`
-            : '';
+        let charIdentityPreamble = '';
 
         _setProgress(jobId, 'PLANNING', 'Planning storyboard scenes...', 30);
         let scenes = [];
@@ -457,7 +454,29 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
         for (let i = 0; i < actualSegCount; i++) {
             if (job.cancelled) throw new Error('Cancelled by user');
 
-            const segmentCuts = scenes[i]?.cutsInSegment || [];
+            // ── Check if segment already exists in DB (Resume Run) ──
+            const existingUrl = existingSegmentUrls[String(i)] || existingSegmentUrls[i];
+            if (existingUrl && existingUrl.startsWith('http')) {
+                console.log(`[SB LongForm ${jobId}] ♻️ Segment ${i+1}/${actualSegCount} already generated: ${existingUrl}. Skipping generation...`);
+                segmentVideoUrls[i] = existingUrl;
+                job.segmentStatuses[i] = {
+                    status: 'completed',
+                    progress: 100,
+                    videoUrl: existingUrl,
+                    prompt: scenes[i]?.visualPrompt || params.videoPrompt || '',
+                    duration: sceneDurations[i],
+                };
+                completedCount++;
+                _setProgress(jobId, 'GENERATING',
+                    `${completedCount}/${actualSegCount} segments done`,
+                    (completedCount / actualSegCount) * 100,
+                );
+                continue;
+            }
+
+            // Generate each segment as a single unified video clip (up to 15s) with shot prompts
+            // rather than splitting into separate 4s cut videos.
+            const segmentCuts = [];
             
             if (segmentCuts.length > 0) {
                 console.log(`[SB LongForm ${jobId}] 🎬 Segment ${i+1}/${actualSegCount} has ${segmentCuts.length} cuts. Generating each cut in parallel...`);
@@ -678,6 +697,40 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
                 const posterStyleRef = signedImageUrl ? [{ url: signedImageUrl, role: 'style_reference' }] : [];
                 const segmentRefs = [...posterStyleRef, ...finalReferenceImages];
 
+                // Compute dynamic character identity lock tag mapping for segment prompt
+                if (charSheetRef.length > 0 && avatarNames.length > 0) {
+                    const charSheetIndexInRefs = (signedImageUrl ? 1 : 0) + (params.referenceImages || []).length;
+                    const charRefTagNumber = 1 + (segmentFirstFrameUrl ? 1 : 0) + charSheetIndexInRefs;
+                    const charRefTag = `@image${charRefTagNumber}`;
+                    charIdentityPreamble = `CHARACTER IDENTITY LOCK (apply to ALL cuts in this segment):
+${charRefTag} = CHARACTER REFERENCE SHEET showing: ${avatarNames.map(n => `"${n}"`).join(', ')}
+• LOCK for each character: face shape, facial features, hair colour/style, skin tone, eye colour.
+• DO NOT lock wardrobe — each character wears the costume/attire described in their cut line below.
+• Never swap or blend character faces.
+
+`;
+                } else if (avatarNames.length > 0) {
+                    charIdentityPreamble = `CHARACTER IDENTITY LOCK:
+Characters in this video: ${avatarNames.map(n => `"${n}"`).join(', ')}.
+Maintain exact face, hair colour, skin tone for each character across all cuts.
+Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
+
+`;
+                } else {
+                    // Fallback character lock when no explicit avatar is uploaded but characters/presenters are expected
+                    // in the cuts, and the storyboard poster is the only source of truth.
+                    const posterTagNumber = 1 + (segmentFirstFrameUrl ? 1 : 0);
+                    const posterTag = `@image${posterTagNumber}`;
+                    charIdentityPreamble = `CHARACTER IDENTITY LOCK (apply to ALL shots):
+• Locate the presenter/character panels inside the storyboard reference grid in ${posterTag}.
+• Extract and lock the exact face shape, facial features, hair style/color, skin tone, and gender of the presenter as depicted in those panels.
+• Maintain this exact same presenter identity consistently in every shot of this video segment.
+• Wardrobe/costume is defined per-shot in the scene description — follow it exactly, overriding the reference image's clothes.
+• Do NOT animate the grid layout itself.
+
+`;
+                }
+
                 const isLast = i === actualSegCount - 1;
                 const positionHint = i === 0
                     ? 'This is the OPENING segment — establish the visual world and hook the viewer immediately.'
@@ -876,6 +929,25 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
 
         return videoUrl;
 
+    } catch (err) {
+        console.error(`[SB LongForm ${jobId}] ❌ Pipeline error: ${err.message}`);
+        const j = activeJobs.get(jobId);
+        if (j) { j.status = 'FAILED'; j.error = err.message; j.progress = 0; }
+        if (params.projectId) {
+            try {
+                const mongoose = (await import('mongoose')).default;
+                const VideoProject = mongoose.model('VideoProject');
+                await VideoProject.findByIdAndUpdate(params.projectId, {
+                    'storyboard.status': 'failed',
+                    'storyboard.error': err.message,
+                    status: 'failed',
+                });
+                console.log(`[SB LongForm ${jobId}] ❌ Persisted FAILED state to DB for project ${params.projectId}`);
+            } catch (dbErr) {
+                console.error(`[SB LongForm ${jobId}] Failed to persist FAILED state: ${dbErr.message}`);
+            }
+        }
+        throw err;
     } finally {
         try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
     }

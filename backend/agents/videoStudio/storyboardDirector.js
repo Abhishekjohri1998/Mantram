@@ -143,6 +143,9 @@ function buildStoryboardDirectorPrompt({
     cuts = [],
     avatarNames = [],
     contentType = 'product_ad', // 'product_ad' | 'music_video' | 'devotional' | 'documentary'
+    brief = '',
+    productName = '',
+    productFeatures = '',
 }) {
     const logoTagInstruction = (includeBranding && logoUrl)
         ? `\n- <<<image_logo>>> = brand logo — describe it as: "${logoDescription || 'brand logo'}".`
@@ -209,8 +212,18 @@ Define ONE environment (set) that all cuts take place in:
 - environmentFingerprint: a single evocative description of the set (e.g. "marble café counter; steam-lit espresso machine; tall street-facing window with soft morning light")
 This environment NEVER changes across cuts. The camera moves through it.`;
 
+    const hasShivaKeywords = /shiva|lingam|shivling|shivaling|mahadev|temple|hindu|indian/i.test((brief || '') + ' ' + (productName || '') + ' ' + (productFeatures || ''));
+    let templeGuide = '';
+    if (hasShivaKeywords) {
+        templeGuide = `\n- HINDU SHIVA TEMPLE ARCHITECTURAL RULES (CRITICAL): This is a Shaivite Hindu Temple setting. It must look authentically Shaivite.
+  • ABSOLUTELY NO Buddha statues, Buddhist icons, Buddhist monks, zen stones, or stupas.
+  • The Shiva Lingam must be represented as a smooth black cylindrical stone sculpture resting on a circular stone pedestal base (yoni base) in the center of the sanctum, with a copper vessel suspended directly above it dripping water, and fresh Bilva leaves (three-lobed leaves) and marigold flowers placed on it.
+  • Include a carved stone Nandi bull statue sitting at the entrance, facing the inner sanctum containing the Shiva Lingam.
+  • Feature stone temple walls, carved stone pillars with Dravidian/Nagara architecture, copper/brass oil lamps (diyas) casting a warm golden glow, and a stone trident (trishul) with a small damru drum tied to it leaning against a wall/pillar.`;
+    }
+
     // Cut rules per content type
-    const cutSpecificRules = isDevotional
+    let cutSpecificRules = isDevotional
         ? `- Each cut MUST show the spiritual narrative progressing — no two consecutive cuts should be emotionally identical
 - Include devotional gestures: folded hands, eyes closed in prayer, lighting diyas, offering flowers, ringing bells, prostrating
 - Feature sacred objects: diyas, incense, marigold garlands, sacred vessels, holy books, idols
@@ -234,6 +247,10 @@ This environment NEVER changes across cuts. The camera moves through it.`;
 - INJECT at least one unexpected, visually striking angle (e.g. extreme low-angle looking up at product, Dutch tilt energy shot, kinetic rack-focus from environment to product)
 - Preserve the product's original design, shape, color shades, and branding details faithfully in all scene descriptions and framePrompts. Do NOT simplify, stylize, or modify any physical product attributes or color values.
 - AVOID boring talking head or moving head close-ups. Presenters/models must be shown as a proper moving person explaining while actively doing something in the scene (e.g., typing on a laptop, gesturing dynamically at a screen, pointing, walking through the studio set, demonstrating the product, or interacting with props/environments) to ensure it looks very natural.`;
+
+    if (templeGuide) {
+        cutSpecificRules += templeGuide;
+    }
 
     return `You are an award-winning Ad Film Director and Cinematographer building a professional pre-production storyboard package. Your output is a structured JSON document — NOT a description of a grid image.
 
@@ -654,6 +671,9 @@ export async function runStoryboardDirector({
         cuts: heuristicCuts,
         avatarNames,
         contentType,
+        brief,
+        productName,
+        productFeatures,
     });
 
     const userPrompt = buildUserPrompt({

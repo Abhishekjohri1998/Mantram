@@ -10553,6 +10553,31 @@ router.post('/storyboard/animate', protect, async (req, res) => {
         let dbAudioSync = true;
 
         if (projectId) {
+            // Perform clearing updates first
+            if (req.body.forceRegenerate === true || req.body.forceRegenerate === 'true') {
+                console.log(`[Storyboard Animate] Force regenerating project ${projectId} — clearing segmentUrls`);
+                await VideoProject.findByIdAndUpdate(projectId, {
+                    'storyboard.segmentUrls': {},
+                    'storyboard.segmentPrompts': {},
+                    'storyboard.status': 'pending',
+                    'storyboard.error': '',
+                });
+            } else if (Array.isArray(req.body.regenerateSegments) && req.body.regenerateSegments.length > 0) {
+                console.log(`[Storyboard Animate] Regenerating specific segments: ${req.body.regenerateSegments.join(', ')}`);
+                const unsetObj = {};
+                for (const idx of req.body.regenerateSegments) {
+                    unsetObj[`storyboard.segmentUrls.${idx}`] = 1;
+                    unsetObj[`storyboard.segmentPrompts.${idx}`] = 1;
+                }
+                await VideoProject.findByIdAndUpdate(projectId, {
+                    $unset: unsetObj,
+                    $set: {
+                        'storyboard.status': 'pending',
+                        'storyboard.error': '',
+                    }
+                });
+            }
+
             const project = await VideoProject.findById(projectId)
                 .populate('brand', 'name dna')
                 .lean();
@@ -10740,6 +10765,59 @@ router.post('/storyboard/animate', protect, async (req, res) => {
             const bgmPreset         = req.body.bgmPreset || 'cinematic';
             const qualityMode       = model === 'seedance-2.0' ? 'quality' : 'fast';
 
+            // Calculate dynamic cost per segment for long-form
+            const totalDuration = parseInt(req.body.duration || req.body.totalDuration) || 30;
+            const segModel     = req.body.model || 'seedance-2.0-fast';
+            const OPTIMAL_SEG  = segModel === 'gemini-flash' ? 6 : (['veo-3.1', 'veo-3.1-fast', 'hunyuan'].includes(segModel) ? 8 : 10);
+            const segCount     = Math.ceil(totalDuration / OPTIMAL_SEG);
+            const segResolution = req.body.resolution || '720p';
+            const segQuality   = segModel.includes('quality') || segModel === 'seedance-2.0' ? 'quality' : 'fast';
+            const segEstimate  = estimateCost(segModel, Math.min(OPTIMAL_SEG, totalDuration), segResolution, segQuality);
+            const perSegCost   = segEstimate.credits;
+
+            // Load updated project to see what segments are skipped
+            let skippedCount = 0;
+            if (projectId) {
+                try {
+                    const freshProject = await VideoProject.findById(projectId).lean();
+                    const existingUrls = freshProject?.storyboard?.segmentUrls || new Map();
+                    const regenerateIndices = new Set(
+                        Array.isArray(req.body.regenerateSegments)
+                            ? req.body.regenerateSegments.map(Number)
+                            : []
+                    );
+                    
+                    if (req.body.forceRegenerate !== true && req.body.forceRegenerate !== 'true') {
+                        const mapKeys = existingUrls instanceof Map ? Array.from(existingUrls.keys()) : Object.keys(existingUrls);
+                        for (const key of mapKeys) {
+                            const idx = Number(key);
+                            const url = existingUrls instanceof Map ? existingUrls.get(key) : existingUrls[key];
+                            if (url && url.startsWith('http') && !regenerateIndices.has(idx)) {
+                                skippedCount++;
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn(`[Storyboard Animate] Failed to count skipped segments: ${e.message}`);
+                }
+            }
+
+            const activeSegCount = Math.max(0, segCount - skippedCount);
+            const actualCost = perSegCost * activeSegCount;
+            const refundAmount = (req.creditsDeducted || 0) - actualCost;
+
+            if (refundAmount > 0) {
+                console.log(`💰 [Storyboard Animate] Refunding ${refundAmount} credits because ${skippedCount}/${segCount} segments are reused.`);
+                await refundCredits(
+                    req.user._id,
+                    refundAmount,
+                    'storyboardAnimateLongForm',
+                    `Credit reuse for ${skippedCount} existing segment(s) in storyboard long-form animation`,
+                    'video',
+                    { projectId }
+                );
+            }
+
             const jobId = startStoryboardLongForm({
                 projectId: projectId || null,
                 userId: req.user._id,
@@ -10857,6 +10935,40 @@ router.post('/storyboard/animate', protect, async (req, res) => {
 });
 
 
+async function buildSegmentsFromProject(project) {
+    const storyboard = project.storyboard || {};
+    const scenes = storyboard.scenes || [];
+    if (!Array.isArray(scenes) || scenes.length === 0) return null;
+
+    const items = [];
+    const segmentUrls = storyboard.segmentUrls || new Map();
+    const segmentPrompts = storyboard.segmentPrompts || new Map();
+
+    const getVal = (map, key) => {
+        if (map instanceof Map) return map.get(String(key));
+        if (map && typeof map === 'object') return map[String(key)] || map[key];
+        return null;
+    };
+
+    for (let i = 0; i < scenes.length; i++) {
+        const url = getVal(segmentUrls, i);
+        const prompt = getVal(segmentPrompts, i);
+        items.push({
+            index: i,
+            status: url ? 'completed' : storyboard.status === 'failed' ? 'failed' : 'pending',
+            progress: url ? 100 : 0,
+            videoUrl: url ? await getSignedUrlIfNeeded(url) : null,
+            prompt: prompt || (scenes[i]?.visualPrompt || ''),
+            duration: scenes[i]?.duration || null,
+            error: url ? null : (storyboard.status === 'failed' ? storyboard.error : null),
+        });
+    }
+
+    const completed = items.filter(it => it.status === 'completed').length;
+    return { completed, total: scenes.length, items };
+}
+
+
 // ── GET /api/video-studio/storyboard/status/:projectId ───────────────────────
 // Poll animation status — handles both single-shot (taskId) and long-form (longFormJobId)
 router.get('/storyboard/status/:projectId', protect, async (req, res) => {
@@ -10870,17 +10982,21 @@ router.get('/storyboard/status/:projectId', protect, async (req, res) => {
         if (storyboard.status === 'done' || storyboard.finalVideoUrl) {
             const rawUrl = storyboard.finalVideoUrl || project.finalVideoUrl;
             const signedUrl = await getSignedUrlIfNeeded(rawUrl);
+            const segments = await buildSegmentsFromProject(project);
             return res.json({
                 success: true, projectId: project._id, allDone: true,
                 finalVideoUrl: signedUrl, status: 'COMPLETED', overallProgress: 100,
+                segments,
             });
         }
 
         // ── FAILED ────────────────────────────────────────────────────────────
         if (storyboard.status === 'failed') {
+            const segments = await buildSegmentsFromProject(project);
             return res.json({
                 success: true, projectId: project._id, allDone: false,
                 anyFailed: true, error: storyboard.error, status: 'FAILED',
+                segments,
             });
         }
 
@@ -10891,14 +11007,36 @@ router.get('/storyboard/status/:projectId', protect, async (req, res) => {
             const jobStatus = getStoryboardLongFormJobStatus(storyboard.longFormJobId);
 
             if (!jobStatus) {
-                // Job not in memory — either server restarted or it completed
-                // Fall through to legacy taskId path or return IN_PROGRESS
+                // Job not in memory — either server restarted or it completed.
+                // If it is animating/generating but missing from memory, check if stuck.
+                if (['animating', 'generating', 'advanced-generating'].includes(storyboard.status) || project.status === 'animating') {
+                    const elapsedMs = Date.now() - new Date(project.updatedAt).getTime();
+                    if (elapsedMs > 3 * 60 * 1000) {
+                        console.log(`[SB Status] 🧹 Automatically marking stuck animating project ${project._id} as failed (last update: ${elapsedMs/1000}s ago)`);
+                        await VideoProject.findByIdAndUpdate(project._id, {
+                            'storyboard.status': 'failed',
+                            'storyboard.error': 'Server restarted or generation timed out.',
+                            status: 'failed',
+                        });
+                        const updatedProject = await VideoProject.findById(project._id);
+                        const segments = await buildSegmentsFromProject(updatedProject);
+                        return res.json({
+                            success: true, projectId: project._id, allDone: false, anyFailed: true,
+                            error: 'Server restarted or generation timed out. You can resume generation from where it left off.',
+                            status: 'FAILED', isLongForm: true,
+                            segments,
+                        });
+                    }
+                }
+
                 if (!storyboard.taskId) {
+                    const segments = await buildSegmentsFromProject(project);
                     return res.json({
                         success: true, projectId: project._id, status: 'IN_PROGRESS',
                         overallProgress: storyboard.progress || 10,
                         phaseLabel: 'Processing...', detail: '',
                         isLongForm: true,
+                        segments,
                     });
                 }
                 // (fall through to taskId path)
@@ -10916,10 +11054,12 @@ router.get('/storyboard/status/:projectId', protect, async (req, res) => {
                     });
                 }
 
+                const segments = await buildSegmentsFromProject(project);
                 return res.json({
                     success: true, projectId: project._id, allDone: true,
                     finalVideoUrl: signed, status: 'COMPLETED', overallProgress: 100,
                     isLongForm: true,
+                    segments,
                 });
 
             } else if (jobStatus.status === 'FAILED') {
@@ -10927,9 +11067,12 @@ router.get('/storyboard/status/:projectId', protect, async (req, res) => {
                     'storyboard.status': 'failed',
                     'storyboard.error': jobStatus.error || 'Long-form generation failed',
                 });
+                const updatedProject = await VideoProject.findById(project._id);
+                const segments = await buildSegmentsFromProject(updatedProject);
                 return res.json({
                     success: true, projectId: project._id, allDone: false, anyFailed: true,
                     error: jobStatus.error, status: 'FAILED', isLongForm: true,
+                    segments,
                 });
 
             } else {

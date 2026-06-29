@@ -44,9 +44,9 @@ const HARD_BANNED = /\b(kill|kills|killing|bomb|bombs|explosion|exploding|gun|gu
 // Multi-word deity phrases (matched first, before single-word processing)
 const DEITY_PHRASE_MAP = [
     // Specific deity + object combinations that almost always trigger
-    [/\bShiva\s+Lingam\b/gi,                      'a carved stone idol'],
-    [/\bshiva\s+lingam\b/gi,                      'a carved stone idol'],
-    [/\bstone\s+Shiva\s+Lingam\b/gi,              'an ancient stone sculpture'],
+    [/\bstone\s+Shiva\s+Lingams?\b/gi,            'an ancient smooth black cylindrical stone sculpture resting on a circular stone pedestal base'],
+    [/\bShiva\s+Lingams?\b/gi,                    'a smooth black cylindrical stone sculpture resting on a circular stone pedestal base'],
+    [/\bshiva\s+lingams?\b/gi,                    'a smooth black cylindrical stone sculpture resting on a circular stone pedestal base'],
     [/\bLord\s+Shiva\b/gi,                        'the ancient venerated figure'],
     [/\bLord\s+Ganesha\b/gi,                      'the elephant-headed figure'],
     [/\bLord\s+Vishnu\b/gi,                       'the divine figure in royal blue'],
@@ -77,13 +77,7 @@ const DEITY_PHRASE_MAP = [
     [/\bdivine\s+being\b/gi,                      'the ancient figure'],
     [/\bdivine\s+(?:presence|light|grace|power)\b/gi, 'an ethereal light'],
     [/\bmaster\s+of\s+the\s+universe\b/gi,        'the powerful figure'],
-    // Temple-specific phrases
-    [/\bdark\s+(?:stone\s+)?temple(?:\s+interior)?\b/gi,  'an ancient stone chamber interior'],
-    [/\btemple\s+sanctuary\b/gi,                  'an ancient stone hall'],
-    [/\btemple\s+doorway\b/gi,                    'an arched stone doorway'],
-    [/\btemple\s+entrance\b/gi,                   'a stone archway entrance'],
-    [/\btemple\s+interior\b/gi,                   'an ancient stone chamber'],
-    [/\bsacred\s+temple\b/gi,                     'an ancient stone chamber'],
+    // Temple-specific phrases (Note: keep 'temple' intact so the model generates authentic temple architecture)
     [/\bmarigold\s+(?:flower\s+)?offerings\b/gi,  'marigold flower arrangements'],
     // Deity names (single-word, after phrases)
     [/\bShiva\b/gi,                               'the venerated figure'],
@@ -107,14 +101,13 @@ const DEITY_PHRASE_MAP = [
     [/\byogi\b/gi,                                'ascetic meditating figure'],
     [/\byogis\b/gi,                               'ascetics meditating'],
     // Shivling and general temple/sacred terms
-    [/\bShivlings?\b/gi,                          'a carved stone sculpture'],
-    [/\bshivlings?\b/gi,                          'a carved stone sculpture'],
-    [/\bShivalings?\b/gi,                         'a carved stone sculpture'],
-    [/\bshivalings?\b/gi,                         'a carved stone sculpture'],
-    [/\bShiva\s+Lingams?\b/gi,                    'a carved stone sculpture'],
-    [/\bshiva\s+lingams?\b/gi,                    'a carved stone sculpture'],
-    [/\bstone\s+Shiva\s+Lingams?\b/gi,            'an ancient stone sculpture'],
-    [/\btemples?\b/gi,                            'stone chamber'],
+    [/\bShivlings?\b/gi,                          'a smooth black cylindrical stone sculpture resting on a circular stone pedestal base'],
+    [/\bshivlings?\b/gi,                          'a smooth black cylindrical stone sculpture resting on a circular stone pedestal base'],
+    [/\bShivalings?\b/gi,                         'a smooth black cylindrical stone sculpture resting on a circular stone pedestal base'],
+    [/\bshivalings?\b/gi,                         'a smooth black cylindrical stone sculpture resting on a circular stone pedestal base'],
+    [/\bShiva\s+Lingams?\b/gi,                    'a smooth black cylindrical stone sculpture resting on a circular stone pedestal base'],
+    [/\bshiva\s+lingams?\b/gi,                    'a smooth black cylindrical stone sculpture resting on a circular stone pedestal base'],
+    [/\bstone\s+Shiva\s+Lingams?\b/gi,            'an ancient smooth black cylindrical stone sculpture resting on a circular stone pedestal base'],
     [/\bsacred\b/gi,                              'ceremonial'],
     [/\bgurus?\b/gi,                              'revered guide'],
     [/\bashrams?\b/gi,                            'peaceful sanctuary'],
