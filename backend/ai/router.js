@@ -31,8 +31,8 @@ class ModelRouter {
             this.nativeGemini = new GeminiProvider({
                 apiKey: providerConfigs.gemini.apiKey,
                 imageApiKey: providerConfigs.gemini.imageApiKey,
-                defaultModel: config.ai.defaultGeminiModel || 'gemini-2.5-flash-preview-05-20',
-                defaultImageModel: config.ai.defaultImageModel || 'gemini-2.5-flash-preview-05-20',
+                defaultModel: config.ai.defaultGeminiModel || 'gemini-1.5-flash-preview-05-20',
+                defaultImageModel: config.ai.defaultImageModel || 'gemini-1.5-flash-preview-05-20',
                 gcpProjectId: providerConfigs.gemini.gcpProjectId,
                 gcpLocation: providerConfigs.gemini.gcpLocation,
                 googleApplicationCredentials: providerConfigs.gemini.googleApplicationCredentials,
@@ -56,8 +56,8 @@ class ModelRouter {
             this.providers.gemini = new GeminiProvider({
                 apiKey: providerConfigs.gemini.apiKey,
                 imageApiKey: providerConfigs.gemini.imageApiKey,
-                defaultModel: config.ai.defaultGeminiModel || 'gemini-2.5-flash-preview-05-20',
-                defaultImageModel: config.ai.defaultImageModel || 'gemini-2.5-flash-preview-05-20',
+                defaultModel: config.ai.defaultGeminiModel || 'gemini-1.5-flash-preview-05-20',
+                defaultImageModel: config.ai.defaultImageModel || 'gemini-1.5-flash-preview-05-20',
                 // GCP Vertex AI (Billed)
                 gcpProjectId: providerConfigs.gemini?.gcpProjectId,
                 gcpLocation: providerConfigs.gemini?.gcpLocation,
@@ -236,11 +236,12 @@ class ModelRouter {
         // Check Laozhang Gemini first — if it's available AND not in cooldown
         const lzGemini = this.providers.gemini;
         if (lzGemini?.isAvailable() && !(lzGemini.cooldownUntil && Date.now() < lzGemini.cooldownUntil)) {
-            return { provider: 'gemini', model: 'gemini-2.5-flash' };
+            const isAtlas = lzGemini.baseUrl && lzGemini.baseUrl.includes('atlascloud');
+            return { provider: 'gemini', model: isAtlas ? 'google/gemini-1.5-flash' : 'gemini-1.5-flash' };
         }
         // Native Gemini (direct Google API) — most reliable fallback
         if (this.nativeGemini?.isAvailable() && !(this.nativeGemini.cooldownUntil && Date.now() < this.nativeGemini.cooldownUntil)) {
-            return { provider: 'native_gemini', model: 'gemini-2.5-flash' };
+            return { provider: 'native_gemini', model: 'gemini-1.5-flash' };
         }
         // OpenAI
         const openai = this.providers.openai;
@@ -263,7 +264,7 @@ class ModelRouter {
             return { provider: 'deepseek', model: 'deepseek-chat' };
         }
         // Fallback
-        return { provider: 'native_gemini', model: 'gemini-2.5-flash' };
+        return { provider: 'native_gemini', model: 'gemini-1.5-flash' };
     }
 
     /**
