@@ -1957,7 +1957,7 @@ export default function Storyboard({
                                                 <div className="sb-seg-card__media">
                                                     {isDone && seg.videoUrl ? (
                                                         <video
-                                                            src={seg.videoUrl}
+                                                            src={seg.videoUrl.startsWith('http') && !seg.videoUrl.includes('localhost') ? `${API}/media/proxy?url=${encodeURIComponent(seg.videoUrl)}` : seg.videoUrl}
                                                             autoPlay muted loop playsInline
                                                             style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6 }}
                                                         />

@@ -68,10 +68,15 @@ router.get('/proxy', async (req, res) => {
                      url.includes('canvas-layers.s3') || 
                      url.includes('mantram-assets');
         const isUnsplash = url.startsWith('https://images.unsplash.com');
+        const isAllowedCdn = url.includes('files.catbox.moe') ||
+                             url.includes('catbox.moe') ||
+                             url.includes('tmpfiles.org') ||
+                             url.includes('atlascloud.ai') ||
+                             url.includes('aliyuncs.com');
         
-        if (!isS3 && !isUnsplash) {
+        if (!isS3 && !isUnsplash && !isAllowedCdn) {
             console.warn(`🛑 [PROXY] Blocked unauthorized URL: ${url}`);
-            return res.status(403).send('Forbidden: Only authorized S3 or Unsplash assets can be proxied');
+            return res.status(403).send('Forbidden: Only authorized S3, Unsplash, or CDN assets can be proxied');
         }
 
         // 1. Handle S3 Assets with Direct Streaming (Bypasses Signatures)
