@@ -332,50 +332,95 @@ function generateFallbackScenes({ sceneCount, durations, arcScenes, language, pr
  * Shot D shifts to a contrasting angle/perspective of the same action.
  * Shot E widens to close the scene beat.
  */
-function ensureMultiCutsPerSegment(cuts, duration) {
+function ensureMultiCutsPerSegment(cuts, duration, sceneIndex = 0) {
     if (!cuts || cuts.length === 0) return [];
-    if (cuts.length >= 3) return cuts;
+    if (cuts.length >= 2) return cuts; // Keep 2 or more cuts exactly as mapped by story director
 
-    // Use the dominant cut as the scene anchor
-    const dominant = cuts.reduce((best, c) => (c.duration > best.duration ? c : best), cuts[0]);
+    // If it has only 1 cut, dynamically expand to 2 or 3 cuts based on duration
+    const dominant = cuts[0];
     if (!dominant) return cuts;
-    const baseScene  = dominant.scene  || 'Cinematic visual scene';
+
     const baseFrame  = dominant.framePrompt || dominant.scene || '';
     const env        = dominant.environment || '';
-    const domShot    = dominant.shot  || 'MEDIUM';
-    const domMove    = dominant.move  || 'STEADICAM';
-    const domLens    = dominant.lens  || '50mm prime';
     const charRef    = '@image2';
-
     const brollSubject = extractBrollSubject(baseFrame, env);
 
-    const dur1 = Math.max(2, Math.floor(duration * 0.4));
-    const dur2 = Math.max(2, Math.floor(duration * 0.3));
-    const dur3 = Math.max(2, duration - dur1 - dur2);
+    // Determine target number of cuts dynamically (2 or 3)
+    const numCuts = duration >= 9 ? 3 : 2;
 
-    return [
+    // Distribute durations among cuts safely
+    const cutDurations = [];
+    if (numCuts === 3) {
+        const d1 = Math.max(2, Math.floor(duration * 0.4));
+        const d2 = Math.max(2, Math.floor(duration * 0.3));
+        const d3 = Math.max(2, duration - d1 - d2);
+        cutDurations.push(d1, d2, d3);
+    } else {
+        const d1 = Math.max(2, Math.floor(duration * 0.6));
+        const d2 = Math.max(2, duration - d1);
+        cutDurations.push(d1, d2);
+    }
+
+    // Dynamic pool of secondary visual angles, B-roll, and camera framings
+    const subShotPool = [
+        // A — Devotional Close-up / Reaction
         {
-            ...dominant,
-            duration: dur1,
-            framePrompt: `${baseFrame}${env ? ` Set: ${env}.` : ''} ${charRef} in frame — scene as directed.`,
-        },
-        {
-            ...dominant,
-            duration: dur2,
             shot: 'CLOSE-UP',
             move: 'DOLLY-IN',
             lens: '85mm portrait',
             framePrompt: `Close-up on ${charRef} face, conveying deep contemplation and emotional expression. Warm key light, soft rim light, bokeh background.`,
         },
+        // B — Detailed macro B-roll / visual element
         {
-            ...dominant,
-            duration: dur3,
             shot: 'INSERT',
             move: 'STATIC',
             lens: '100mm macro',
             framePrompt: `B-roll insert — focus on ${brollSubject}. 100mm macro lens, extreme close-up, razor-sharp foreground detail, bokeh background. No character faces in frame.`,
+        },
+        // C — Low-angle environmental context
+        {
+            shot: 'LOW-ANGLE',
+            move: 'ARC',
+            lens: '35mm anamorphic',
+            framePrompt: `Low-angle perspective showing the details of the environment. ${env ? `Location: ${env}.` : ''} Ambient lighting, cinematic depth.`,
+        },
+        // D — Over-the-shoulder tracking
+        {
+            shot: 'OTS',
+            move: 'TRACKING',
+            lens: '50mm prime',
+            framePrompt: `Over-the-shoulder perspective. ${env ? `Location: ${env}.` : ''} Camera tracks slowly. Cinematic depth of field.`,
         }
     ];
+
+    // Pick from pool dynamically using sceneIndex rotation to prevent repetitive layout
+    const selectedSubShots = [];
+    let poolIndex = sceneIndex % subShotPool.length;
+    for (let k = 0; k < numCuts - 1; k++) {
+        selectedSubShots.push(subShotPool[poolIndex]);
+        poolIndex = (poolIndex + 1) % subShotPool.length;
+    }
+
+    const outputCuts = [
+        {
+            ...dominant,
+            duration: cutDurations[0],
+            framePrompt: `${baseFrame}${env ? ` Set: ${env}.` : ''} ${charRef} in frame — scene as directed.`,
+        }
+    ];
+
+    for (let k = 0; k < selectedSubShots.length; k++) {
+        outputCuts.push({
+            ...dominant,
+            duration: cutDurations[k + 1],
+            shot: selectedSubShots[k].shot,
+            move: selectedSubShots[k].move,
+            lens: selectedSubShots[k].lens,
+            framePrompt: selectedSubShots[k].framePrompt,
+        });
+    }
+
+    return outputCuts;
 }
 
 function ensureMinCutsPerSegment(cuts, duration) {
@@ -544,7 +589,7 @@ export async function planStoryboardScenes({
 
         const scenes = segments.map((seg, i) => {
             // Preserve timing, but if the segment has fewer than 3 cuts, expand it to ensure multi-shot visual variety.
-            const activeCuts = ensureMultiCutsPerSegment(seg.cutsInSegment, seg.duration);
+            const activeCuts = ensureMultiCutsPerSegment(seg.cutsInSegment, seg.duration, i);
 
             let elapsed = 0;
 
@@ -560,19 +605,17 @@ export async function planStoryboardScenes({
             const isFirstSeg = i === 0;
             const isLastSeg = i === totalSegs - 1;
 
-            // Build character preamble
+            // Build SUBJECTS preamble
             const charPreamble = characterNames.length > 0
-                ? `CHARACTERS: ${characterNames.map(n => `"${n}"`).join(', ')}. Lock: exact face, hair colour, skin tone per reference sheet. Wardrobe follows per-shot costume description.\n`
+                ? `SUBJECTS: ${characterNames.map(n => `"${n}"`).join(', ')}. Lock: exact face, hair colour, skin tone per reference sheet.`
                 : '';
 
             // Build SHOT lines in Seedance directorial format
             // KEY: framePrompt = rich visual + camera description (up to 40 words)
             //      scene       = narrative beat (1 short sentence)
             // Seedance is a VISUAL model — use framePrompt as primary, scene as context.
+            // Build SHOT lines in clean directorial format
             const shotLines = activeCuts.map((cut, ci) => {
-                const start = elapsed;
-                const end = elapsed + cut.duration;
-                elapsed = end;
                 const shotNum = ci + 1;
 
                 // Primary visual description: framePrompt contains dynamic angles, lighting, props, subjects
@@ -580,18 +623,17 @@ export async function planStoryboardScenes({
                     ? cut.framePrompt.trim()
                     : cut.scene || `Shot ${shotNum}`;
 
-                // Narrative context: what happens in this cut
-                const narrativeBeat = (cut.scene && cut.framePrompt && cut.framePrompt.trim().length > 15)
-                    ? ` Story: ${cut.scene.trim()}`
-                    : '';
+                // Short shot code mapping for aesthetic consistency
+                let shotType = cut.shot || 'MEDIUM';
+                if (shotType === 'WIDE') shotType = 'WS';
+                else if (shotType === 'CLOSE-UP') shotType = 'CU';
+                else if (shotType === 'MEDIUM_CLOSE_UP') shotType = 'MCU';
+                else if (shotType === 'MEDIUM') shotType = 'MS';
+                else shotType = shotType.replace(/_/g, ' ');
 
-                // Voiceover is handled by audio; do not output VO text in visual prompt.
-                const voiceoverLine = '';
+                const shotGrammar = `${shotType}, ${cut.lens || '50mm'} ${cut.move || 'STEADICAM'}`;
 
-                // Shot grammar: shot type + lens + camera move in Seedance's language
-                const shotGrammar = `${(cut.shot || 'MEDIUM').replace(/_/g,' ')}, ${cut.lens || '50mm'} ${cut.move || 'STEADICAM'}`;
-
-                return `SHOT ${shotNum} [${start}s-${end}s] ${shotGrammar}: ${primaryVisual}${narrativeBeat}${voiceoverLine}`;
+                return `SHOT ${shotNum}: ${shotGrammar} / ${primaryVisual}`;
             }).join('\n');
 
             // Segment position note
@@ -617,9 +659,7 @@ export async function planStoryboardScenes({
 
             const promptParts = [
                 charPreamble.trim(),
-                `STYLE: ${trimmedStyle}`,
-                `COLOR PALETTE: ${paletteNames || 'See reference'} (${palette}).`,
-                trimmedMaterials ? `MATERIALS: ${trimmedMaterials}` : null,
+                `STYLE: ${trimmedStyle}. Color palette: ${paletteNames || 'See reference'} (${palette}). ${trimmedMaterials ? `Materials: ${trimmedMaterials}.` : ''}`,
                 `ENVIRONMENT: ${trimmedEnv}`,
                 `MOOD: ${moodKeywords || 'Premium, cinematic'}.`,
                 isNonEnglish ? `LANGUAGE: All dialogue and voiceover MUST be in ${language} script/characters.` : null,
@@ -640,9 +680,7 @@ export async function planStoryboardScenes({
                     trimmedEnv = trimmedEnv.substring(0, trimmedEnv.length - diff - 5).trim() + '...';
                     visualPrompt = [
                         charPreamble.trim(),
-                        `STYLE: ${trimmedStyle}`,
-                        `COLOR PALETTE: ${paletteNames || 'See reference'} (${palette}).`,
-                        trimmedMaterials ? `MATERIALS: ${trimmedMaterials}` : null,
+                        `STYLE: ${trimmedStyle}. Color palette: ${paletteNames || 'See reference'} (${palette}). ${trimmedMaterials ? `Materials: ${trimmedMaterials}.` : ''}`,
                         `ENVIRONMENT: ${trimmedEnv}`,
                         `MOOD: ${moodKeywords || 'Premium, cinematic'}.`,
                         isNonEnglish ? `LANGUAGE: All dialogue and voiceover MUST be in ${language} script/characters.` : null,
