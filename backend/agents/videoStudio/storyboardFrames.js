@@ -196,7 +196,7 @@ export async function generateStoryboardPoster(
     console.log(`  raw buffers: product=${rawProductBuffers.length}, avatars=${allRawAvatarBuffers.length}, logo=${!!rawLogoBuffer}, refs=${rawRefBuffers.length}`);
     console.log(`  Prompt (first 120): ${finalPrompt.substring(0, 120)}...`);
 
-    const TIMEOUT_MS = 180000; // 180s — no fallback, fail loudly if primary model fails
+    const TIMEOUT_MS = 300000; // 300s (5 minutes) — no fallback, allows long prompts/high load to finish
 
     if (useNanoBanana) {
         const result = await generateWithNanoBanana(
