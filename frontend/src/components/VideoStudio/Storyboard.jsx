@@ -1898,7 +1898,7 @@ export default function Storyboard({
                         )}
 
                         {/* ── Manual Mode: Segment Gallery ─────────────────────────────────── */}
-                        {isLongForm && generateMode === 'manual' && (phase === 'animating' || phase === 'complete') && segmentItems.length > 0 && (
+                        {isLongForm && (phase === 'animating' || phase === 'complete' || phase === 'review') && segmentItems.length > 0 && (
                             <div className="sb-segment-gallery">
                                 <div className="sb-seg-gallery-header">
                                     <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'rgba(139,92,246,0.8)' }}>view_module</span>

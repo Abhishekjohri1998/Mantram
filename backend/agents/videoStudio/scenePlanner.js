@@ -497,8 +497,8 @@ export async function planStoryboardScenes({
         const sceneCount = segments.length;
 
         const scenes = segments.map((seg, i) => {
-            // Guarantee a minimum visual density of at least 5 cuts per segment
-            const activeCuts = ensureMinCutsPerSegment(seg.cutsInSegment, seg.duration);
+            // Use the director's planned cuts directly to preserve script/audio synchronization timing.
+            const activeCuts = seg.cutsInSegment;
 
             let elapsed = 0;
 
