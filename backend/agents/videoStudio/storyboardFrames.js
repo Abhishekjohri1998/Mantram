@@ -210,16 +210,31 @@ export async function generateStoryboardPoster(
         return result;
     }
 
-    // GPT-Image-2 path — NO FALLBACK to NanoBanana, fail immediately with the real error
-    const result = await generateWithGptImage2(
+    // GPT-Image-2 path with self-healing fallback to NanoBanana if it fails/times out
+    try {
+        console.log(`[SB Poster] Attempting primary GPT Image 2 generation via LaoZhang (timeout: 45s)...`);
+        const result = await generateWithGptImage2(
+            finalPrompt, ar,
+            rawProductBuffers, null, productImageUrls, null,
+            45000, logoUrl, rawLogoBuffer,
+            allRawAvatarBuffers, allAvatarUrls, avatarNames,
+            rawRefBuffers, refImageUrls,
+        );
+        if (result) return result;
+    } catch (gptErr) {
+        console.warn(`[SB Poster] GPT Image 2 failed or hung (${gptErr.message}). Retrying with fallback NanoBanana...`);
+    }
+
+    console.log(`[SB Poster] Running fallback NanoBanana image generation (Gemini)...`);
+    const fallbackResult = await generateWithNanoBanana(
         finalPrompt, ar,
         rawProductBuffers, null, productImageUrls, null,
-        TIMEOUT_MS, logoUrl, rawLogoBuffer,
+        TIMEOUT_MS, imageSize, logoUrl, rawLogoBuffer,
         allRawAvatarBuffers, allAvatarUrls, avatarNames,
         rawRefBuffers, refImageUrls,
     );
-    if (!result) throw new Error('GPT Image 2 returned an empty image response.');
-    return result;
+    if (!fallbackResult) throw new Error('Both GPT Image 2 and NanoBanana fallback image generation returned empty responses.');
+    return fallbackResult;
 }
 
 // ── GPT Image 2 via LaoZhang ─────────────────────────────────────────────────
