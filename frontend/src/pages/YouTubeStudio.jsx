@@ -975,11 +975,11 @@ function ProjectDetail({ project, onRefresh }) {
                                         ? parts[0] * 3600 + parts[1] * 60 + parts[2]
                                         : parts[0] * 60 + (parts[1] || 0);
                                 }
-                                // YouTube CDN thumbnail for specific second — no API key needed
-                                // Note: YouTube only serves auto-generated keyframes (~every 3s)
-                                // so the actual frame shown may be ±a few seconds off
-                                const frameUrl = (ytId && frameSeek != null)
-                                    ? `https://img.youtube.com/vi_webp/${ytId}/${Math.max(1, Math.floor(frameSeek))}.webp`
+                                // YouTube CDN thumbnail for chapters. 
+                                // YouTube does NOT support fetching arbitrary seconds via vi_webp.
+                                // We use the standard hqdefault thumbnail, or if you prefer you can map to project.extractedFrames.
+                                const frameUrl = ytId
+                                    ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`
                                     : null;
 
                                 return (
