@@ -1956,11 +1956,28 @@ export default function Storyboard({
                                                 {/* Video / placeholder */}
                                                 <div className="sb-seg-card__media">
                                                     {isDone && seg.videoUrl ? (
-                                                        <video
-                                                            src={seg.videoUrl.startsWith('http') && !seg.videoUrl.includes('localhost') ? `${API.replace('/video-studio', '')}/media/proxy?url=${encodeURIComponent(seg.videoUrl)}` : seg.videoUrl}
-                                                            autoPlay muted loop playsInline
-                                                            style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6 }}
-                                                        />
+                                                         (() => {
+                                                             const proxiedUrl = seg.videoUrl.startsWith('http') && !seg.videoUrl.includes('localhost')
+                                                                 ? `${API.replace('/video-studio', '')}/media/proxy?url=${encodeURIComponent(seg.videoUrl)}`
+                                                                 : seg.videoUrl;
+                                                             return (
+                                                                 <>
+                                                                     <video
+                                                                         src={proxiedUrl}
+                                                                         autoPlay muted loop playsInline
+                                                                         style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6 }}
+                                                                     />
+                                                                     <div className="sb-seg-media-overlay">
+                                                                         <button className="sb-seg-overlay-btn" onClick={(e) => { e.stopPropagation(); setPreviewVideo(proxiedUrl); }} title="Play Fullscreen">
+                                                                             <span className="material-symbols-outlined">play_arrow</span>
+                                                                         </button>
+                                                                         <a href={proxiedUrl} download={`segment-${i + 1}.mp4`} className="sb-seg-overlay-btn" title="Download Video" target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}>
+                                                                             <span className="material-symbols-outlined">download</span>
+                                                                         </a>
+                                                                     </div>
+                                                                 </>
+                                                             );
+                                                         })()
                                                     ) : isRegen ? (
                                                         <div className="sb-seg-card__spin">
                                                             <span className="material-symbols-outlined spin" style={{ fontSize: 28, color: 'rgba(139,92,246,0.7)' }}>sync</span>
@@ -2001,7 +2018,39 @@ export default function Storyboard({
                                                 </div>
 
                                                 {/* Actions */}
-                                                <div className="sb-seg-card__actions">
+                                                <div className="sb-seg-card__actions" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', width: '100%' }}>
+                                                     {isDone && seg.videoUrl && (
+                                                         (() => {
+                                                             const proxiedUrl = seg.videoUrl.startsWith('http') && !seg.videoUrl.includes('localhost')
+                                                                 ? `${API.replace('/video-studio', '')}/media/proxy?url=${encodeURIComponent(seg.videoUrl)}`
+                                                                 : seg.videoUrl;
+                                                             return (
+                                                                 <>
+                                                                     <button
+                                                                         className="sb-seg-action-btn-secondary"
+                                                                         onClick={() => setPreviewVideo(proxiedUrl)}
+                                                                         title="Play Fullscreen"
+                                                                         style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 9px', borderRadius: 7, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                                                                     >
+                                                                         <span className="material-symbols-outlined" style={{ fontSize: 14 }}>play_arrow</span>
+                                                                         Play
+                                                                     </button>
+                                                                     <a
+                                                                         href={proxiedUrl}
+                                                                         download={`segment-${i + 1}.mp4`}
+                                                                         className="sb-seg-action-btn-secondary"
+                                                                         title="Download Video"
+                                                                         target="_blank"
+                                                                         rel="noreferrer"
+                                                                         style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 9px', borderRadius: 7, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}
+                                                                     >
+                                                                         <span className="material-symbols-outlined" style={{ fontSize: 14 }}>download</span>
+                                                                         Download
+                                                                     </a>
+                                                                 </>
+                                                             );
+                                                         })()
+                                                     )}
                                                     <button
                                                         className="sb-seg-regen-btn"
                                                         onClick={() => handleRegenSegment(i)}

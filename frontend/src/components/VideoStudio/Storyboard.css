@@ -1647,3 +1647,47 @@
 /* spin utility (shared) */
 .spin { animation: sbSpin 0.8s linear infinite; }
 
+/* ── Segment Card Media Hover Overlay ── */
+.sb-seg-card__media {
+    position: relative;
+}
+.sb-seg-media-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    opacity: 0;
+    transition: opacity 0.22s ease;
+    z-index: 10;
+    border-radius: 6px;
+}
+.sb-seg-card__media:hover .sb-seg-media-overlay {
+    opacity: 1;
+}
+.sb-seg-overlay-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.15s;
+    backdrop-filter: blur(4px);
+}
+.sb-seg-overlay-btn:hover {
+    background: var(--sys-primary);
+    border-color: var(--sys-primary);
+    transform: scale(1.1);
+}
+.sb-seg-overlay-btn .material-symbols-outlined {
+    font-size: 18px;
+}
+
+
