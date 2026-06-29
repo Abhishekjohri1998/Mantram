@@ -653,6 +653,17 @@ export async function planStoryboardScenes({
         characterContext = `\nCHARACTERS (distribute across segments for ensemble storytelling):\n${charLines.join('\n')}\nFeature different characters in different segments. Include at least one segment with two characters interacting.`;
     }
 
+    const hasShivaKeywords = /shiva|lingam|shivling|shivaling|mahadev|temple|hindu|indian/i.test((videoPrompt || '') + ' ' + (productName || '') + ' ' + (productFeatures || ''));
+    let templeGuide = '';
+    if (hasShivaKeywords) {
+        templeGuide = `\n\nCRITICAL SHIVA TEMPLE ARCHITECTURAL RULES (MANDATORY):
+- This is a Shaivite Hindu Temple setting. It must look authentically Shaivite.
+- ABSOLUTELY NO Buddha statues, Buddhist icons, Buddhist monks, zen stones, or stupas.
+- The Shiva Lingam must be represented as a smooth black cylindrical stone sculpture resting on a circular stone pedestal base (yoni base) in the center of the sanctum, with a copper vessel suspended directly above it dripping water, and fresh Bilva leaves (three-lobed leaves) and marigold flowers placed on it.
+- Include a carved stone Nandi bull statue sitting at the entrance, facing the inner sanctum containing the Shiva Lingam.
+- Feature stone temple walls, carved stone pillars with Dravidian/Nagara architecture, copper/brass oil lamps (diyas) casting a warm golden glow, and a stone trident (trishul) with a small damru drum tied to it leaning against a wall/pillar.`;
+    }
+
     const systemPrompt = `You are a world-class ad director, screenwriter, and cinematographer. You are planning a long-form video ad of ${targetDuration} seconds based on a master storyboard.
 
 The master storyboard consists of:
@@ -671,7 +682,7 @@ PRODUCT:
   Features: ${productFeatures || 'Highlight product features visually'}
 
 REFERENCE IMAGES: ${referenceImages.length} images provided (product + avatar).
-Every scene MUST reference these images to maintain visual consistency. Use @image1, @image2, etc.${characterContext}
+Every scene MUST reference these images to maintain visual consistency. Use @image1, @image2, etc.${characterContext}${templeGuide}
 
 YOUR TASK:
 Decompose the master storyboard video prompt into exactly ${sceneCount} sequential segments.

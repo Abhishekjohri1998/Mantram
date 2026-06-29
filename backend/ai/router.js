@@ -128,9 +128,10 @@ class ModelRouter {
      * Get a specific provider by name, or the default
      */
     getProvider(name) {
-        const provider = this.providers[name];
-        if (!provider) throw new Error(`Unknown provider: ${name}`);
-        if (!provider.isAvailable()) throw new Error(`Provider ${name} not configured (missing API key)`);
+        const resolvedName = name === 'claude' ? 'anthropic' : name;
+        const provider = this.providers[resolvedName];
+        if (!provider) throw new Error(`Unknown provider: ${resolvedName}`);
+        if (!provider.isAvailable()) throw new Error(`Provider ${resolvedName} not configured (missing API key)`);
         return provider;
     }
 
@@ -144,8 +145,10 @@ class ModelRouter {
             return this.nativeGemini;
         }
 
+        const reqProvider = preferences.provider === 'claude' ? 'anthropic' : preferences.provider;
+
         const priority = [
-            preferences.provider,
+            reqProvider,
             config.ai.defaultTextProvider,
             'gemini',
             'openai',

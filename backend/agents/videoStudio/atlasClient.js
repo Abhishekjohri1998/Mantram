@@ -652,10 +652,14 @@ export async function submitAtlasCloudVideoGeneration({
         negative_prompt: SEEDANCE_NEGATIVE_PROMPT,
         aspect_ratio:    aspectRatio || '16:9',
         duration:        dur,
-        resolution:      resolution === '4k' ? '4k' : (resolution === '1080p' ? '1080p' : (resolution === '480p' ? '480p' : '720p')),
         generate_audio:  refAudio ? false : (generateAudio !== false),
         customCharacterNames,
     };
+
+    const isSeedanceOrVeo = model.includes('seedance') || model.includes('veo');
+    if (!isSeedanceOrVeo) {
+        taskInput.resolution = resolution === '4k' ? '4k' : (resolution === '1080p' ? '1080p' : (resolution === '480p' ? '480p' : '720p'));
+    }
 
     if (refAudio) {
         taskInput.audio_url = refAudio;
