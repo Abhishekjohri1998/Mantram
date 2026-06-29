@@ -365,7 +365,7 @@ function ensureMultiCutsPerSegment(cuts, duration) {
             shot: 'CLOSE-UP',
             move: 'DOLLY-IN',
             lens: '85mm portrait',
-            framePrompt: `Close-up on ${charRef} face, conveying emotion as ${baseScene.replace(/\.$/, '').toLowerCase()}. Warm key light, soft rim light, bokeh background.`,
+            framePrompt: `Close-up on ${charRef} face, conveying deep contemplation and emotional expression. Warm key light, soft rim light, bokeh background.`,
         },
         {
             ...dominant,
@@ -373,7 +373,7 @@ function ensureMultiCutsPerSegment(cuts, duration) {
             shot: 'INSERT',
             move: 'STATIC',
             lens: '100mm macro',
-            framePrompt: `B-roll insert — ${brollSubject}. 100mm macro lens, extreme close-up, razor-sharp foreground detail, bokeh background. No character faces in frame.`,
+            framePrompt: `B-roll insert — focus on ${brollSubject}. 100mm macro lens, extreme close-up, razor-sharp foreground detail, bokeh background. No character faces in frame.`,
         }
     ];
 }
@@ -419,28 +419,28 @@ function ensureMinCutsPerSegment(cuts, duration) {
             shot: 'CLOSE-UP',
             move: 'DOLLY-IN',
             lens: '85mm portrait',
-            framePrompt: `85mm portrait lens, shallow depth of field. Close-up on ${charRef} — face, eyes, expression conveying emotion as ${baseScene.replace(/\.$/, '').toLowerCase()}. Warm key light, soft rim light, creamy bokeh background.`,
+            framePrompt: `85mm portrait lens, shallow depth of field. Close-up on ${charRef} — face, eyes, expression conveying deep emotion and quiet devotion. Warm key light, soft rim light, creamy bokeh background.`,
         },
         // C — Contextual B-roll: a real visual element from this specific scene/environment
         {
             shot: 'INSERT',
             move: 'STATIC',
             lens: '100mm macro',
-            framePrompt: `B-roll insert — ${brollSubject}. 100mm macro lens, extreme close-up, razor-sharp foreground detail, bokeh background. Natural or ambient light picking out texture and surface. No character faces in frame — pure visual element.`,
+            framePrompt: `B-roll insert — focus on ${brollSubject}. 100mm macro lens, extreme close-up, razor-sharp foreground detail, bokeh background. Natural or ambient light picking out texture and surface. No character faces in frame — pure visual element.`,
         },
         // D — Perspective contrast: opposite angle of the same action for visual variety
         {
             shot: contrastShot,
             move: contrastMove,
             lens: '50mm prime',
-            framePrompt: `${contrastShot.toLowerCase().replace('-', ' ')} perspective — ${baseScene.replace(/\.$/, '').toLowerCase()}. ${env ? `Location: ${env}.` : ''} ${charRef} repositioned in frame. 50mm prime, ${contrastMove.toLowerCase()} camera movement, cinematic depth.`,
+            framePrompt: `${contrastShot.toLowerCase().replace('-', ' ')} perspective. ${env ? `Location: ${env}.` : ''} ${charRef} repositioned in frame. 50mm prime, ${contrastMove.toLowerCase()} camera movement, cinematic depth.`,
         },
         // E — Scene resolution: wider pull-out closing this beat before the next scene
         {
             shot: 'WIDE',
             move: 'PULL-OUT',
             lens: '35mm anamorphic',
-            framePrompt: `Wide pull-out closing this scene beat — ${baseScene.replace(/\.$/, '').toLowerCase()}. ${env || 'Location'} fully revealed. 35mm anamorphic, natural ambient light, full depth of field, foreground to background.`,
+            framePrompt: `Wide pull-out closing this scene beat. ${env || 'Location'} fully revealed. 35mm anamorphic, natural ambient light, full depth of field, foreground to background.`,
         },
     ];
 
