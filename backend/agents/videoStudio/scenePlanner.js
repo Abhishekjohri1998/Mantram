@@ -332,6 +332,52 @@ function generateFallbackScenes({ sceneCount, durations, arcScenes, language, pr
  * Shot D shifts to a contrasting angle/perspective of the same action.
  * Shot E widens to close the scene beat.
  */
+function ensureMultiCutsPerSegment(cuts, duration) {
+    if (!cuts || cuts.length === 0) return [];
+    if (cuts.length >= 3) return cuts;
+
+    // Use the dominant cut as the scene anchor
+    const dominant = cuts.reduce((best, c) => (c.duration > best.duration ? c : best), cuts[0]);
+    if (!dominant) return cuts;
+    const baseScene  = dominant.scene  || 'Cinematic visual scene';
+    const baseFrame  = dominant.framePrompt || dominant.scene || '';
+    const env        = dominant.environment || '';
+    const domShot    = dominant.shot  || 'MEDIUM';
+    const domMove    = dominant.move  || 'STEADICAM';
+    const domLens    = dominant.lens  || '50mm prime';
+    const charRef    = '@image2';
+
+    const brollSubject = extractBrollSubject(baseFrame, env);
+
+    const dur1 = Math.max(2, Math.floor(duration * 0.4));
+    const dur2 = Math.max(2, Math.floor(duration * 0.3));
+    const dur3 = Math.max(2, duration - dur1 - dur2);
+
+    return [
+        {
+            ...dominant,
+            duration: dur1,
+            framePrompt: `${baseFrame}${env ? ` Set: ${env}.` : ''} ${charRef} in frame — scene as directed.`,
+        },
+        {
+            ...dominant,
+            duration: dur2,
+            shot: 'CLOSE-UP',
+            move: 'DOLLY-IN',
+            lens: '85mm portrait',
+            framePrompt: `Close-up on ${charRef} face, conveying emotion as ${baseScene.replace(/\.$/, '').toLowerCase()}. Warm key light, soft rim light, bokeh background.`,
+        },
+        {
+            ...dominant,
+            duration: dur3,
+            shot: 'INSERT',
+            move: 'STATIC',
+            lens: '100mm macro',
+            framePrompt: `B-roll insert — ${brollSubject}. 100mm macro lens, extreme close-up, razor-sharp foreground detail, bokeh background. No character faces in frame.`,
+        }
+    ];
+}
+
 function ensureMinCutsPerSegment(cuts, duration) {
     if (cuts.length >= 5) return cuts;
 
@@ -497,8 +543,8 @@ export async function planStoryboardScenes({
         const sceneCount = segments.length;
 
         const scenes = segments.map((seg, i) => {
-            // Use the director's planned cuts directly to preserve script/audio synchronization timing.
-            const activeCuts = seg.cutsInSegment;
+            // Preserve timing, but if the segment has fewer than 3 cuts, expand it to ensure multi-shot visual variety.
+            const activeCuts = ensureMultiCutsPerSegment(seg.cutsInSegment, seg.duration);
 
             let elapsed = 0;
 
@@ -539,10 +585,8 @@ export async function planStoryboardScenes({
                     ? ` Story: ${cut.scene.trim()}`
                     : '';
 
-                // Voiceover inline
-                const voiceoverLine = cut.voiceover && cut.voiceover.trim()
-                    ? ` VO: "${cut.voiceover.trim()}"`
-                    : '';
+                // Voiceover is handled by audio; do not output VO text in visual prompt.
+                const voiceoverLine = '';
 
                 // Shot grammar: shot type + lens + camera move in Seedance's language
                 const shotGrammar = `${(cut.shot || 'MEDIUM').replace(/_/g,' ')}, ${cut.lens || '50mm'} ${cut.move || 'STEADICAM'}`;
