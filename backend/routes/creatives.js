@@ -1857,6 +1857,8 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
     try {
         console.log(`🎨 Using: ${selectedModelId} (Vertex AI)...`);
         
+        // NATIVE fallback config (when Atlas Cloud fails)
+        const NATIVE_GEMINI_IMAGE_MODEL = 'gemini-2.5-flash'; // Valid on direct Gemini API
         const data = await generateImageWithVertex(parts, selectedModelId, temperature, { aspectRatio, imageSize });
 
         const resParts = data.candidates?.[0]?.content?.parts || [];
@@ -2296,7 +2298,7 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
                 continue;
             }
 
-            console.error(`❌ Image generation failed (${GEMINI_MODEL}):`, error.message);
+            console.error(`❌ Image generation failed (${NATIVE_GEMINI_IMAGE_MODEL}):`, error.message);
 
             return {
                 imageUrl: null,
@@ -2304,7 +2306,7 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
                 textResponse: '',
                 warnings: [],
                 modelBusy: true,
-                busyModel: GEMINI_MODEL,
+                busyModel: NATIVE_GEMINI_IMAGE_MODEL,
                 errorMessage: isTimeout
                     ? `Image generation timed out (${Math.round(TIMEOUT_MS / 1000)}s). Google servers may be slow — please try again.`
                     : (error.message?.includes('BUSY') ? 'Gemini is busy, please try again later.' : error.message || 'Image generation failed. Please try again.'),
