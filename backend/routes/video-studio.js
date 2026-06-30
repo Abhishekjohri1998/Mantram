@@ -9429,11 +9429,13 @@ STEP 1 — VERBATIM TRANSCRIPTION (mandatory):
 Transcribe the entire audio content exactly as it is spoken. Keep all original words.
 
 STEP 2 — SCENE BREAKDOWN (mandatory):
-Decompose the verbatim transcript into distinct sequential cuts/scenes based on natural semantic boundaries.
+Decompose the verbatim transcript into distinct sequential cuts/scenes based on when they are spoken in the audio timeline.
 For each cut:
 - Provide a detailed visual scene description (what to show on screen). Must directly illustrate the verbatim words spoken.
 - Provide the exact verbatim portion of the transcript (dialogue) spoken during this cut.
-- Allocate a duration in seconds for this cut. The sum of all cut durations MUST equal exactly ${Math.round(audioDuration)} seconds. No cut should be less than 2 seconds or more than 15 seconds.
+- Allocate a duration in seconds for this cut. 
+  CRITICAL: You must estimate this duration based on the actual pacing of the speech in the audio. If the dialogue for a cut is spoken between 10s and 15s in the audio, the duration of this cut MUST be 5 seconds. Do NOT simply divide the total duration equally (e.g., giving 10 seconds to every cut). If there are silences, distribute them naturally.
+  The sum of all cut durations MUST equal exactly the total audio duration (${Math.round(audioDuration)} seconds). No cut should be less than 2 seconds.
 
 STEP 3 — JSON RESPONSE:
 Return ONLY a valid JSON object:
@@ -9448,6 +9450,8 @@ Return ONLY a valid JSON object:
     {
       "id": 1,
       "lens": "50mm prime",
+      "startTime": 0,
+      "endTime": 5,
       "duration": 5,
       "move": "STEADICAM",
       "shot": "MEDIUM",
@@ -9461,6 +9465,7 @@ Return ONLY a valid JSON object:
 CRITICAL RULES:
 - extractedText MUST contain the COMPLETE verbatim transcript of the audio.
 - The sum of all cut durations in preSeededCuts MUST equal exactly ${Math.round(audioDuration)} seconds.
+- You MUST base the cut durations on the actual timing of the audio. Do not uniform-distribute durations.
 - Do NOT use external brand knowledge.
 - suggestedFormat MUST be one of: "9:16" portrait, "16:9" landscape, "1:1" square.
 - Return ONLY JSON. Do not include any explanations or markdown wrappers outside the JSON object.`;

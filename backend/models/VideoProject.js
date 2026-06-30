@@ -95,6 +95,7 @@ const videoProjectSchema = new mongoose.Schema({
         narrative: { type: String, default: '' },  // overall story arc
     },
     backendPrompt: { type: String, default: '' },  // exact fal.ai prompt (user-visible)
+    refAudio: { type: String, default: '' },
 
     // ── Voice Over Preview (QC before video generation) ──
     voiceoverPreview: {
