@@ -11465,9 +11465,13 @@ router.post('/storyboard/regenerate-segment', protect, async (req, res) => {
 
         // Mark segment as 'regenerating' in MongoDB immediately
         const longFormJobId = sb.longFormJobId;
+        if (Array.isArray(storedScenes) && storedScenes[segIdx]) {
+            storedScenes[segIdx].visualPrompt = basePrompt;
+        }
         await VideoProject.findByIdAndUpdate(projectId, {
             [`storyboard.segmentUrls.${segIdx}`]:    null,
             [`storyboard.segmentPrompts.${segIdx}`]: basePrompt,
+            'storyboard.scenes':                     storedScenes,
         });
 
         // Update in-memory job if still alive
