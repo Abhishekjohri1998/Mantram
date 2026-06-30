@@ -392,12 +392,16 @@ async function submitAtlasCloudPayload(payload) {
             model:           atlasModel,
             prompt:          sanitizedPrompt,
             duration:        payload.input?.duration || 5,
-            resolution:      normalizedRes,
             ratio:           rawRatio,
             generate_audio:  payload.input?.generate_audio !== false,
             watermark:       false,
             return_last_frame: false,
         };
+
+        if (payload.input?.resolution || (!atlasModel.includes('seedance') && !atlasModel.includes('veo'))) {
+            atlasPayload.resolution = normalizedRes;
+        }
+
 
         if (payload.input?.audio_url) {
             console.log(`🔊 [Atlas] Uploading audio track to Atlas CDN...`);
