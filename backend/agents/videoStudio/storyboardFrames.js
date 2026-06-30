@@ -371,7 +371,6 @@ async function generateWithGptImage2(
             fd.append('prompt', finalPrompt);
             fd.append('size', size);
             fd.append('n', '1');
-            fd.append('response_format', 'b64_json');
             
             // LaoZhang proxy supports multiple 'image[]' parameters for character/style/logo injection
             // AtlasCloud strictly expects the standard 'image' parameter for OpenAI compatibility
@@ -391,7 +390,7 @@ async function generateWithGptImage2(
             response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ model: resolvedModelId, prompt: finalPrompt, size, n: 1, response_format: 'b64_json' }),
+                body: JSON.stringify({ model: resolvedModelId, prompt: finalPrompt, size, n: 1 }),
                 signal: AbortSignal.timeout(TIMEOUT_MS),
             });
         }
@@ -403,11 +402,20 @@ async function generateWithGptImage2(
         }
 
         const data = await response.json();
-        let b64 = data.data?.[0]?.b64_json || '';
-        if (!b64) throw new Error('No b64_json in response');
-        if (b64.startsWith('data:')) b64 = b64.substring(b64.indexOf(',') + 1);
+        
+        let rawBuf;
+        if (data.data?.[0]?.b64_json) {
+            let b64 = data.data[0].b64_json;
+            if (b64.startsWith('data:')) b64 = b64.substring(b64.indexOf(',') + 1);
+            rawBuf = Buffer.from(b64, 'base64');
+        } else if (data.data?.[0]?.url) {
+            const { buffer } = await downloadBuffer(data.data[0].url);
+            if (!buffer) throw new Error('Failed to download image from generated URL');
+            rawBuf = buffer;
+        } else {
+            throw new Error('No valid image data (b64_json or url) in response');
+        }
 
-        const rawBuf = Buffer.from(b64, 'base64');
         let mime = 'image/png';
         if (rawBuf[0] === 0xFF && rawBuf[1] === 0xD8) mime = 'image/jpeg';
         else if (rawBuf.length > 12 && rawBuf.toString('ascii', 8, 12) === 'WEBP') mime = 'image/webp';
