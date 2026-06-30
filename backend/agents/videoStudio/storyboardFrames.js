@@ -374,10 +374,12 @@ async function generateWithGptImage2(
             fd.append('response_format', 'b64_json');
             
             // LaoZhang proxy supports multiple 'image[]' parameters for character/style/logo injection
+            // AtlasCloud strictly expects the standard 'image' parameter for OpenAI compatibility
             refBuffers.forEach(({ buffer, mimeType, label }, idx) => {
                 const ext = mimeType?.includes('png') ? 'png' : mimeType?.includes('webp') ? 'webp' : 'jpg';
                 const fName = label ? `${label}_${idx}.${ext}` : `ref_${idx}.${ext}`;
-                fd.append('image[]', buffer, { filename: fName, contentType: mimeType });
+                const fieldName = baseUrl.includes('atlascloud') ? 'image' : 'image[]';
+                fd.append(fieldName, buffer, { filename: fName, contentType: mimeType });
             });
             response = await fetch(endpoint, {
                 method: 'POST',
