@@ -1352,7 +1352,25 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
                     <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.08)' }} />
                     <CfgMenu value={format} onChange={setFormat} options={FMTS} icon="crop" />
                     <CfgMenu value={resolution} onChange={setResolution} options={RES} icon="hd" />
-                    <CfgMenu value={duration} onChange={setDuration} options={DURS} icon="timer" />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 12px', background: 'rgba(255,255,255,0.06)', borderRadius: '10px', height: '36px', border: '1px solid rgba(255,255,255,0.08)', flex: '0 0 auto' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'rgba(255,255,255,0.5)' }}>timer</span>
+                        <span style={{ fontSize: 11, color: '#fff', fontWeight: 600, minWidth: '24px' }}>{duration}s</span>
+                        <input
+                            type="range"
+                            min={selectedModel.startsWith('seedance') ? 4 : 5}
+                            max={selectedModel === 'seedance-2.0-mini' ? 15 : 120}
+                            step={1}
+                            value={duration}
+                            onChange={e => {
+                                let val = Number(e.target.value);
+                                if (!selectedModel.startsWith('seedance')) {
+                                    val = DURS.map(o => o.value).reduce((prev, curr) => Math.abs(curr - val) < Math.abs(prev - val) ? curr : prev);
+                                }
+                                setDuration(val);
+                            }}
+                            style={{ width: '70px', accentColor: '#10b981', cursor: 'pointer', height: '3px', background: 'rgba(255,255,255,0.1)', border: 'none', outline: 'none' }}
+                        />
+                    </div>
 
                     <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.08)' }} />
                     <CfgMenu value={selectedModel} onChange={setSelectedModel} options={VIDEO_MODELS} icon="smart_toy" />

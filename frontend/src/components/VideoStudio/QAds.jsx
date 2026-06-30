@@ -34,6 +34,11 @@ const FORMATS = [
     { value: '16:9', label: '16:9', msIcon: 'crop_landscape' },
     { value: '1:1', label: '1:1', msIcon: 'crop_square' },
 ]
+const VIDEO_MODELS = [
+    { value: 'seedance-2.0', label: 'Seedance 2.0', msIcon: 'local_movies' },
+    { value: 'seedance-2.0-fast', label: 'Seedance Fast', msIcon: 'bolt' },
+    { value: 'seedance-2.0-mini', label: 'Seedance Mini', msIcon: 'bolt' },
+]
 const CTA_PRESETS = ['Shop now', 'Link in bio', 'Swipe up', 'Try it free', 'Learn more']
 
 /* ═══════════════════════════════════════════════════════ CSS ══ */
@@ -184,6 +189,7 @@ export default function QAds({ activeBrand, projects = [] }) {
     const [format, setFormat] = useState('9:16')
     const [cta, setCta] = useState('Shop now')
     const [customDialogue, setCustomDialogue] = useState('')
+    const [selectedModel, setSelectedModel] = useState('seedance-2.0-fast')
 
     // ── Prompt ──
     const [promptText, setPromptText] = useState('')
@@ -280,13 +286,13 @@ export default function QAds({ activeBrand, projects = [] }) {
         try {
             const data = await apiJson('/video-studio/ugc-pro/qads/build-prompt', {
                 brandId: activeBrand?._id, categoryId: selectedCat, productData, avatarUrl, productImageUrls,
-                settings: { duration, format, cta, customDialogue },
+                settings: { duration, format, cta, customDialogue, model: selectedModel },
             })
             setPromptText(data.prompt)
             setPromptReady(true)
         } catch (err) { setError(err.message) }
         setBuildingPrompt(false)
-    }, [selectedCat, productData, avatarUrl, productImageUrls, activeBrand, duration, format, cta, customDialogue, isNoAvatar])
+    }, [selectedCat, productData, avatarUrl, productImageUrls, activeBrand, duration, format, cta, customDialogue, isNoAvatar, selectedModel])
 
     // ── Generate ──
     const handleGenerate = useCallback(async () => {
@@ -300,7 +306,7 @@ export default function QAds({ activeBrand, projects = [] }) {
             const data = await apiJson('/video-studio/ugc-pro/qads/generate', {
                 brandId: activeBrand?._id, categoryId: selectedCat, productData, avatarUrl, productImageUrls,
                 prebuiltPrompt: promptText,
-                settings: { duration, format, cta, customDialogue, quality: 'high' },
+                settings: { duration, format, cta, customDialogue, quality: 'high', model: selectedModel },
             })
             setIsMinimized(true)
             setJobs(prev => prev.map(j => j.id === jobId ? { ...j, requestId: data.requestId, prompt: data.prompt } : j))
@@ -334,7 +340,7 @@ export default function QAds({ activeBrand, projects = [] }) {
             setJobs(prev => prev.filter(j => j.id !== jobId))
         }
         setLoading(false)
-    }, [activeBrand, selectedCat, productData, productImageUrls, avatarUrl, promptText, duration, format, cta, customDialogue])
+    }, [activeBrand, selectedCat, productData, productImageUrls, avatarUrl, promptText, duration, format, cta, customDialogue, selectedModel])
 
     async function downloadVideo(url) {
         try {
@@ -588,10 +594,29 @@ export default function QAds({ activeBrand, projects = [] }) {
                     {/* Bottom Bar */}
                     <div className="qa-bottom">
                         <div className="qa-bottom-left">
-                            <CfgDropdown value={duration} onChange={v => setDuration(v)}
-                                options={DURATIONS.map(d => ({ value: d.value, label: d.label, msIcon: 'timer' }))} />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 12px', background: 'transparent', height: '36px', flex: '0 0 auto' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'rgba(255,255,255,0.6)' }}>timer</span>
+                                <span style={{ fontSize: 11, color: '#fff', fontWeight: 600, minWidth: '24px' }}>{duration}s</span>
+                                <input
+                                    type="range"
+                                    min={selectedModel.startsWith('seedance') ? 4 : 5}
+                                    max={selectedModel === 'seedance-2.0-mini' ? 15 : 120}
+                                    step={1}
+                                    value={duration}
+                                    onChange={e => {
+                                        let val = Number(e.target.value);
+                                        if (!selectedModel.startsWith('seedance')) {
+                                            val = DURATIONS.map(d => d.value).reduce((prev, curr) => Math.abs(curr - val) < Math.abs(prev - val) ? curr : prev);
+                                        }
+                                        setDuration(val);
+                                    }}
+                                    style={{ width: '70px', accentColor: 'var(--sys-primary)', cursor: 'pointer', height: '3px', background: 'rgba(255,255,255,0.1)', border: 'none', outline: 'none' }}
+                                />
+                            </div>
                             <CfgDropdown value={format} onChange={v => setFormat(v)}
                                 options={FORMATS} />
+                            <CfgDropdown value={selectedModel} onChange={setSelectedModel}
+                                options={VIDEO_MODELS} />
                         </div>
                         {!promptReady ? (
                             <button className="qa-generate" disabled={!selectedCat || !hasProduct || !hasAvatar || buildingPrompt}

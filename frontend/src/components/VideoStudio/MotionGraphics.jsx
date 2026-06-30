@@ -428,8 +428,25 @@ export default function MotionGraphics({ activeBrand, canCreateVideo = true, onU
                     </div>
                     <CfgDrop value={ratio} onChange={setRatio} options={RATIOS} icon="aspect_ratio" />
                     <CfgDrop value={resolution} onChange={setResolution} options={RESOLUTIONS} icon="high_quality" />
-                    <CfgDrop value={duration} onChange={v => setDuration(Number(v))}
-                        options={DURATIONS.map(d => ({ value: d, label: `${d}s` }))} icon="timer" />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 12px', background: 'transparent', height: '36px', flex: '0 0 auto' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'rgba(255,255,255,0.6)' }}>timer</span>
+                        <span style={{ fontSize: 11, color: '#fff', fontWeight: 600, minWidth: '24px' }}>{duration}s</span>
+                        <input
+                            type="range"
+                            min={model.startsWith('seedance') ? 4 : 5}
+                            max={model === 'seedance-2.0-mini' ? 15 : 120}
+                            step={1}
+                            value={duration}
+                            onChange={e => {
+                                let val = Number(e.target.value);
+                                if (!model.startsWith('seedance')) {
+                                    val = DURATIONS.reduce((prev, curr) => Math.abs(curr - val) < Math.abs(prev - val) ? curr : prev);
+                                }
+                                setDuration(val);
+                            }}
+                            style={{ width: '70px', accentColor: '#FF4D00', cursor: 'pointer', height: '3px', background: 'rgba(255,255,255,0.1)', border: 'none', outline: 'none' }}
+                        />
+                    </div>
                     <CfgDrop value={model} onChange={setModel} options={MODELS} icon="smart_toy" />
                     <button className="mg-gen-btn" onClick={handleGenerate} disabled={busy || images.length === 0}>
                         {busy ? <span className="mg-spinner" /> : <span className="material-symbols-outlined" style={{ fontSize: 18 }}>auto_awesome</span>}

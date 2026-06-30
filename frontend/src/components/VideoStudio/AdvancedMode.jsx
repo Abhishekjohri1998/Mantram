@@ -1668,7 +1668,25 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                             <ConfigDropdown value={model} onChange={setModel} options={Object.values(MODELS).map(mod => ({ value: mod.id, label: mod.name, msIcon: mod.msIcon }))} label="Model" />
                             <ConfigDropdown value={aspectRatio} onChange={setAspectRatio} options={m.ratios.map(r => ({ value: r, label: r }))} label="Ratio" />
                             <ConfigDropdown value={resolution} onChange={setResolution} options={m.res.map(r => ({ value: r, label: r }))} label="Resolution" />
-                            <ConfigDropdown value={duration} onChange={setDuration} options={m.durs.map(d => ({ value: d, label: `${d}s` }))} label="Duration" />
+                            <div className="vm-slider-container" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 12px', background: 'var(--sys-surface-glass)', borderRadius: '10px', height: '36px', border: '1px solid var(--sys-border)' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--sys-text-muted)' }}>timer</span>
+                                <span style={{ fontSize: 11, color: 'var(--sys-text)', fontWeight: 600, minWidth: '24px' }}>{duration}s</span>
+                                <input
+                                    type="range"
+                                    min={model.startsWith('seedance') ? 4 : (m.durs ? m.durs[0] : 5)}
+                                    max={model === 'seedance-2.0-mini' ? 15 : (m.durs ? m.durs[m.durs.length - 1] : 120)}
+                                    step={1}
+                                    value={duration}
+                                    onChange={e => {
+                                        let val = Number(e.target.value);
+                                        if (!model.startsWith('seedance') && m.durs) {
+                                            val = m.durs.reduce((prev, curr) => Math.abs(curr - val) < Math.abs(prev - val) ? curr : prev);
+                                        }
+                                        setDuration(val);
+                                    }}
+                                    style={{ width: '80px', accentColor: 'var(--sys-primary)', cursor: 'pointer', height: '3px' }}
+                                />
+                            </div>
                             <ConfigDropdown value={language} onChange={setLanguage} options={LANGUAGES.map(l => ({ value: l.id, label: l.label }))} label="Language" />
                         </div>
 

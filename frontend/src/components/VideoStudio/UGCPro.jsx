@@ -777,18 +777,26 @@ export default function UGCPro({ activeBrand, projects = [], projectsLoaded = fa
                     {/* Bottom Bar */}
                     <div className="ugc-bottom">
                         <div className="ugc-bottom-left">
-                            <Dropdown value={duration} onChange={v => setDuration(v)} options={[
-                                { value: 5, label: '5s', icon: 'timer' },
-                                { value: 8, label: '8s', icon: 'timer' },
-                                { value: 10, label: '10s', icon: 'timer' },
-                                { value: 15, label: '15s', icon: 'timer' },
-                                { value: 20, label: '20s', icon: 'timer' },
-                                { value: 30, label: '30s', icon: 'movie' },
-                                { value: 45, label: '45s', icon: 'movie' },
-                                { value: 60, label: '60s', icon: 'movie' },
-                                { value: 90, label: '90s', icon: 'movie' },
-                                { value: 120, label: '120s', icon: 'movie' },
-                            ]} />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 12px', background: 'transparent', height: '32px', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', flex: '0 0 auto' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--sys-text-muted)' }}>timer</span>
+                                <span style={{ fontSize: 11, color: 'var(--sys-text)', fontWeight: 600, minWidth: '24px' }}>{duration}s</span>
+                                <input
+                                    type="range"
+                                    min={selectedModel.startsWith('seedance') ? 4 : 5}
+                                    max={selectedModel === 'seedance-2.0-mini' ? 15 : 120}
+                                    step={1}
+                                    value={duration}
+                                    onChange={e => {
+                                        let val = Number(e.target.value);
+                                        if (!selectedModel.startsWith('seedance')) {
+                                            const allowed = [5, 8, 10, 15, 20, 30, 45, 60, 90, 120];
+                                            val = allowed.reduce((prev, curr) => Math.abs(curr - val) < Math.abs(prev - val) ? curr : prev);
+                                        }
+                                        setDuration(val);
+                                    }}
+                                    style={{ width: '70px', accentColor: 'var(--sys-primary)', cursor: 'pointer', height: '3px', background: 'rgba(255,255,255,0.1)', border: 'none', outline: 'none' }}
+                                />
+                            </div>
                             <Dropdown value={aspectRatio} onChange={v => setAspectRatio(v)} options={[
                                 { value: '9:16', label: '9:16', icon: 'crop_portrait' },
                                 { value: '16:9', label: '16:9', icon: 'crop_landscape' },
