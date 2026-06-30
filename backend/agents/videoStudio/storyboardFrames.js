@@ -348,16 +348,9 @@ async function generateWithGptImage2(
     let baseUrl = '';
     let resolvedModelId = modelId;
 
-    if (!useEditsEndpoint && modelId === 'gpt-image-2' && process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.startsWith('sk-')) {
-        isDirectOpenAI = true;
-        apiKey = process.env.OPENAI_API_KEY;
-        baseUrl = 'https://api.openai.com/v1';
-        resolvedModelId = 'dall-e-3';
-    } else {
-        const isAtlas = !!process.env.ATLASCLOUD_API_KEY;
-        apiKey = isAtlas ? process.env.ATLASCLOUD_API_KEY : (config.ai?.laozhangApiKey || process.env.LAOZHANG_API_KEY || process.env.OPENAI_API_KEY);
-        baseUrl = isAtlas ? 'https://api.atlascloud.ai/v1' : (config.ai?.laozhangBaseUrl || 'https://api.laozhang.ai/v1');
-    }
+    const isAtlas = !!process.env.ATLASCLOUD_API_KEY;
+    apiKey = isAtlas ? process.env.ATLASCLOUD_API_KEY : (config.ai?.laozhangApiKey || process.env.LAOZHANG_API_KEY || process.env.OPENAI_API_KEY);
+    baseUrl = isAtlas ? 'https://api.atlascloud.ai/v1' : (config.ai?.laozhangBaseUrl || 'https://api.laozhang.ai/v1');
 
     const endpoint = useEditsEndpoint ? `${baseUrl}/images/edits` : `${baseUrl}/images/generations`;
 
