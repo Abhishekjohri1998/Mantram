@@ -86,13 +86,27 @@ router.get('/download', async (req, res) => {
         if (!url) return res.status(400).send('URL is required');
 
         // Allow only mantram S3 buckets or specific provider CDNs to prevent SSRF
-        if (!url.includes('mantram-ai-generated-media.s3') && 
-            !url.includes('amazonaws.com') &&
+        const isS3 = url.includes('mantram-ai-generated-media.s3') || (url.includes('amazonaws.com') && url.includes('mantram'));
+        if (!isS3 && 
             !url.includes('fal.media') &&
             !url.includes('atlascloud.ai')) {
             return res.status(403).send('Unauthorized domain');
         }
 
+        if (isS3) {
+            // Use AWS SDK to stream from private bucket (avoids 403 AccessDenied)
+            const { getObjectStream } = await import('../utils/s3.js');
+            const { stream, contentType, contentLength } = await getObjectStream(url);
+            
+            res.setHeader('Content-Disposition', `attachment; filename="${filename || 'video.mp4'}"`);
+            if (contentType) res.setHeader('Content-Type', contentType);
+            if (contentLength) res.setHeader('Content-Length', contentLength);
+            
+            stream.pipe(res);
+            return;
+        }
+
+        // External provider CDN fallback
         const fetch = (await import('node-fetch')).default;
         const response = await fetch(url);
         
