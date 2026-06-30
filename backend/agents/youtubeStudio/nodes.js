@@ -1002,9 +1002,9 @@ Return ONLY a JSON object, no markdown:
     // How to describe the character(s) to generate
     // Priority: primaryFacePart (YouTube thumbnail) > leadPortraitPart (Cast Bank) > text description
     const characterGenerationBlock = primaryFacePart
-        ? `CHARACTER FACE REFERENCE (CRITICAL — HIGHEST PRIORITY):\nThe attached face reference image shows the EXACT REAL PERSON from the video. You MUST perfectly preserve their exact likeness, facial structure, skin tone, hair, beard, glasses, and all features. DO NOT hallucinate a different face. This is the actual creator/vlogger — their audience will recognize them. Place them prominently in the scene.`
+        ? `CHARACTER FACE REFERENCE:\nThe attached face reference image shows the lead character. Use this as a general stylistic reference for the character in the scene, focusing on the overall archetype and vibe.`
         : (leadPortraitPart
-            ? `CHARACTER: Use the provided reference portrait image for the lead character's exact appearance. Preserve their exact likeness, facial structure, and features. Place them in the scene as the focal subject.`
+            ? `CHARACTER: Use the provided reference portrait image as a general style guide for the lead character. Place them in the scene as the focal subject.`
             : (characterList
                 ? `CHARACTERS TO GENERATE (from AI video analysis — create these people from scratch matching these descriptions):\n  ${characterList}`
                 : 'Generate the show\'s lead character(s) appropriate to the show style and scene.'));
@@ -1059,7 +1059,7 @@ Return ONLY a JSON object, no markdown:
         ``,
         `[SUBJECT & IDENTITY]`,
         primaryFacePart 
-            ? `IMAGE-TO-IMAGE RECONSTRUCTION: The attached face crop image contains the EXACT identity of the subject. You MUST perfectly preserve their likeness, facial structure, skin tone, and features. DO NOT hallucinate a generic face.` 
+            ? `IMAGE-TO-IMAGE REFERENCE: Use the attached face crop image as a general stylistic reference for the subject. Focus on matching the overall vibe and character archetype rather than an exact facial likeness.` 
             : `Focus on the lead character.`,
         `Emotion: ${peakEmotion} — convey this STRONGLY through facial expression.`,
         ``,

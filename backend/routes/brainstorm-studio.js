@@ -44,7 +44,7 @@ function getFastModelOptions() {
     console.error('Error delegating getFastModelOptions:', e.message);
   }
   // Fallback: let the router figure it out (it will try native_gemini as last resort)
-  return { provider: 'native_gemini', model: 'gemini-2.5-flash' };
+  return { provider: 'native_gemini', model: 'gemini-1.5-flash' };
 }
 
 function parseJSON(text) {
@@ -1674,7 +1674,12 @@ Respond in STRICT JSON:
 
 // ── SSE helpers ───────────────────────────────────────────────────────────────
 function sseEvent(res, data) {
-  try { res.write(`data: ${JSON.stringify(data)}\n\n`); } catch {}
+  try { 
+    res.write(`data: ${JSON.stringify(data)}\n\n`); 
+    if (typeof res.flush === 'function') res.flush();
+  } catch (err) {
+    console.error('[fidato-chat] sseEvent write error:', err.message);
+  }
 }
 
 async function streamWords(res, text, delayMs = 5) {
@@ -2086,7 +2091,7 @@ Return ONLY this JSON:
     let result;
 
     // ── Overall timeout: if AI providers are all failing, don't make user wait ──
-    // NOTE: gemini-2.5-flash is a "thinking" model that needs 15-25s via Atlas Cloud
+    // NOTE: gemini-1.5-flash is a "thinking" model that needs 15-25s via Atlas Cloud
     const MCOT_TIMEOUT_MS = 30000; // 30 seconds max for MCoT reasoning
     console.log('[fidato-chat] MCoT reasoning started, timeout:', MCOT_TIMEOUT_MS, 'ms, fast provider:', JSON.stringify(fastOpts));
     const aiCallPromise = (async () => {
@@ -2098,7 +2103,7 @@ Return ONLY this JSON:
             userPrompt: `Analyze conversation and decide next action. Use web search to find relevant market data, competitor insights, or industry trends if applicable. Latest message: "${message}"`,
             temperature: 0.3,
             maxTokens: 1200,
-            model: 'gemini-2.5-flash',
+            model: 'gemini-1.5-flash',
           });
           const text = searchResult.text;
           if (searchResult.citations?.length > 0) {
@@ -2520,6 +2525,7 @@ ${outputFormat}`;
 
   const actResult = await aiCall(systemPrompt, `Intent: ${intent}\n${brandContext}\n\nBrief:\n${answersText}`, {
     temperature: 0.85, maxTokens: 6000,
+    provider: 'gemini', model: 'gemini-1.5-flash'
   });
   try {
     return parseJSON(actResult) || {};
@@ -2578,7 +2584,7 @@ Respond in JSON with these keys: title, executive_summary, objective, duration, 
 }
 
 // ── POST /api/brainstorm-studio/fidato-chat — Main conversational SSE endpoint ──
-router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (req, res) => {
+router.post('/fidato-chat', async (req, res) => {
   // Set SSE headers
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -2588,8 +2594,7 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
 
   const { message, history = [], sessionState = {}, brand, sessionId } = req.body;
 
-  const onClose = () => { try { res.end(); } catch {} };
-  req.on('close', onClose);
+
 
   // Hard safety timeout: if the ENTIRE handler hasn't finished in 45s, force-close with an error
   let handlerFinished = false;
@@ -2683,13 +2688,17 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
     // ── STAGE 2: Execute Action ─────────────────────────────────────────────
 
     if (action === 'ask_question' || action === 'general_chat') {
+      console.log(`[fidato-chat] Executing streamWords for action: ${action}`);
       await streamWords(res, fidatoResponse);
+      console.log(`[fidato-chat] Finished streamWords, saving message...`);
       await saveFidatoMsg(fidatoResponse, { questionOptions: questionOptions || undefined });
+      console.log(`[fidato-chat] Message saved. Emitting 'done' event...`);
       sseEvent(res, {
         type: 'done',
         sessionState: newSessionState,
         questionOptions: questionOptions || null,
       });
+      console.log(`[fidato-chat] 'done' event emitted.`);
 
     } else if (action === 'generate_ideas') {
       const preMsg = preGenerationMessage || "Okay, I have enough to work with! Give me a moment to cook up some ideas 🔥";
@@ -2885,6 +2894,13 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
         sessionState: newSessionState,
         questionOptions: questionOptions || null,
       });
+    } else {
+      // ── CATCH-ALL FOR UNHANDLED OR HALLUCINATED ACTIONS ──
+      console.warn(`[fidato-chat] UNHANDLED ACTION: "${action}" — falling back to text response`);
+      const fallbackMsg = fidatoResponse || "Tell me more about what you have in mind!";
+      await streamWords(res, fallbackMsg);
+      await saveFidatoMsg(fallbackMsg);
+      sseEvent(res, { type: 'done', sessionState: newSessionState });
     }
 
     // ── Persist session to DB ─────────────────────────────────────────────
@@ -2892,6 +2908,7 @@ router.post('/fidato-chat', protect, requireStudio('brainstormStudio'), async (r
       try { await session.save(); } catch (e) { console.warn('[fidato-chat] Session save failed:', e.message); }
     }
 
+    console.log(`[fidato-chat] Calling res.end() for action: ${action}`);
     res.end();
   } catch (err) {
     console.error('fidato-chat error:', err);
@@ -2969,7 +2986,12 @@ router.post('/strategy-mode/stream', protect, requireStudio('brainstormStudio'),
   res.flushHeaders();
 
   const emit = (obj) => {
-    try { if (!res.writableEnded) res.write(`data: ${JSON.stringify(obj)}\n\n`); } catch { /* disconnected */ }
+    try { 
+      if (!res.writableEnded) {
+        res.write(`data: ${JSON.stringify(obj)}\n\n`); 
+        if (typeof res.flush === 'function') res.flush();
+      }
+    } catch { /* disconnected */ }
   };
 
   try {

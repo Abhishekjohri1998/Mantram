@@ -209,11 +209,11 @@ export const authorize = (...roles) => (req, res, next) => {
 
 export const superadmin = authorize('superadmin');
 
-// Generate JWT — SEC-002 (FIX-02): Includes tokenVersion, reduced to 24h expiry
+// Generate JWT — SEC-002 (FIX-02): Includes tokenVersion, set to 30d expiry
 export const generateToken = (userId, tokenVersion = 0) => {
     return jwt.sign(
         { id: userId, v: tokenVersion },
         config.jwtSecret,
-        { expiresIn: '24h' }  // Reduced from 7d for tighter session control
+        { expiresIn: '30d' }
     );
 };

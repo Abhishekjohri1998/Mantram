@@ -242,10 +242,17 @@ async function generateWithGptImage2(
     allRawAvatarBuffers = [], allAvatarUrls = [], avatarNames = [],
     rawRefBuffers = [], refImageUrls = [],
 ) {
-    const size = AR_TO_SIZE[ar] || '1792x1024';
+    // AtlasCloud proxy has bugs with 1792x1024, so we force 1024x1024 for stability
+    const size = '1024x1024';
     const modelId = 'gpt-image-2';
 
     const refBuffers = [];
+    
+    // Truncate overly long prompts to prevent DALL-E 3 from exceeding 120s processing time and hitting proxy timeouts
+    if (finalPrompt.length > 800) {
+        finalPrompt = finalPrompt.substring(0, 800) + '...';
+        console.log(`[SB Poster][GPT-Image-2] ✂️ Prompt truncated to 800 chars to avoid 120s proxy timeout.`);
+    }
 
     // 1. Collect Product Image (first only to avoid slot confusion)
     if (rawProductBuffers.length > 0) {
@@ -338,7 +345,6 @@ async function generateWithGptImage2(
             fd.append('model', modelId);
             fd.append('prompt', finalPrompt);
             fd.append('size', size);
-            fd.append('quality', 'high');
             fd.append('n', '1');
             fd.append('response_format', 'b64_json');
             
@@ -358,14 +364,15 @@ async function generateWithGptImage2(
             response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ model: modelId, prompt: finalPrompt, size, quality: 'high', n: 1, response_format: 'b64_json' }),
+                body: JSON.stringify({ model: modelId, prompt: finalPrompt, size, n: 1, response_format: 'b64_json' }),
                 signal: AbortSignal.timeout(TIMEOUT_MS),
             });
         }
 
         if (!response.ok) {
             const errText = await response.text();
-            throw new Error(`LaoZhang ${response.status}: ${errText.substring(0, 300)}`);
+            const proxyName = isAtlas ? 'AtlasCloud' : 'LaoZhang';
+            throw new Error(`${proxyName} ${response.status}: ${errText.substring(0, 300)}`);
         }
 
         const data = await response.json();

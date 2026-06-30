@@ -59,6 +59,16 @@ export default defineConfig({
           })
         },
       },
+      '/api/brainstorm-studio/fidato-chat': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('proxyRes', (proxyRes) => {
+            proxyRes.headers['cache-control'] = 'no-cache'
+            proxyRes.headers['x-accel-buffering'] = 'no'
+          })
+        },
+      },
       '/api': {
         target: 'http://localhost:3001',
         changeOrigin: true,
