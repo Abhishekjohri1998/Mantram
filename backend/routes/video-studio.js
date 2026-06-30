@@ -79,6 +79,37 @@ const execFileAsync = promisify(execFile);
 
 const router = Router();
 
+// ── Proxy Download Endpoint (Bypasses S3 CORS and Phishing Warnings) ──
+router.get('/download', async (req, res) => {
+    try {
+        const { url, filename } = req.query;
+        if (!url) return res.status(400).send('URL is required');
+
+        // Allow only mantram S3 buckets or specific provider CDNs to prevent SSRF
+        if (!url.includes('mantram-ai-generated-media.s3') && 
+            !url.includes('amazonaws.com') &&
+            !url.includes('fal.media') &&
+            !url.includes('atlascloud.ai')) {
+            return res.status(403).send('Unauthorized domain');
+        }
+
+        const fetch = (await import('node-fetch')).default;
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            return res.status(response.status).send('Failed to fetch file');
+        }
+
+        res.setHeader('Content-Disposition', `attachment; filename="${filename || 'video.mp4'}"`);
+        res.setHeader('Content-Type', response.headers.get('content-type') || 'video/mp4');
+        
+        response.body.pipe(res);
+    } catch (error) {
+        console.error('Proxy download error:', error);
+        res.status(500).send('Download failed');
+    }
+});
+
 // ── Cost Optimization: Dedup Cache Guard ─────────────────────────────────────
 /**
  * Checks if an identical generation already completed (within 72h).

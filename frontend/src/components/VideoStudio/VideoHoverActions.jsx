@@ -99,26 +99,25 @@ export default function VideoHoverActions({ videoUrl, onPreview, project, onReus
         });
     };
 
-    const triggerDownload = async (e) => {
+    const triggerDownload = (e) => {
         e.preventDefault();
         e.stopPropagation();
         showFeedback("Downloading video...");
-        try {
-            const resp = await fetch(videoUrl);
-            const blob = await resp.blob();
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = project?.title ? `${project.title.substring(0,30).replace(/[^a-zA-Z0-9]/g, '_')}.mp4` : 'video.mp4';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            showFeedback("Downloaded successfully!");
-        } catch (err) {
-            console.error('Download failed, opening in new tab:', err);
-            window.open(videoUrl, '_blank');
-        }
+        
+        const filename = project?.title ? `${project.title.substring(0,30).replace(/[^a-zA-Z0-9]/g, '_')}.mp4` : 'video.mp4';
+        
+        // Use the backend proxy to bypass S3 CORS & phishing warnings
+        const proxyUrl = `/api/video-studio/download?url=${encodeURIComponent(videoUrl)}&filename=${encodeURIComponent(filename)}`;
+        
+        // Natively trigger download without blob memory buffering
+        const a = document.createElement('a');
+        a.href = proxyUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+        setTimeout(() => showFeedback("Download started!"), 500);
     };
 
     const handleAction = (e, actionName) => {
