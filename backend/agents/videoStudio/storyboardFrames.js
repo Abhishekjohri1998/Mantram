@@ -78,6 +78,20 @@ function sanitizeMimeType(mimeType) {
 
 // ── Download a URL to a Buffer ────────────────────────────────────────────────
 async function downloadBuffer(url) {
+    try {
+        const { getObjectStream } = await import('../../utils/s3.js');
+        const isS3 = url.includes('mantram-ai-generated-media.s3') || (url.includes('amazonaws.com') && url.includes('mantram'));
+        
+        if (isS3) {
+            const { stream, contentType } = await getObjectStream(url);
+            const chunks = [];
+            for await (const chunk of stream) chunks.push(chunk);
+            return { buffer: Buffer.concat(chunks), mimeType: sanitizeMimeType(contentType) };
+        }
+    } catch (e) {
+        console.warn(`[storyboardFrames] getObjectStream failed, falling back to fetch: ${e.message}`);
+    }
+
     let targetUrl = url;
     try {
         const { getSignedUrlIfNeeded } = await import('../../utils/s3.js');

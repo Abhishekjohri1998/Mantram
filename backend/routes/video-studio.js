@@ -9895,6 +9895,15 @@ Format: ${format} | Style: ${style === '3d' ? 'Pixar/Unreal Engine 3D animated' 
         // Helper: download a URL to a buffer
         const dlBufCreate = async (url) => {
             try {
+                const isS3 = url.includes('mantram-ai-generated-media.s3') || (url.includes('amazonaws.com') && url.includes('mantram'));
+                if (isS3) {
+                    const { getObjectStream } = await import('../utils/s3.js');
+                    const { stream, contentType } = await getObjectStream(url);
+                    const chunks = [];
+                    for await (const chunk of stream) chunks.push(chunk);
+                    return { buffer: Buffer.concat(chunks), mimeType: contentType || 'image/jpeg' };
+                }
+
                 const signedUrl = await getSignedUrlIfNeeded(url);
                 const resp = await fetch(signedUrl, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(15000) });
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
