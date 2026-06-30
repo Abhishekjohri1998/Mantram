@@ -370,6 +370,9 @@ export const getObjectStream = async (urlOrKey) => {
             if (pathParts[0] === config.aws.bucket) key = pathParts.slice(1).join('/');
             else key = pathParts.join('/');
             key = key.split('?')[0]; 
+            
+            // Decode URI components: URL has %20 etc. but the actual S3 key has raw chars.
+            try { key = decodeURIComponent(key); } catch { /* keep as-is if malformed */ }
         }
 
         const command = new GetObjectCommand({
