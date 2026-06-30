@@ -202,6 +202,7 @@ export default function Storyboard({
     const [phaseLabel, setPhaseLabel] = useState('');
     const [phaseDetail, setPhaseDetail] = useState('');
     const [segmentInfo, setSegmentInfo] = useState(null); // { completed, total }
+    const [eta, setEta] = useState('');
     // Manual mode — generation mode toggle
     const [generateMode, setGenerateMode] = useState('automatic'); // 'automatic' | 'manual'
     // Manual mode — per-segment items for the gallery
@@ -808,6 +809,18 @@ export default function Storyboard({
                     if (data.segments?.items?.length > 0) {
                         setSegmentItems(data.segments.items);
                     }
+                    if (data.startedAt && data.overallProgress > 0) {
+                        const elapsed = (Date.now() - new Date(data.startedAt).getTime()) / 1000;
+                        const velocity = elapsed / data.overallProgress;
+                        const remaining = velocity * (100 - data.overallProgress);
+                        if (remaining > 0) {
+                            const mins = Math.floor(remaining / 60);
+                            const secs = Math.floor(remaining % 60);
+                            setEta(`~ ${mins}m ${secs}s remaining`);
+                        } else {
+                            setEta('Finishing up...');
+                        }
+                    }
                 }
 
                 if (data.finalVideoUrl) setFinalVideoUrl(data.finalVideoUrl);
@@ -906,6 +919,18 @@ export default function Storyboard({
                         if (data.segments)   setSegmentInfo(data.segments);
                         if (data.segments?.items?.length > 0) {
                             setSegmentItems(data.segments.items);
+                        }
+                        if (data.startedAt && data.overallProgress > 0) {
+                            const elapsed = (Date.now() - new Date(data.startedAt).getTime()) / 1000;
+                            const velocity = elapsed / data.overallProgress;
+                            const remaining = velocity * (100 - data.overallProgress);
+                            if (remaining > 0) {
+                                const mins = Math.floor(remaining / 60);
+                                const secs = Math.floor(remaining % 60);
+                                setEta(`~ ${mins}m ${secs}s remaining`);
+                            } else {
+                                setEta('Finishing up...');
+                            }
                         }
                     }
                     if (data.finalVideoUrl) setFinalVideoUrl(data.finalVideoUrl);
@@ -1851,6 +1876,12 @@ export default function Storyboard({
                                     </div>
                                     <span>{overallProgress}%</span>
                                 </div>
+                                {eta && (
+                                    <div style={{ marginTop: '6px', fontSize: '12px', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-start' }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>schedule</span>
+                                        {eta}
+                                    </div>
+                                )}
                                 {phaseDetail && !isLongForm && (
                                     <p style={{ margin: '4px 0 0', fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{phaseDetail}</p>
                                 )}

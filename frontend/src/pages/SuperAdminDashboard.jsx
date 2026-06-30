@@ -302,6 +302,12 @@ export default function SuperAdminDashboard() {
         finally { setGrowthGenerating(false) }
     }
 
+    const [growthVideoProgress, setGrowthVideoProgress] = useState(0)
+    const [growthVideoPhase, setGrowthVideoPhase] = useState('')
+    const [growthVideoDetail, setGrowthVideoDetail] = useState('')
+    const [growthVideoSegments, setGrowthVideoSegments] = useState(null)
+    const [growthVideoEta, setGrowthVideoEta] = useState('')
+
     // Polling for active storyboard video completion in SuperAdmin dashboard
     useEffect(() => {
         const activeProjectId = growthContent?.instagram?.reel?.storyboardProjectId;
@@ -332,6 +338,25 @@ export default function SuperAdminDashboard() {
                     } else if (data.status === 'FAILED') {
                         clearInterval(pollInterval);
                         showToast('Video studio generation failed.', 'error');
+                    } else if (data.status === 'IN_PROGRESS') {
+                        setGrowthVideoProgress(data.overallProgress || 0);
+                        setGrowthVideoPhase(data.phaseLabel || 'Generating...');
+                        setGrowthVideoDetail(data.detail || '');
+                        setGrowthVideoSegments(data.segments || null);
+                        
+                        if (data.startedAt && data.overallProgress > 0) {
+                            const elapsed = (Date.now() - new Date(data.startedAt).getTime()) / 1000;
+                            const velocity = elapsed / data.overallProgress;
+                            const remaining = velocity * (100 - data.overallProgress);
+                            
+                            if (remaining > 0) {
+                                const mins = Math.floor(remaining / 60);
+                                const secs = Math.floor(remaining % 60);
+                                setGrowthVideoEta(`~ ${mins}m ${secs}s remaining`);
+                            } else {
+                                setGrowthVideoEta('Finishing up...');
+                            }
+                        }
                     }
                 }
             } catch (err) {
@@ -5781,17 +5806,35 @@ export default function SuperAdminDashboard() {
                                                                 <p className="text-[10px] font-bold text-[var(--sys-text-muted)] uppercase tracking-wider">🎥 Video Studio</p>
                                                                 <div className="flex flex-col items-center justify-center p-6 bg-[var(--sys-bg)] rounded-2xl border border-dashed border-[var(--sys-border)] min-h-[300px]">
                                                                     {growthContent.instagram?.reel?.storyboardProjectId ? (
-                                                                        <>
-                                                                            <span className="material-symbols-outlined text-4xl text-primary animate-spin mb-3">progress_activity</span>
-                                                                            <p className="text-xs font-bold text-[var(--sys-text)] mb-1">Generating Video Reel...</p>
-                                                                            <p className="text-[10px] text-[var(--sys-text-muted)] mb-4 text-center">Your storyboard video is rendering in the background.</p>
+                                                                        <div className="w-full flex flex-col items-center w-full px-4">
+                                                                            <div className="w-full flex justify-between text-[10px] font-bold text-primary mb-1.5 uppercase tracking-wider">
+                                                                                <span>{growthVideoPhase || 'Generating Video Reel...'}</span>
+                                                                                <span>{Math.round(growthVideoProgress)}%</span>
+                                                                            </div>
+                                                                            <div className="w-full h-2 bg-[var(--sys-bg)] border border-[var(--sys-border)] rounded-full overflow-hidden mb-3">
+                                                                                <div 
+                                                                                    className="h-full bg-primary transition-all duration-1000 ease-out relative overflow-hidden" 
+                                                                                    style={{ width: `${growthVideoProgress}%` }}
+                                                                                >
+                                                                                    <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+                                                                                </div>
+                                                                            </div>
+                                                                            {growthVideoSegments && growthVideoSegments.total > 0 && (
+                                                                                <p className="text-[11px] text-[var(--sys-text)] font-bold mb-1 bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                                                                    Segment {growthVideoSegments.completed} of {growthVideoSegments.total}
+                                                                                </p>
+                                                                            )}
+                                                                            <p className="text-[10px] text-[var(--sys-text-muted)] mb-5 text-center h-4 flex items-center gap-1">
+                                                                                <span className="material-symbols-outlined text-[12px]">schedule</span>
+                                                                                {growthVideoEta || 'Estimating time remaining...'}
+                                                                            </p>
                                                                             <button 
                                                                                 onClick={() => handleOpenStoryboard()}
-                                                                                className="px-4 py-2 rounded-xl text-xs font-bold bg-[var(--sys-surface)] text-[var(--sys-text)] border border-[var(--sys-border)] hover:bg-[var(--sys-surface)] transition-all flex items-center gap-1.5 cursor-pointer"
+                                                                                className="px-4 py-2 rounded-xl text-xs font-bold bg-[var(--sys-surface)] text-[var(--sys-text)] border border-[var(--sys-border)] hover:bg-[var(--sys-bg)] transition-all flex items-center gap-1.5 cursor-pointer w-full justify-center shadow-sm"
                                                                             >
-                                                                                <span className="material-symbols-outlined text-sm">open_in_new</span> Open Storyboard Status
+                                                                                <span className="material-symbols-outlined text-sm">open_in_new</span> Open Video Studio Details
                                                                             </button>
-                                                                        </>
+                                                                        </div>
                                                                     ) : (
                                                                         <>
                                                                             <span className="material-symbols-outlined text-4xl text-[var(--sys-text-muted)] mb-3">movie_creation</span>

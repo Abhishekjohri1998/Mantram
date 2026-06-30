@@ -11154,6 +11154,7 @@ router.get('/storyboard/status/:projectId', protect, async (req, res) => {
                     detail: jobStatus.detail || '',
                     segments: { completed: completedSegs, total: totalSegs, items },
                     isLongForm: true,
+                    startedAt: jobStatus.startedAt || new Date(project.updatedAt).toISOString(),
                 });
             }
         }
