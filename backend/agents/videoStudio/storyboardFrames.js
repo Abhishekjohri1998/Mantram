@@ -140,9 +140,19 @@ export async function generateStoryboardPoster(
     const allAvatarUrls = avatarUrls.length > 0 ? avatarUrls : (avatarUrl ? [avatarUrl] : []);
     const allRawAvatarBuffers = rawAvatarBuffers.length > 0 ? rawAvatarBuffers : (rawAvatarBuffer ? [rawAvatarBuffer] : []);
 
-    const stylePrefix = STYLE_PREFIXES[style] || STYLE_PREFIXES.hyperrealistic;
+    const isGpt = imageModel === 'gpt-image-2' || imageModel === 'gpt-image-1';
+    let stylePrefix = STYLE_PREFIXES[style] || STYLE_PREFIXES.hyperrealistic;
+    if (isGpt) {
+        stylePrefix = style === '3d'
+            ? 'A premium 3D animated cinematic keyframe. Pixar and Unreal Engine 5 rendering, ray-traced lighting, clean composition.'
+            : style === '2d'
+            ? 'A premium 2D animated commercial keyframe illustration. Clean flat vector design, vibrant colors, clean composition.'
+            : 'A premium hyperrealistic cinematic live-action film keyframe. Professional DSLR photography, volumetric lighting, shallow depth of field, clean composition.';
+    }
     const ar = format || '16:9';
-    const styleSuffix = buildStyleSuffix(panelCount, avatarNames);
+    const styleSuffix = isGpt
+        ? 'Cinematic film keyframe poster. Unified concept art displaying the mood, lighting style, color grading, and overall aesthetic environment of the story. Clean composition, crisp cinematic detail.'
+        : buildStyleSuffix(panelCount, avatarNames);
     let finalPrompt = `${stylePrefix} ${imagePrompt} ${styleSuffix}`;
 
     const hasProductRefs = rawProductBuffers.length > 0 || productImageUrls.length > 0;
