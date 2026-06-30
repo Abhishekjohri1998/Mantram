@@ -14,6 +14,9 @@ import Integration from '../models/Integration.js';
 import SeoAudit from '../models/SeoAudit.js';
 import Subscription from '../models/Subscription.js';
 import Coupon from '../models/Coupon.js';
+import MonthlyStrategy from '../models/MonthlyStrategy.js';
+import BrandStrategy from '../models/BrandStrategy.js';
+import SocialStrategy from '../models/SocialStrategy.js';
 
 import SubscriptionPackage from '../models/SubscriptionPackage.js';
 import SystemSettings, { getSetting, setSetting } from '../models/SystemSettings.js';
@@ -881,6 +884,9 @@ router.delete('/brands/:id', async (req, res) => {
             Integration.collection.deleteMany({ brand: brandId }),
             SeoAudit.collection.deleteMany({ brand: brandId }),
             Feedback.collection.deleteMany({ brand: brandId }),
+            MonthlyStrategy.collection.deleteMany({ brand: brandId }),
+            BrandStrategy.collection.deleteMany({ brand: brandId }),
+            SocialStrategy.collection.deleteMany({ brand: brandId }),
             Brand.collection.deleteOne({ _id: brandId }),
         ]);
         res.json({ success: true, message: 'Brand and all associated data deleted' });
