@@ -329,20 +329,31 @@ async function generateWithGptImage2(
 
     const useEditsEndpoint = refBuffers.length > 0;
 
-    const useLaoZhang = process.env.OPENAI_USE_LZ === 'true';
-    // Always prioritize Atlas Cloud if available, as it is much faster and more stable than the LaoZhang proxy for storyboard poster generation.
-    const isAtlas = !!process.env.ATLASCLOUD_API_KEY;
-    const apiKey = isAtlas ? process.env.ATLASCLOUD_API_KEY : (config.ai?.laozhangApiKey || process.env.LAOZHANG_API_KEY || process.env.OPENAI_API_KEY);
-    const baseUrl = isAtlas ? 'https://api.atlascloud.ai/v1' : (config.ai?.laozhangBaseUrl || 'https://api.laozhang.ai/v1');
+    let isDirectOpenAI = false;
+    let apiKey = '';
+    let baseUrl = '';
+    let resolvedModelId = modelId;
+
+    if (!useEditsEndpoint && modelId === 'gpt-image-2' && process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.startsWith('sk-')) {
+        isDirectOpenAI = true;
+        apiKey = process.env.OPENAI_API_KEY;
+        baseUrl = 'https://api.openai.com/v1';
+        resolvedModelId = 'dall-e-3';
+    } else {
+        const isAtlas = !!process.env.ATLASCLOUD_API_KEY;
+        apiKey = isAtlas ? process.env.ATLASCLOUD_API_KEY : (config.ai?.laozhangApiKey || process.env.LAOZHANG_API_KEY || process.env.OPENAI_API_KEY);
+        baseUrl = isAtlas ? 'https://api.atlascloud.ai/v1' : (config.ai?.laozhangBaseUrl || 'https://api.laozhang.ai/v1');
+    }
+
     const endpoint = useEditsEndpoint ? `${baseUrl}/images/edits` : `${baseUrl}/images/generations`;
 
-    console.log(`[SB Poster][GPT-Image-2] ${endpoint} | refs=${refBuffers.length} | size=${size}`);
+    console.log(`[SB Poster][GPT-Image-2] ${endpoint} | refs=${refBuffers.length} | size=${size} | directOpenAI=${isDirectOpenAI}`);
 
     try {
         let response;
         if (useEditsEndpoint) {
             const fd = new FormData();
-            fd.append('model', modelId);
+            fd.append('model', resolvedModelId);
             fd.append('prompt', finalPrompt);
             fd.append('size', size);
             fd.append('n', '1');
@@ -364,15 +375,15 @@ async function generateWithGptImage2(
             response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ model: modelId, prompt: finalPrompt, size, n: 1, response_format: 'b64_json' }),
+                body: JSON.stringify({ model: resolvedModelId, prompt: finalPrompt, size, n: 1, response_format: 'b64_json' }),
                 signal: AbortSignal.timeout(TIMEOUT_MS),
             });
         }
 
         if (!response.ok) {
             const errText = await response.text();
-            const proxyName = isAtlas ? 'AtlasCloud' : 'LaoZhang';
-            throw new Error(`${proxyName} ${response.status}: ${errText.substring(0, 300)}`);
+            const providerName = isDirectOpenAI ? 'OpenAI' : (baseUrl.includes('atlascloud') ? 'AtlasCloud' : 'LaoZhang');
+            throw new Error(`${providerName} ${response.status}: ${errText.substring(0, 300)}`);
         }
 
         const data = await response.json();
