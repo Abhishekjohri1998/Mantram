@@ -82,7 +82,7 @@ export const PROVIDER_PRICING = {
                 flatCostUSD: 0.04, unit: 'USD/image',
                 pricingUrl: 'https://ai.google.dev/pricing',
             },
-            'gemini-3-pro-image-preview': {
+            'gemini-3-pro-image': {
                 name: 'Gemini 3 Pro Image (NanoBanana Pro)', type: 'image',
                 flatCostUSD: 0.06, unit: 'USD/image',
                 pricingUrl: 'https://ai.google.dev/pricing',

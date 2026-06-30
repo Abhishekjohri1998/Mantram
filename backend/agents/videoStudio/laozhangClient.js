@@ -236,7 +236,7 @@ function getImageTimeout(model) {
 //   uses /v1/chat/completions which returns inline image data
 
 const GEMINI_IMAGE_MODELS = new Set([
-    'gemini-3.1-flash-image', 'gemini-3-pro-image-preview',
+    'gemini-3.1-flash-image', 'gemini-3-pro-image',
     'gemini-2.5-flash', 'gemini-flash', 'nanobanana-2', 'nanobanana-pro',
 ]);
 

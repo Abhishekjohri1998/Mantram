@@ -50,7 +50,7 @@ export class OpenAIProvider extends BaseProvider {
         // Anthropic/Claude — Atlas uses dot notation (4.6) instead of dash (4-6)
         const claudeMap = {
             'claude-sonnet-4-6':            'anthropic/claude-sonnet-4.6',
-            'claude-sonnet-4-20250514':     'anthropic/claude-sonnet-4-20250514', // doesn't work but kept for reference
+            'claude-sonnet-4-6':     'anthropic/claude-sonnet-4-6', // doesn't work but kept for reference
             'claude-haiku-4-20250514':      'anthropic/claude-haiku-4.5-20251001', // Map to closest working model
             'claude-haiku-4.5-20251001':    'anthropic/claude-haiku-4.5-20251001',
             'claude-sonnet-4.5-20250929':   'anthropic/claude-sonnet-4.5-20250929',

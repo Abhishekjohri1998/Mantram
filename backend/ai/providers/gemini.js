@@ -17,7 +17,7 @@ export class GeminiProvider extends BaseProvider {
     }
 
     async generateText({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 2048, model, images = [], youtubeUrl = null, jsonMode = false }) {
-        const modelId = model || this.config.defaultModel || 'gemini-2.5-flash-preview-05-20';
+        const modelId = model || this.config.defaultModel || 'gemini-2.5-flash';
         const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${this.apiKey}`;
         
         // Native YouTube URL support — inject as fileData part so Gemini watches the video

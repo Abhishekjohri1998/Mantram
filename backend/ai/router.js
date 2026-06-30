@@ -31,8 +31,8 @@ class ModelRouter {
             this.nativeGemini = new GeminiProvider({
                 apiKey: providerConfigs.gemini.apiKey,
                 imageApiKey: providerConfigs.gemini.imageApiKey,
-                defaultModel: config.ai.defaultGeminiModel || 'gemini-1.5-flash-preview-05-20',
-                defaultImageModel: config.ai.defaultImageModel || 'gemini-1.5-flash-preview-05-20',
+                defaultModel: config.ai.defaultGeminiModel || 'gemini-1.5-flash',
+                defaultImageModel: config.ai.defaultImageModel || 'gemini-1.5-flash',
                 gcpProjectId: providerConfigs.gemini.gcpProjectId,
                 gcpLocation: providerConfigs.gemini.gcpLocation,
                 googleApplicationCredentials: providerConfigs.gemini.googleApplicationCredentials,
@@ -56,8 +56,8 @@ class ModelRouter {
             this.providers.gemini = new GeminiProvider({
                 apiKey: providerConfigs.gemini.apiKey,
                 imageApiKey: providerConfigs.gemini.imageApiKey,
-                defaultModel: config.ai.defaultGeminiModel || 'gemini-1.5-flash-preview-05-20',
-                defaultImageModel: config.ai.defaultImageModel || 'gemini-1.5-flash-preview-05-20',
+                defaultModel: config.ai.defaultGeminiModel || 'gemini-1.5-flash',
+                defaultImageModel: config.ai.defaultImageModel || 'gemini-1.5-flash',
                 // GCP Vertex AI (Billed)
                 gcpProjectId: providerConfigs.gemini?.gcpProjectId,
                 gcpLocation: providerConfigs.gemini?.gcpLocation,

@@ -406,7 +406,7 @@ let MODEL_COSTS = {
     'claude-3-7-sonnet-20250219': { input: 0.1, output: 0.5 },
     'sarvam-m': { input: 0.02, output: 0.08 },
     // ── Image models (flat cost per image in USD cents) ──
-    'gemini-3.1-flash-image-preview': { flatCost: 4.0, type: 'image' },
+    'gemini-3.1-flash-image': { flatCost: 4.0, type: 'image' },
     'gemini-1.5-flash-latest': { flatCost: 4.0, type: 'image' },
     'gemini-2.5-flash-image': { flatCost: 4.0, type: 'image' },
     'imagen-3.0-generate-001': { flatCost: 4.0, type: 'image' },
@@ -428,7 +428,7 @@ let MODEL_COSTS = {
     'fal-ai/flux-pro/v2': { flatCost: 8.0, type: 'image' },      // Flux 2 Pro (premium)
     'fal-ai/bytedance/seedream/v3/text-to-image': { flatCost: 5.0, type: 'image' },        // Seedream 5
     'fal-ai/ideogram/v3': { flatCost: 6.0, type: 'image' },       // Ideogram v3
-    'gemini-3-pro-image-preview': { flatCost: 6.0, type: 'image' }, // NanoBanana Pro
+    'gemini-3-pro-image': { flatCost: 6.0, type: 'image' }, // NanoBanana Pro
     'grok-imagine-image': { flatCost: 7.0, type: 'image' },        // Grok Imagen (xAI)
     // ── Voice models (flat cost per call in USD cents) ──
     'sarvam-stt-saaras-v3': { flatCost: 0.5, type: 'voice' },

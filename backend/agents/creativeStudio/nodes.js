@@ -536,7 +536,7 @@ export async function artDirectorNode(state) {
     ].filter(Boolean).join('\n');
 
     // Art Director: Claude Sonnet — high temperature for genuinely creative, non-template outputs
-    const result = await agentUtils.callAgent(ART_DIRECTOR_PROMPT(brandContext, state.aspectRatio), userPrompt, 0.82, 3500, { provider: 'anthropic', model: 'claude-sonnet-4-20250514' });
+    const result = await agentUtils.callAgent(ART_DIRECTOR_PROMPT(brandContext, state.aspectRatio), userPrompt, 0.82, 3500, { provider: 'anthropic', model: 'claude-sonnet-4-6' });
     console.log(`🎨 Art direction defined in ${Date.now() - startMs}ms (Claude Sonnet 4)`);
 
     return {
@@ -733,7 +733,7 @@ export async function promptEngineerNode(state) {
 
     // Prompt Engineer: Claude Sonnet for precise, brand-faithful prompt construction
     // Prompt Engineer at 0.75 — low temp produces mechanical identical prompts every generation
-    const result = await agentUtils.callAgent(PROMPT_ENGINEER_PROMPT(brandContext, state.aspectRatio), userPrompt, 0.75, 3200, { provider: 'anthropic', model: 'claude-sonnet-4-20250514' });
+    const result = await agentUtils.callAgent(PROMPT_ENGINEER_PROMPT(brandContext, state.aspectRatio), userPrompt, 0.75, 3200, { provider: 'anthropic', model: 'claude-sonnet-4-6' });
     console.log(`🔧 Prompt engineered in ${Date.now() - startMs}ms (Claude Sonnet)`);
 
     return {
@@ -1074,7 +1074,7 @@ export async function unifiedCreativeEngineNode(state) {
         userPrompt,
         0.82,
         4000,
-        { provider: 'anthropic', model: 'claude-sonnet-4-20250514', timeoutMs: 120_000 }
+        { provider: 'anthropic', model: 'claude-sonnet-4-6', timeoutMs: 120_000 }
     );
     console.log(`⚡ Unified Creative Engine done in ${Date.now() - startMs}ms (Claude Sonnet) — trend: ${result.designTrend?.split(' ')[0] || '?'} | copy: ${result.copyHeadline || 'none'}`);
 

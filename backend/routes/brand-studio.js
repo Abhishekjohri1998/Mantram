@@ -1051,7 +1051,7 @@ Return this JSON:
         try {
             artPlan = await callAgent(artDirectorSystem, artDirectorPrompt, 0.85, 6000, {
                 provider: 'anthropic',
-                model: 'claude-sonnet-4-20250514',
+                model: 'claude-sonnet-4-6',
                 timeoutMs: 120_000,
             });
             console.log(`✅ Claude Art Director: aesthetic="${artPlan?.chosenAesthetic?.split(' ')[0] || '?'}" | headline="${artPlan?.headline || '?'}"`);

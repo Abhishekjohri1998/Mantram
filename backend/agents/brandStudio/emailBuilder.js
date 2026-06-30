@@ -1,7 +1,7 @@
 /**
  * Pulse Mail — Brand-native HTML email builder
  *
- * Intelligence: Claude Opus (claude-sonnet-4-20250514)
+ * Intelligence: Claude Opus (claude-sonnet-4-6)
  * Images: NanoBanana 2 via Lao Zhang
  * Rendering: MJML → bulletproof cross-client HTML
  * Gmail safe: output stays under 80KB
