@@ -13,7 +13,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fetch from 'node-fetch';
 import { planScenes } from './scenePlanner.js';
-import { submitVideoGeneration, estimateCost, submitLipSync, pollLipSyncResult } from './falClient.js';
+import { submitVideoGeneration, estimateCost } from './falClient.js';
 import { submitAtlasCloudVideoGeneration } from './atlasClient.js';
 import { uploadToS3 } from '../../utils/s3.js';
 import ffmpegPath from 'ffmpeg-static';

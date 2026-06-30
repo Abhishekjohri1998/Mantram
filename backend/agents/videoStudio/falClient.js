@@ -3,11 +3,11 @@
  */
 
 import config from '../../config/env.js';
-import { submitKieVideoGeneration } from './kieClient.js';
-import { submitAtlasCloudVideoGeneration, submitAtlasCloudVideoExtend, submitHappyHorseVideoGeneration } from './atlasClient.js';
-import { submitMuApiVideoGeneration } from './muapiClient.js';
+import { submitKieVideoGeneration, getKieGenerationStatus } from './kieClient.js';
+import { submitAtlasCloudVideoGeneration, submitAtlasCloudVideoExtend, submitHappyHorseVideoGeneration, getAtlasCloudGenerationStatus } from './atlasClient.js';
+import { submitMuApiVideoGeneration, getMuApiGenerationStatus } from './muapiClient.js';
 import { ensureS3Url } from '../../utils/s3.js';
-import { isLaozhangAvailable, submitLaozhangVideoGeneration } from './laozhangClient.js';
+import { isLaozhangAvailable, submitLaozhangVideoGeneration, getLaozhangVideoStatus } from './laozhangClient.js';
 import { getSetting } from '../../models/SystemSettings.js';
 import { getActiveProvider } from '../../ai/providerRouting.js';
 
@@ -687,3 +687,20 @@ export async function extendGrokVideo({ videoUrl, prompt, duration = 6 }) {
     const data = await response.json();
     return { requestId: data.request_id, provider: 'grok' };
 }
+
+export async function getUnifiedGenerationStatus(provider, requestId, statusUrl, resultUrl) {
+    if (provider === 'muapi') {
+        return await getMuApiGenerationStatus(requestId);
+    } else if (provider === 'atlascloud') {
+        return await getAtlasCloudGenerationStatus(requestId);
+    } else if (provider === 'laozhang') {
+        return await getLaozhangVideoStatus(requestId);
+    } else if (provider === 'kie') {
+        return await getKieGenerationStatus(requestId);
+    } else if (provider === 'grok') {
+        return await getGrokGenerationStatus(requestId);
+    } else {
+        return await getGenerationStatus(requestId, statusUrl, resultUrl);
+    }
+}
+
