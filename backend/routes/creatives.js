@@ -1231,13 +1231,13 @@ function extractBase64(dataUri) {
 const IMAGE_MODEL_CONFIG = {
     'nanobanana-2': {
         provider: 'laozhang',
-        modelId: 'gemini-3.1-flash-image-preview',
+        modelId: 'gemini-3.1-flash-image',
         name: 'NanoBanana 2',
         supportsRefImages: true,
     },
     'nanobanana-pro': {
         provider: 'laozhang',
-        modelId: 'gemini-3.1-flash-image-preview',
+        modelId: 'gemini-3.1-flash-image',
         name: 'NanoBanana Pro',
         supportsRefImages: true,
     },
@@ -1821,7 +1821,7 @@ export async function openaiImageGenerate(promptText, aspectRatio = '1:1', quali
 // ── Gemini image generation via Vertex AI ────────────────────────────────
 // Used for NanoBanana 2 and NanoBanana Pro. NO auto-fallback chain.
 // If the model is busy (503), returns modelBusy flag so frontend can notify user.
-async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.4, aspectRatio = '1:1', imageSize = '1K', selectedModelId = 'gemini-3.1-flash-image-preview') {
+async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.4, aspectRatio = '1:1', imageSize = '1K', selectedModelId = 'gemini-3.1-flash-image') {
     const { generateImageWithVertex } = await import('../services/vertexImage.js');
 
     // Build content parts — images as inlineData, then text prompt last
@@ -1902,8 +1902,8 @@ async function geminiImageGenerate(promptText, imageParts = [], temperature = 0.
 // NanoBanana 2 is the default. Other models are strictly opt-in.
 // If any model is busy/unavailable, returns a clear error — no silent model switching.
 async function routedImageGenerate(promptText, imageParts = [], temperature = 0.4, aspectRatio = '1:1', imageSize = '1K', selectedModel = 'nanobanana-2', refImageUrls = [], customSize = null, timeoutMs = null) {
-    // NanoBanana 2 = gemini-3.1-flash-image-preview via LaoZhang proxy.
-    // NOTE: 'gemini-3.1-flash-image-preview' does NOT exist on the direct Gemini API
+    // NanoBanana 2 = gemini-3.1-flash-image via LaoZhang proxy.
+    // NOTE: 'gemini-3.1-flash-image' does NOT exist on the direct Gemini API
     // (generativelanguage.googleapis.com). It ONLY works via the LaoZhang proxy.
     // Using router.generateImage() would route it to nativeGemini → 404 → misclassified as busy.
     const LZ_IMAGE_MODEL = 'gemini-3.1-flash-image'; // LaoZhang alias for NanoBanana 2
@@ -2254,14 +2254,14 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
 
         let routerResult;
         try {
-            // Atlas Cloud path — supports gemini-3.1-flash-image-preview (NanoBanana 2)
+            // Atlas Cloud path — supports gemini-3.1-flash-image (NanoBanana 2)
             const genResult = refCount > 0
                 ? await multimodalGen(finalPromptForModel, finalImageParts.map(p => p.inlineData ? `data:${p.inlineData.mimeType};base64,${p.inlineData.data}` : null).filter(Boolean), { model: LZ_IMAGE_MODEL, size: pixelSize })
                 : await imageGen(finalPromptForModel, { model: LZ_IMAGE_MODEL, size: pixelSize });
             routerResult = { imageUrl: genResult.imageUrl };
         } catch (atlasErr) {
             console.warn(`⚠️ Atlas Cloud image generation failed, falling back to Native Gemini: ${atlasErr.message}`);
-            // Native Gemini fallback — use valid model ID (NOT gemini-3.1-flash-image-preview)
+            // Native Gemini fallback — use valid model ID (NOT gemini-3.1-flash-image)
             const result = await router.generateImage({
                 prompt: finalPromptForModel,
                 aspectRatio: nativeAspectRatio,
@@ -3170,7 +3170,7 @@ router.post('/edit-image', protect, requireCredits('creative'), async (req, res)
 
         // ── Build Gemini multi-turn conversation ──
         const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
-        const modelId = 'gemini-3.1-flash-image-preview';
+        const modelId = 'gemini-3.1-flash-image';
         const url = `${baseUrl}/models/${modelId}:generateContent?key=${imageKey}`;
 
         // Build contents array for multi-turn editing

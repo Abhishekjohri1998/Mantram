@@ -1207,7 +1207,7 @@ router.post('/blog/:id/generate-image', protect, async (req, res) => {
             try {
                 const lzSize = arConfig.lz;
                 console.log(`🏷️ [LaoZhang-First] Blog image via LZ (${lzSize}, AR=${aspectRatio})...`);
-                const lzResult = await laozhangImageGenerate(imagePrompt, { model: 'gemini-3.1-flash-image-preview', size: lzSize });
+                const lzResult = await laozhangImageGenerate(imagePrompt, { model: 'gemini-3.1-flash-image', size: lzSize });
                 if (lzResult?.imageUrl) {
                     console.log(`✅ [LaoZhang] Blog image generated successfully`);
                     // Upload to S3 if it's a base64 data URI
@@ -1244,9 +1244,9 @@ router.post('/blog/:id/generate-image', protect, async (req, res) => {
             }
         }
 
-        // ── Fallback: Call NanoBanana 2 (gemini-3.1-flash-image-preview) directly ──
+        // ── Fallback: Call NanoBanana 2 (gemini-3.1-flash-image) directly ──
         const { generateImageWithVertex } = await import('../services/vertexImage.js');
-        const modelId = 'gemini-3.1-flash-image-preview'; // NanoBanana 2
+        const modelId = 'gemini-3.1-flash-image'; // NanoBanana 2
         const arInstruction = `Generate this image in ${aspectRatio} aspect ratio (${arConfig.geminiInstruction}). `;
 
         // Build parts array — optionally include brand reference image

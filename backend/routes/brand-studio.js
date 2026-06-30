@@ -309,7 +309,7 @@ router.post('/quick-post', protect, async (req, res) => {
 router.post('/mood-board', protect, async (req, res) => {
     try {
         const { productDNA, productData, brandId } = req.body;
-        // MUST use gemini-3.1-flash-image-preview — it's the only model that supports multimodal
+        // MUST use gemini-3.1-flash-image — it's the only model that supports multimodal
         // reference images. gpt-image-2 ignores productRefImages entirely (useMultimodal=false).
         const imageModel = req.body.imageModel || 'gpt-image-2';
         if (!productDNA) return res.status(400).json({ success: false, error: 'productDNA required' });
@@ -1316,7 +1316,7 @@ router.post('/deck/regenerate-image', protect, async (req, res) => {
         const { imagePrompt, slideType, referenceImage, imageModel } = req.body;
         if (!imagePrompt) return res.status(400).json({ success: false, error: 'imagePrompt required' });
         const { laozhangImageGenerate, laozhangMultimodalImageGenerate } = await import('../agents/videoStudio/laozhangClient.js');
-        const model = imageModel || 'gemini-3.1-flash-image-preview';
+        const model = imageModel || 'gemini-3.1-flash-image';
         const size = (slideType === 'hero' || slideType === 'cta') ? '1792x1024' : '1024x768';
         const style = 'contemporary premium aesthetic, photorealistic, 8k, cinematic lighting. Do NOT render any text, words, or typography.';
         let imageUrl;
@@ -2386,11 +2386,11 @@ router.post('/aplus/regenerate-image', protect, async (req, res) => {
         let result;
         if (productImages?.length) {
             result = await laozhangMultimodalImageGenerate(`${imagePrompt}. ${style}`, productImages.slice(0, 2), {
-                model: 'gemini-3.1-flash-image-preview', size
+                model: 'gemini-3.1-flash-image', size
             });
         } else {
             result = await laozhangImageGenerate(`${imagePrompt}. ${style}`, {
-                model: 'gemini-3.1-flash-image-preview', size
+                model: 'gemini-3.1-flash-image', size
             });
         }
 

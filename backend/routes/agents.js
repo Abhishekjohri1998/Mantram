@@ -1450,7 +1450,7 @@ Bold, ${moodPhrase} visual suitable for advertising and social media. ${ratioPhr
 
         // ── Model selection & routing ─────────────────────────────────────
         const PHOTOSHOOT_MODELS = {
-            'nanobanana-2':   { provider: 'gemini', modelId: 'gemini-3.1-flash-image-preview', name: 'NanoBanana 2' },
+            'nanobanana-2':   { provider: 'gemini', modelId: 'gemini-3.1-flash-image', name: 'NanoBanana 2' },
             'nanobanana-pro': { provider: 'gemini', modelId: 'gemini-3-pro-image-preview', name: 'NanoBanana Pro' },
             'flux-pro-v1.1':  { provider: 'fal', endpoint: 'fal-ai/flux-pro/v1.1', name: 'Flux Pro v1.1' },
             'flux-2-pro':     { provider: 'fal', endpoint: 'fal-ai/flux-pro/v2', name: 'Flux 2 Pro' },

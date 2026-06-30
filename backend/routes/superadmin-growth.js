@@ -328,7 +328,7 @@ router.post('/:id/generate-image', async (req, res) => {
                         result = await aiRouter.generateImage({
                             prompt: promptText,
                             aspectRatio,
-                            model: 'gemini-3.1-flash-image-preview'
+                            model: 'gemini-3.1-flash-image'
                         }, { provider: 'gemini' });
                     } catch (fallbackErr) {
                         console.error(`[Growth Image Gen] ❌ Fallback to gemini failed: ${fallbackErr.message}`);

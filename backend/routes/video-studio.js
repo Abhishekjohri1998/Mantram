@@ -3521,7 +3521,7 @@ router.post('/ugc/enhance-photo', protect, requireCredits('imageEnhance'), async
         }
 
         const { generateImageWithVertex } = await import('../services/vertexImage.js');
-        const modelId = 'gemini-3.1-flash-image-preview'; // NanoBanana 2
+        const modelId = 'gemini-3.1-flash-image'; // NanoBanana 2
 
         const promptText = `SYSTEM INSTRUCTION: You are a professional photo editor. You only produce realistic photographs of real people. Never produce illustrations, 3D renders, cartoons, paintings, or digital art. Every output must look like a real photograph taken by a professional camera.\n\nEdit this real photograph: ${prompt.trim()}. Preserve the person's exact face, skin tone, and identity. Only modify what is described. Output must be a photorealistic photograph — not an illustration or render.`;
 

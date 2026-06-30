@@ -219,7 +219,7 @@ Generate the adapted image now.`
 
         // ── Step C: Generate with NanoBanana 2 ──
         const response = await ai.models.generateContent({
-            model: 'gemini-3.1-flash-image-preview',
+            model: 'gemini-3.1-flash-image',
             contents: [{
                 role: 'user',
                 parts: [imageInline, { text: detailedPrompt }],
@@ -539,7 +539,7 @@ router.post('/ai-generate', protect, requireCredits('canvasGenerate'), async (re
         }
 
         const baseUrl = 'https://generativelanguage.googleapis.com/v1beta'
-        const models = ['gemini-3.1-flash-image-preview', 'gemini-2.5-flash-image']
+        const models = ['gemini-3.1-flash-image', 'gemini-2.5-flash-image']
         let imageUrl = null
 
         // Build multimodal parts — reference images first, then text prompt
@@ -784,7 +784,7 @@ Output the modified image.`
         parts.push({ text: editText })
 
         const { generateImageWithVertex } = await import('../services/vertexImage.js');
-        const models = ['gemini-3.1-flash-image-preview', 'gemini-2.5-flash-image']
+        const models = ['gemini-3.1-flash-image', 'gemini-2.5-flash-image']
         let imageUrl = null
 
         for (const modelId of models) {
@@ -848,7 +848,7 @@ router.post('/ai-edit-visual', protect, requireCredits('canvasGenerate'), async 
         }
 
         const { generateImageWithVertex } = await import('../services/vertexImage.js');
-        const modelId = 'gemini-3.1-flash-image-preview'
+        const modelId = 'gemini-3.1-flash-image'
         const data = await generateImageWithVertex(parts, modelId);
         
         const resParts = data.candidates?.[0]?.content?.parts || []
@@ -903,7 +903,7 @@ router.post('/ai-retouch', protect, requireCredits('canvasGenerate'), async (req
         }
 
         const { generateImageWithVertex } = await import('../services/vertexImage.js');
-        const modelId = 'gemini-3.1-flash-image-preview'
+        const modelId = 'gemini-3.1-flash-image'
         const data = await generateImageWithVertex(parts, modelId);
         const resParts = data.candidates?.[0]?.content?.parts || []
         let imageUrl = null
@@ -947,7 +947,7 @@ router.post('/ai-background', protect, requireCredits('canvasBgRemove'), async (
         }
 
         const { generateImageWithVertex } = await import('../services/vertexImage.js');
-        const modelId = 'gemini-3.1-flash-image-preview'
+        const modelId = 'gemini-3.1-flash-image'
         const parts = [
             { inlineData: { mimeType, data: base64Data } },
             { text: promptText },

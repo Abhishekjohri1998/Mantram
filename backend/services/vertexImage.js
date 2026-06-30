@@ -23,7 +23,7 @@ const auth = new GoogleAuth({
  * Fallback to Developer Google AI Studio API when credentials are not available.
  *
  * @param {Array}  parts                     – Content parts (text + inlineData)
- * @param {string} [modelId]                 – Model name, e.g. 'gemini-3.1-flash-image-preview'
+ * @param {string} [modelId]                 – Model name, e.g. 'gemini-3.1-flash-image'
  * @param {number} [temperature=0.4]         – Generation temperature
  * @param {object} [imageConfig={}]          – Image configuration
  * @param {string} [imageConfig.aspectRatio] – '1:1','16:9','9:16','4:3','3:4','3:2','2:3'
@@ -32,7 +32,7 @@ const auth = new GoogleAuth({
  */
 export async function generateImageWithVertex(
     parts,
-    modelId = 'gemini-3.1-flash-image-preview',
+    modelId = 'gemini-3.1-flash-image',
     temperature = 0.4,
     imageConfig = {}
 ) {
@@ -60,7 +60,7 @@ export async function generateImageWithVertex(
     if (!hasCreds && apiKey) {
         console.log(`🔑 [Gemini API] No Vertex credentials. Using Developer API fallback...`);
         let devModel = modelId;
-        if (modelId === 'gemini-3.1-flash-image-preview') {
+        if (modelId === 'gemini-3.1-flash-image') {
             const hasReferenceImages = parts.some(p => p.inlineData);
             devModel = hasReferenceImages ? 'gemini-2.5-flash-image' : 'gemini-3.1-flash-image';
         } else if (modelId === 'gemini-2.5-flash') {
@@ -108,7 +108,7 @@ export async function generateImageWithVertex(
 
     // ── Model Mapping (Handle non-existent 3.1 model) ──
     let mappedModelId = modelId;
-    if (modelId === 'gemini-3.1-flash-image-preview') {
+    if (modelId === 'gemini-3.1-flash-image') {
         const hasReferenceImages = parts.some(p => p.inlineData);
         mappedModelId = hasReferenceImages ? 'gemini-2.5-flash' : 'imagen-3.0-generate-002';
     }

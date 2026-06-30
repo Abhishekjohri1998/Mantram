@@ -33,7 +33,7 @@ const IMAGE_MODELS = {
     'nanobanana-2': {
         label: 'NanoBanana 2',
         badge: 'Gemini',
-        apiModel: 'gemini-3.1-flash-image-preview',
+        apiModel: 'gemini-3.1-flash-image',
         provider: 'lz',        // NanoBanana 2 goes through LZ proxy for image gen
         supportsMultimodal: true,
     },

@@ -24,14 +24,14 @@ async function runTest() {
 
         const result = await router.generateImage({
             prompt: 'A futuristic city with flying cars',
-            model: 'gemini-3.1-flash-image-preview' // This is the ID we want to see stripped
+            model: 'gemini-3.1-flash-image' // This is the ID we want to see stripped
         });
 
         console.log('✅ Fallback succeeded!');
         console.log('✅ Used Provider:', result.provider);
         console.log('✅ Used Model:', result.model);
         
-        if (result.provider === 'openai' && result.model !== 'gemini-3.1-flash-image-preview') {
+        if (result.provider === 'openai' && result.model !== 'gemini-3.1-flash-image') {
             console.log('🎉 SUCCESS: Model ID was correctly stripped for fallback.');
         } else {
             console.log('❌ FAILURE: Model ID was NOT stripped or fallback failed to use correct provider.');

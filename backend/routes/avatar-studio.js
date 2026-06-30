@@ -50,7 +50,7 @@ export const AVATAR_MODELS = {
     'nanobanana-2': {
         label: 'NanoBanana 2',
         badge: 'Gemini',
-        apiModel: 'gemini-3.1-flash-image-preview',
+        apiModel: 'gemini-3.1-flash-image',
         provider: 'gemini',          // ← uses Gemini REST, not LZ
         defaultSize: '9:16',         // passed as aspectRatio hint in prompt
         responseFormat: 'base64',
