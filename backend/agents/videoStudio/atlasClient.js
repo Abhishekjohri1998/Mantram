@@ -408,7 +408,9 @@ async function submitAtlasCloudPayload(payload) {
         }
         
         if (payload.input?.video_url) {
-            atlasPayload.video_url = payload.input.video_url;
+            console.log(`📹 [Atlas] Uploading video track to Atlas CDN...`);
+            const cdnVideo = await uploadMediaToAtlasCDN(payload.input.video_url);
+            atlasPayload.video_url = cdnVideo;
         }
 
         const rawImageUrls  = payload.input?.image_urls       || [];
@@ -664,6 +666,11 @@ export async function submitAtlasCloudVideoGeneration({
     if (refAudio) {
         taskInput.audio_url = refAudio;
         console.log(`🎤 [Atlas] refAudio injected for lip-sync: ${refAudio.substring(0, 70)}...`);
+    }
+
+    if (refVideo) {
+        taskInput.video_url = refVideo;
+        console.log(`📹 [Atlas] refVideo injected for animation: ${refVideo.substring(0, 70)}...`);
     }
 
     const finalReferenceImages = [...registeredAssetUris, ...rawFallbackUrls];

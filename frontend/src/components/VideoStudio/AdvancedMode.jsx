@@ -26,7 +26,7 @@ const MODELS = {
     'kling-3.0-o': { id: 'kling-3.0-o', name: 'Kling 3.O Omni', msIcon: 'all_inclusive', durs: [5, 10, 15, 20, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16', '1:1'], res: ['4k', '1080p', '720p', '480p'], has: { firstFrame: false, lastFrame: false, audio: true, quality: true, multishot: true, refImages: true, refVideo: false, refAudio: false }, cost: 0.12, desc: "Ultimate cinematic omni-model. Supports multi-shot & dynamic ref images." },
     'seedance-2.0': { id: 'seedance-2.0', name: 'Seedance 2.0', msIcon: 'movie_filter', durs: [5, 10, 15, 20, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16', '1:1', '4:3', '21:9'], res: ['4k', '1080p', '720p', '480p'], has: { firstFrame: true, refImages: true, refVideo: true, refAudio: true, audio: true, quality: true, multiRefImages: 9, negativePrompt: true, seed: true, cfgScale: true }, cost: 0.08, desc: "Best for Lip-Sync and precise motion tracking. Supports up to 9 reference images." },
     'seedance-2.0-fast': { id: 'seedance-2.0-fast', name: 'Seedance 2.0 Fast', msIcon: 'movie_filter', durs: [5, 10, 15, 20, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16', '1:1', '4:3', '21:9'], res: ['4k', '1080p', '720p', '480p'], has: { firstFrame: true, refImages: true, refVideo: true, refAudio: true, audio: true, quality: true, multiRefImages: 9, negativePrompt: true, seed: true, cfgScale: true }, cost: 0.05, desc: "Ultra-fast generation for testing and rapid prototyping." },
-    'seedance-2.0-mini': { id: 'seedance-2.0-mini', name: 'Seedance 2.0 Mini', msIcon: 'movie_filter', durs: [5, 10, 15], ratios: ['16:9', '9:16', '1:1', '4:3', '21:9'], res: ['720p', '480p'], has: { firstFrame: true, refImages: true, refVideo: false, refAudio: true, audio: true, quality: false, multiRefImages: 9, negativePrompt: true, seed: true, cfgScale: true }, cost: 0.03, desc: "ByteDance Seedance 2.0 Mini — lightweight, low-cost video generation." },
+    'seedance-2.0-mini': { id: 'seedance-2.0-mini', name: 'Seedance 2.0 Mini', msIcon: 'movie_filter', durs: [5, 10, 15], ratios: ['16:9', '9:16', '1:1', '4:3', '21:9'], res: ['720p', '480p'], has: { firstFrame: true, refImages: true, refVideo: true, refAudio: true, audio: true, quality: false, multiRefImages: 9, negativePrompt: true, seed: true, cfgScale: true }, cost: 0.03, desc: "ByteDance Seedance 2.0 Mini — lightweight, low-cost video generation." },
     'kling-3.0': { id: 'kling-3.0', name: 'Kling 3.0', msIcon: 'videocam', durs: [5, 10, 15, 20, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16', '1:1'], res: ['4k', '1080p', '720p', '480p'], has: { firstFrame: true, lastFrame: true, audio: true, quality: true }, cost: 0.07, desc: "High realistic generation with Fast and Pro options." },
     'veo-3.1': { id: 'veo-3.1', name: 'Veo 3.1', msIcon: 'smart_display', durs: [5, 8, 20, 30, 45, 60, 90, 120], ratios: ['16:9', '9:16'], res: ['4k', '1080p', '720p', '480p'], has: { firstFrame: true, lastFrame: true, refImages: true, audio: true, quality: true }, cost: 0.10, desc: "Incredible Cinematic physics. Fast and Pro options." },
     'seedance-1.0': { id: 'seedance-1.0', name: 'Seedance 1.0', msIcon: 'slow_motion_video', durs: [5, 10, 20, 30, 45, 60], ratios: ['16:9', '9:16', '1:1', '4:3'], res: ['4k', '720p', '480p'], has: { firstFrame: true, lastFrame: true }, cost: 0.05, desc: "Cost-effective, reliable motion." },
@@ -763,12 +763,32 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
             r.readAsDataURL(f)
         })
     }
-    function onMediaFile(e, setter) {
-        const f = e.target.files?.[0]; if (!f) return
-        setter(prev => {
-            if (prev?.url?.startsWith('blob:')) URL.revokeObjectURL(prev.url)
-            return { url: URL.createObjectURL(f), name: f.name }
+    async function uploadFile(file) {
+        const fd = new FormData()
+        fd.append('file', file)
+        const token = localStorage.getItem('mantram_token')
+        const res = await fetch(`${API_BASE}/video-studio/agent/upload`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: fd
         })
+        if (!res.ok) throw new Error(`Upload failed: ${res.status}`)
+        const d = await res.json()
+        if (!d.success) throw new Error(d.error || 'Upload failed')
+        return d.url
+    }
+    async function onMediaFile(e, setter) {
+        const f = e.target.files?.[0]; if (!f) return
+        const localBlob = URL.createObjectURL(f)
+        setter({ url: localBlob, name: f.name, uploading: true })
+        try {
+            const hostedUrl = await uploadFile(f)
+            setter({ url: hostedUrl, name: f.name, uploading: false })
+        } catch (err) {
+            console.error('Failed to upload media file:', err)
+            setError(`Failed to upload file: ${err.message}`)
+            setter(null)
+        }
     }
     function onI2VFile(e) {
         const file = e.target.files?.[0]; if (!file) return
@@ -877,6 +897,10 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
     async function handleGenerate() {
         if (!canCreateVideo) { onUpgradeRequired?.(); return }
         if (!canGenerate) { setError(`Max ${MAX_CONCURRENT} concurrent generations. Wait for one to finish.`); return }
+        if (refVideo?.uploading || refAudio?.uploading || refImages.some(r => r.uploading) || firstFrame?.uploading || lastFrame?.uploading) {
+            setError('Please wait for all media files to finish uploading first.')
+            return
+        }
         if (!prompt.trim()) { setError('Write your ad idea first'); return }
         setLoading(true); setError('')
         const jobId = `job-${Date.now()}`
@@ -907,6 +931,8 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                     brandId: activeBrand?._id || null,
                     language: language || 'English',
                     referenceImages: allRefUrls,
+                    refAudio: refAudio?.url || '',
+                    refVideo: refVideo?.url || '',
                     ...(m.has.negativePrompt && negativePrompt.trim() ? { negativePrompt: negativePrompt.trim() } : {}),
                     ...(m.has.seed && seed >= 0 ? { seed } : {}),
                     ...(m.has.cfgScale ? { cfgScale } : {}),
