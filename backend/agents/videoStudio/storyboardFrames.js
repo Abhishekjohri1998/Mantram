@@ -313,7 +313,8 @@ async function generateWithGptImage2(
     const useEditsEndpoint = refBuffers.length > 0;
 
     const useLaoZhang = process.env.OPENAI_USE_LZ === 'true';
-    const isAtlas = !useLaoZhang && !!process.env.ATLASCLOUD_API_KEY;
+    // Always prioritize Atlas Cloud if available, as it is much faster and more stable than the LaoZhang proxy for storyboard poster generation.
+    const isAtlas = !!process.env.ATLASCLOUD_API_KEY;
     const apiKey = isAtlas ? process.env.ATLASCLOUD_API_KEY : (config.ai?.laozhangApiKey || process.env.LAOZHANG_API_KEY || process.env.OPENAI_API_KEY);
     const baseUrl = isAtlas ? 'https://api.atlascloud.ai/v1' : (config.ai?.laozhangBaseUrl || 'https://api.laozhang.ai/v1');
     const endpoint = useEditsEndpoint ? `${baseUrl}/images/edits` : `${baseUrl}/images/generations`;
