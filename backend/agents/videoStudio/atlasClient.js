@@ -411,6 +411,8 @@ async function submitAtlasCloudPayload(payload) {
             console.log(`📹 [Atlas] Uploading video track to Atlas CDN...`);
             const cdnVideo = await uploadMediaToAtlasCDN(payload.input.video_url);
             atlasPayload.video_url = cdnVideo;
+            atlasPayload.video = cdnVideo;
+            atlasPayload.ref_video = cdnVideo;
         }
 
         const rawImageUrls  = payload.input?.image_urls       || [];
@@ -642,7 +644,10 @@ export async function submitAtlasCloudVideoGeneration({
     const rawFallbackUrls     = faceAssetUris.filter(u => u && !u.startsWith('asset://'));
 
     const imageCount     = registeredAssetUris.length + rawFallbackUrls.length + firstFrameAssetUris.length;
-    const effectiveCount = (registeredAssetUris.length > 0 || rawFallbackUrls.length > 0) ? Math.max(imageCount, 2) : imageCount;
+    let effectiveCount   = (registeredAssetUris.length > 0 || rawFallbackUrls.length > 0) ? Math.max(imageCount, 2) : imageCount;
+    if (refVideo) {
+        effectiveCount = Math.max(effectiveCount, 2);
+    }
     const modelName      = resolveModelName(qualityMode, effectiveCount, model);
     const dur            = Math.min(Math.max(parseInt(duration, 10) || 5, 4), 15);
 

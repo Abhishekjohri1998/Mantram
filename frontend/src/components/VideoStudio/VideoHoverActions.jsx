@@ -99,6 +99,28 @@ export default function VideoHoverActions({ videoUrl, onPreview, project, onReus
         });
     };
 
+    const triggerDownload = async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showFeedback("Downloading video...");
+        try {
+            const resp = await fetch(videoUrl);
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = project?.title ? `${project.title.substring(0,30).replace(/[^a-zA-Z0-9]/g, '_')}.mp4` : 'video.mp4';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showFeedback("Downloaded successfully!");
+        } catch (err) {
+            console.error('Download failed, opening in new tab:', err);
+            window.open(videoUrl, '_blank');
+        }
+    };
+
     const handleAction = (e, actionName) => {
         e.stopPropagation();
         if (actionName === 'preview' && onPreview) {
@@ -144,9 +166,9 @@ export default function VideoHoverActions({ videoUrl, onPreview, project, onReus
             <button title="Virality Check" onClick={(e) => handleAction(e, 'virality')}>
                 <span className="material-symbols-outlined">trending_up</span>
             </button>
-            <a title="Download" href={videoUrl} download="video.mp4" onClick={e => e.stopPropagation()}>
+            <button title="Download" onClick={triggerDownload}>
                 <span className="material-symbols-outlined">download</span>
-            </a>
+            </button>
             <div style={{ position: 'relative' }} ref={menuRef}>
                 <button title="More Options" onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}>
                     <span className="material-symbols-outlined">more_vert</span>

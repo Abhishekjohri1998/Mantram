@@ -473,12 +473,12 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     }
     if (model === 'seedance-2.0' || model === 'seedance-2.0-fast' || model === 'seedance-2.0-mini') {
         const seedanceMode = model === 'seedance-2.0-fast' ? 'fast' : (mode || 'quality');
-        const hasRealFaceRefs = s3ReferenceImages.filter(Boolean).length > 0;
+        const hasRealFaceRefs = s3ReferenceImages.filter(Boolean).length > 0 || !!s3RefVideo;
         
         // 👤 REAL FACE REFERENCE-TO-VIDEO: Bypass MuAPI/LaoZhang entirely
         // Only Atlas Cloud supports the reference-to-video model that locks real facial identity
         if (hasRealFaceRefs) {
-            console.log(`👤 [Seedance 2.0] ${s3ReferenceImages.length} reference image(s) detected → forcing Atlas Cloud reference-to-video`);
+            console.log(`👤 [Seedance 2.0] Reference image(s) or video detected → forcing Atlas Cloud reference-to-video`);
             try {
                 const result = await submitAtlasCloudVideoGeneration({
                     model,

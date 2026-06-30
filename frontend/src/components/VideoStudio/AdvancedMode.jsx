@@ -806,7 +806,7 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
     function renderRichPrompt(text) {
         if (!text) return null;
         // Split by exactly the tags we use
-        const regex = /(@image\d+|@video|@audio)/g;
+        const regex = /(@image\d+|@video\d*|@audio\d*)/g;
         const parts = text.split(regex);
         return parts.map((part, i) => {
             if (part.match(regex)) {
