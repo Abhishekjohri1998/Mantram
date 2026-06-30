@@ -9998,6 +9998,61 @@ Format: ${format} | Style: ${style === '3d' ? 'Pixar/Unreal Engine 3D animated' 
 
         plan.imageUrl = posterUrl;
 
+        // Load brand context for scene planner
+        let dbBrandContext = '';
+        if (brandId) {
+            try {
+                const { loadBrandContext } = await import('../agents/shared/agentUtils.js');
+                const brandData = await loadBrandContext(brandId);
+                dbBrandContext = brandData?.brandContext || '';
+            } catch (e) {
+                console.warn('[Storyboard Create] Failed to load brand context:', e.message);
+            }
+        }
+
+        // ── Pre-generate scenes and detailed segment prompts ──
+        let scenes = [];
+        try {
+            const { planStoryboardScenes } = await import('../agents/videoStudio/scenePlanner.js');
+            const referenceImages = [
+                ...productImageUrls.map(url => ({ url, role: 'product' })),
+                ...avatarUrls.map((url, i) => ({ url, role: 'character_reference', name: avatarNames[i] || `Character ${i + 1}` })),
+            ];
+
+            scenes = await planStoryboardScenes({
+                videoPrompt: plan.videoPrompt,
+                imageUrl: plan.imageUrl,
+                targetDuration: totalDuration,
+                model: req.body.videoModel || 'seedance-2.0-fast',
+                language: dialogueLanguage,
+                brandContext: includeBranding ? dbBrandContext : '',
+                productName,
+                productFeatures,
+                referenceImages,
+                characterNames: avatarNames,
+                structuredPlan: plan,
+            });
+            console.log(`[Storyboard Create] Pre-flight planned ${scenes.length} segments`);
+        } catch (sceneErr) {
+            console.warn('[Storyboard Create] Pre-flight scene planning failed:', sceneErr.message);
+            scenes = (plan.cuts || []).map((cut, i) => ({
+                sceneId: i + 1,
+                duration: cut.duration,
+                visualPrompt: cut.framePrompt || cut.scene || `Segment ${i + 1}`,
+                dialogue: cut.voiceover ? [{ text: cut.voiceover, emotion: 'natural' }] : [],
+                camerawork: `${cut.shot || 'MEDIUM'}, ${cut.lens || '50mm'} ${cut.move || 'STEADICAM'}`,
+                transitionOut: 'Smooth crossfade to next scene',
+            }));
+        }
+
+        const segmentPrompts = {};
+        scenes.forEach((scene, idx) => {
+            segmentPrompts[String(idx)] = scene.visualPrompt;
+        });
+
+        // Add scenes to the returned plan object
+        plan.scenes = scenes;
+
         // Persist as a storyboard VideoProject
         const project = await VideoProject.create({
             user: req.user._id,
@@ -10049,6 +10104,8 @@ Format: ${format} | Style: ${style === '3d' ? 'Pixar/Unreal Engine 3D animated' 
                 },
                 // Character Reference Sheet URL — generated below and back-patched
                 characterRefSheetUrl: null,
+                scenes,
+                segmentPrompts,
             },
         });
 
@@ -10579,12 +10636,49 @@ router.post('/storyboard/animate', protect, async (req, res) => {
             generateMode = 'automatic',
             audioSync,
             voiceoverScript,
+            editedPrompts = {},
+            editedVoiceovers = {},
         } = req.body;
 
         // Mutable — may be re-signed or overridden by DB copy below
         let imageUrl = _imageUrlFromClient;
 
         if (!imageUrl) return res.status(400).json({ success: false, error: 'No imageUrl provided' });
+
+        // Save/Update user edits on prompts & voiceovers
+        if (projectId && (Object.keys(editedPrompts).length > 0 || Object.keys(editedVoiceovers).length > 0)) {
+            try {
+                const projectDoc = await VideoProject.findById(projectId);
+                if (projectDoc && projectDoc.storyboard && Array.isArray(projectDoc.storyboard.scenes)) {
+                    const updatedScenes = projectDoc.storyboard.scenes.map((scene, idx) => {
+                        const updated = { ...scene };
+                        if (editedPrompts[idx] !== undefined) {
+                            updated.visualPrompt = editedPrompts[idx];
+                        }
+                        if (editedVoiceovers[idx] !== undefined) {
+                            updated.dialogue = [{ text: editedVoiceovers[idx], emotion: 'natural' }];
+                            updated.voiceoverText = editedVoiceovers[idx];
+                        }
+                        return updated;
+                    });
+
+                    const segmentPrompts = projectDoc.storyboard.segmentPrompts ? new Map(projectDoc.storyboard.segmentPrompts) : new Map();
+                    Object.keys(editedPrompts).forEach(idxStr => {
+                        segmentPrompts.set(idxStr, editedPrompts[idxStr]);
+                    });
+
+                    await VideoProject.findByIdAndUpdate(projectId, {
+                        $set: {
+                            'storyboard.scenes': updatedScenes,
+                            'storyboard.segmentPrompts': Object.fromEntries(segmentPrompts),
+                        }
+                    });
+                    console.log(`[Storyboard Animate] Updated ${Object.keys(editedPrompts).length} prompts and ${Object.keys(editedVoiceovers).length} voiceovers in DB`);
+                }
+            } catch (updateErr) {
+                console.warn('[Storyboard Animate] Failed to update edited prompts/voiceovers in DB:', updateErr.message);
+            }
+        }
 
         // ── Load full context from DB ─────────────────────────────────────────
         let dbProductImgs = [];

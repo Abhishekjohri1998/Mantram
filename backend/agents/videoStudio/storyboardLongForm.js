@@ -368,8 +368,30 @@ async function _runPipeline(jobId, params) {
         _setProgress(jobId, 'PLANNING', 'Planning storyboard scenes...', 30);
         let scenes = [];
         try {
-            // Pass structuredPlan so scenePlanner can use cuts[] directly (no LLM re-decomposition)
-            let structuredPlan = params.structuredPlan || null;
+            const mongoose = (await import('mongoose')).default;
+            const VideoProject = mongoose.model('VideoProject');
+            const freshProject = await VideoProject.findById(params.projectId).lean();
+            if (freshProject?.storyboard?.scenes?.length > 0) {
+                scenes = freshProject.storyboard.scenes;
+                console.log(`[SB LongForm ${jobId}] 📋 Using ${scenes.length} pre-saved scenes from DB (preserving user edits).`);
+
+                // Ensure all scene visual prompts are sanitized
+                try {
+                    const { sanitizeRawText } = await import('./promptSanitizer.js');
+                    scenes = scenes.map(s => ({
+                        ...s,
+                        visualPrompt: sanitizeRawText(s.visualPrompt || ''),
+                    }));
+                } catch (sErr) {}
+            }
+        } catch (dbLoadErr) {
+            console.warn(`[SB LongForm ${jobId}] Failed to load scenes from DB: ${dbLoadErr.message}`);
+        }
+
+        if (scenes.length === 0) {
+            try {
+                // Pass structuredPlan so scenePlanner can use cuts[] directly (no LLM re-decomposition)
+                let structuredPlan = params.structuredPlan || null;
 
             // RC#6/7: Pre-sanitize videoPrompt and structuredPlan cut content before scene planning.
             // These values come from MongoDB and may contain deity/religious terms from the original
@@ -415,7 +437,7 @@ async function _runPipeline(jobId, params) {
                 visualPrompt: `Segment ${i + 1} of ${segCount}: Continue storyboard flow. ${params.videoPrompt?.substring(0, 300)}`,
                 dialogue: [],
             }));
-
+        }
         }
 
         job.scenes = scenes;

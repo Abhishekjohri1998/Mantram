@@ -209,6 +209,10 @@ export default function Storyboard({
     const [segmentItems, setSegmentItems] = useState([]); // [{index, status, videoUrl, prompt, duration, error}]
     const [regenSegIdx, setRegenSegIdx] = useState(null); // which segment is being regen'd
     const [editedPrompts, setEditedPrompts] = useState({}); // {segIdx: editedPrompt}
+    const [editedVoiceovers, setEditedVoiceovers] = useState({}); // {segIdx: editedVoiceover}
+    const [characterRefSheetUrl, setCharacterRefSheetUrl] = useState('');
+    const [activeMediaTab, setActiveMediaTab] = useState('poster'); // 'poster' | 'character'
+    const [scenes, setScenes] = useState([]); // pre-generated segments/scenes
     const [isCompiling, setIsCompiling] = useState(false);
     const [isBatchGeneratingSegments, setIsBatchGeneratingSegments] = useState(false);
     const [isCancelling, setIsCancelling] = useState(false); // stop generation in progress
@@ -684,9 +688,14 @@ export default function Storyboard({
             }
 
             setPlan(data.plan);
+            setEditedPrompts({});
+            setEditedVoiceovers({});
+            setActiveMediaTab('poster');
             if (data.plan) {
                 setImageUrl(data.plan.imageUrl);
                 setImagePrompt(data.plan.imagePrompt);
+                setCharacterRefSheetUrl(data.plan.characterRefSheetUrl || '');
+                setScenes(data.plan.scenes || []);
                 // videoPrompt is NOT stored at creation time — generated fresh at animate-time
                 if (data.plan.dialogueLanguage) setDialogueLanguage(data.plan.dialogueLanguage);
                 // Store the 4-section structured plan for display + animate-time use
@@ -756,6 +765,8 @@ export default function Storyboard({
                     generateMode, // 'automatic' | 'manual'
                     audioSync,
                     voiceoverScript: plan?.voiceoverScript || '',
+                    editedPrompts,
+                    editedVoiceovers,
                 }),
             });
 
@@ -858,6 +869,11 @@ export default function Storyboard({
         setImageUrl(sb.imageUrl || '');
         setImagePrompt(sb.imagePrompt || '');
         setGeneratedVideoPrompt(sb.videoPrompt || '');
+        setCharacterRefSheetUrl(sb.characterRefSheetUrl || '');
+        setScenes(sb.scenes || []);
+        setEditedPrompts({});
+        setEditedVoiceovers({});
+        setActiveMediaTab('poster');
         if (sb.dialogueLanguage) setDialogueLanguage(sb.dialogueLanguage);
         if (sb.format) setFormat(sb.format);
         if (proj.routing?.selectedModel) setModel(proj.routing.selectedModel);
@@ -1615,8 +1631,83 @@ export default function Storyboard({
                     {/* Master Poster Layout */}
                     <div className="sb-poster-layout">
                         <div className="sb-poster-left">
+                            {characterRefSheetUrl && (
+                                <div className="sb-media-tabs" style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setActiveMediaTab('poster')}
+                                        className={`sb-media-tab-btn ${activeMediaTab === 'poster' ? 'active' : ''}`}
+                                        style={{
+                                            padding: '8px 16px',
+                                            borderRadius: '8px',
+                                            border: '1px solid rgba(255,255,255,0.08)',
+                                            background: activeMediaTab === 'poster' ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255,255,255,0.03)',
+                                            color: activeMediaTab === 'poster' ? '#C084FC' : 'rgba(255,255,255,0.6)',
+                                            fontWeight: 600,
+                                            fontSize: '13px',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s',
+                                        }}
+                                    >
+                                        Storyboard Poster
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setActiveMediaTab('character')}
+                                        className={`sb-media-tab-btn ${activeMediaTab === 'character' ? 'active' : ''}`}
+                                        style={{
+                                            padding: '8px 16px',
+                                            borderRadius: '8px',
+                                            border: '1px solid rgba(255,255,255,0.08)',
+                                            background: activeMediaTab === 'character' ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255,255,255,0.03)',
+                                            color: activeMediaTab === 'character' ? '#C084FC' : 'rgba(255,255,255,0.6)',
+                                            fontWeight: 600,
+                                            fontSize: '13px',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s',
+                                        }}
+                                    >
+                                        Character consistency sheet
+                                    </button>
+                                </div>
+                            )}
                             <div className="sb-poster-wrap">
-                                {imageUrl ? (
+                                {activeMediaTab === 'character' ? (
+                                    characterRefSheetUrl ? (
+                                        <>
+                                            <img 
+                                                src={characterRefSheetUrl} 
+                                                className="sb-poster-img" 
+                                                alt="Character Consistency Sheet" 
+                                                onClick={() => setPreviewImage(characterRefSheetUrl)}
+                                                style={{ cursor: 'zoom-in' }}
+                                            />
+                                            <div className="sb-poster-actions">
+                                                <button 
+                                                    type="button" 
+                                                    className="sb-poster-action-btn"
+                                                    onClick={() => setPreviewImage(characterRefSheetUrl)}
+                                                    title="Zoom / View Full Size"
+                                                >
+                                                    <span className="material-symbols-outlined">zoom_in</span>
+                                                </button>
+                                                <button 
+                                                    type="button" 
+                                                    className="sb-poster-action-btn"
+                                                    onClick={() => handleDownloadImage(characterRefSheetUrl)}
+                                                    title="Download Character Sheet"
+                                                >
+                                                    <span className="material-symbols-outlined">download</span>
+                                                </button>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="sb-poster-img" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)' }}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'rgba(255,255,255,0.2)', marginBottom: 16 }}>broken_image</span>
+                                            <p style={{ color: 'rgba(255,255,255,0.5)' }}>Character sheet failed to load.</p>
+                                        </div>
+                                    )
+                                ) : imageUrl ? (
                                     <>
                                         <img 
                                             src={imageUrl} 
@@ -1784,8 +1875,73 @@ export default function Storyboard({
                                          </div>
                                      )}
 
-                                     {/* Section 3 — Cut Plan */}
-                                     {structuredPlan.cuts?.length > 0 && (
+                                     {/* Section 3 — Cut Plan (Prompts & Dialogues Editor) */}
+                                     {scenes?.length > 0 ? (
+                                         <div style={{ marginBottom: 10 }}>
+                                             <p style={{ margin: '0 0 10px', fontSize: 9, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: 1.2, fontWeight: 700 }}>§3 — Detailed Video Segment Prompts ({scenes.length} segments · {duration}s)</p>
+                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                                 {scenes.map((scene, i) => {
+                                                     const displayPrompt = editedPrompts[i] !== undefined ? editedPrompts[i] : (scene.visualPrompt || '');
+                                                     const voiceoverVal = scene.dialogue?.[0]?.text || scene.voiceoverText || '';
+                                                     const displayVoiceover = editedVoiceovers[i] !== undefined ? editedVoiceovers[i] : voiceoverVal;
+                                                     return (
+                                                         <div key={i} style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8 }}>
+                                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                                                 <span style={{ fontSize: 11, fontWeight: 600, color: '#C084FC' }}>Segment {i + 1} ({scene.duration}s)</span>
+                                                                 <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: 4 }}>{scene.camerawork || 'Cinematic'}</span>
+                                                             </div>
+
+                                                             {/* Visual Prompt Textarea */}
+                                                             <div style={{ marginBottom: 8 }}>
+                                                                 <label style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>Visual Scene Prompt</label>
+                                                                 <textarea
+                                                                     rows={3}
+                                                                     value={displayPrompt}
+                                                                     onChange={e => setEditedPrompts(prev => ({ ...prev, [i]: e.target.value }))}
+                                                                     placeholder="Visual prompt details..."
+                                                                     style={{
+                                                                         width: '100%',
+                                                                         background: 'rgba(0,0,0,0.2)',
+                                                                         border: '1px solid rgba(255,255,255,0.08)',
+                                                                         borderRadius: '6px',
+                                                                         color: '#fff',
+                                                                         padding: '8px',
+                                                                         fontSize: '11px',
+                                                                         lineHeight: '1.4',
+                                                                         fontFamily: 'inherit',
+                                                                         resize: 'vertical',
+                                                                     }}
+                                                                 />
+                                                             </div>
+
+                                                             {/* Voiceover Textarea */}
+                                                             <div>
+                                                                 <label style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>Voiceover / Dialogue Text</label>
+                                                                 <textarea
+                                                                     rows={2}
+                                                                     value={displayVoiceover}
+                                                                     onChange={e => setEditedVoiceovers(prev => ({ ...prev, [i]: e.target.value }))}
+                                                                     placeholder="Narrator or character speech..."
+                                                                     style={{
+                                                                         width: '100%',
+                                                                         background: 'rgba(0,0,0,0.2)',
+                                                                         border: '1px solid rgba(255,255,255,0.08)',
+                                                                         borderRadius: '6px',
+                                                                         color: '#38BDF8',
+                                                                         padding: '6px 8px',
+                                                                         fontSize: '11px',
+                                                                         lineHeight: '1.4',
+                                                                         fontFamily: 'inherit',
+                                                                         resize: 'vertical',
+                                                                     }}
+                                                                 />
+                                                             </div>
+                                                         </div>
+                                                     );
+                                                 })}
+                                             </div>
+                                         </div>
+                                     ) : structuredPlan.cuts?.length > 0 ? (
                                          <div style={{ marginBottom: 10 }}>
                                              <p style={{ margin: '0 0 6px', fontSize: 9, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: 1.2, fontWeight: 700 }}>§3 — Cut Plan ({structuredPlan.cuts.length} cuts · {duration}s)</p>
                                              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -1818,7 +1974,7 @@ export default function Storyboard({
                                                  })()}
                                              </div>
                                          </div>
-                                     )}
+                                     ) : null}
 
                                      {/* Section 4 — Mood + Arc */}
                                      {(structuredPlan.moodKeywords?.length > 0 || structuredPlan.emotionalArc || structuredPlan.cinematographyRules) && (
