@@ -3,7 +3,7 @@
  *
  * Routes image generation based on user-selected model:
  *   - gpt-image-2  → LaoZhang proxy (/images/edits with ref images, or /images/generations)
- *   - nanobanana   → Gemini Vertex AI (gemini-3.1-flash-image-preview)
+ *   - nanobanana   → Gemini Vertex AI (gemini-3.1-flash-image)
  *
  * Raw multer buffers are preferred for GPT Image 2 (no S3 roundtrip).
  * NanoBanana uses inline base64 parts for Vertex AI.
@@ -432,7 +432,7 @@ async function generateWithNanoBanana(
     allRawAvatarBuffers = [], allAvatarUrls = [], avatarNames = [],
     rawRefBuffers = [], refImageUrls = [],
 ) {
-    const GEMINI_MODEL = 'gemini-3.1-flash-image-preview';
+    const GEMINI_MODEL = 'gemini-3.1-flash-image';
 
     try {
         const { generateImageWithVertex } = await import('../../services/vertexImage.js');
@@ -532,9 +532,9 @@ async function generateWithNanoBanana(
         parts.push({ text: finalPrompt });
 
         const hasReferenceImages = parts.filter(p => p.inlineData).length > 0;
-        // gemini-3.1-flash-image-preview reads reference images but doesn't support imageSize token ('1K'/'2K')
-        // When we have references, use gemini-3.1-flash-image-preview. When no references, use imagen-3.0-generate-002 for quality.
-        const activeModel = hasReferenceImages ? 'gemini-3.1-flash-image-preview' : 'imagen-3.0-generate-002';
+        // gemini-3.1-flash-image reads reference images but doesn't support imageSize token ('1K'/'2K')
+        // When we have references, use gemini-3.1-flash-image. When no references, use imagen-3.0-generate-002 for quality.
+        const activeModel = hasReferenceImages ? 'gemini-3.1-flash-image' : 'imagen-3.0-generate-002';
         const imageConfigObj = hasReferenceImages
             ? { aspectRatio: ar }               // 2.0 only supports aspectRatio
             : { aspectRatio: ar, imageSize };    // imagen-3 supports imageSize too

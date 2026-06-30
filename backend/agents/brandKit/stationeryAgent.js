@@ -14,7 +14,7 @@ import { runArtDirector } from './artDirectorAgent.js';
 import { mirrorUrlToS3 } from '../../utils/s3.js';
 import { v4 as uuidv4 } from 'uuid';
 
-const GPT_IMAGE_MODEL = 'gemini-3.1-flash-image-preview';
+const GPT_IMAGE_MODEL = 'gemini-3.1-flash-image';
 
 const STATIONERY_ASSETS = [
     { subType: 'business-card-front', name: 'Business Card (Front)', size: '1792x1024', desc: '3.5x2 inch, horizontal' },

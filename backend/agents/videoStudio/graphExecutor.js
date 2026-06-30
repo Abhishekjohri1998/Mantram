@@ -84,7 +84,7 @@ class AssistantHandler extends NodeHandler {
         const outputMode = node.params?.output_mode || 'simple';
 
         let provider = 'gemini';
-        let modelId = 'gemini-2.5-flash-preview-05-20';
+        let modelId = 'gemini-2.5-flash';
 
         if (modelParam === 'gpt-4o') {
             provider = 'openai';

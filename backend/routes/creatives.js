@@ -1906,8 +1906,8 @@ async function routedImageGenerate(promptText, imageParts = [], temperature = 0.
     // NOTE: 'gemini-3.1-flash-image-preview' does NOT exist on the direct Gemini API
     // (generativelanguage.googleapis.com). It ONLY works via the LaoZhang proxy.
     // Using router.generateImage() would route it to nativeGemini → 404 → misclassified as busy.
-    const LZ_IMAGE_MODEL = 'gemini-3.1-flash-image-preview'; // LaoZhang alias for NanoBanana 2
-    const NATIVE_GEMINI_IMAGE_MODEL = 'gemini-2.5-flash-preview-05-20'; // Valid on direct Gemini API
+    const LZ_IMAGE_MODEL = 'gemini-3.1-flash-image'; // LaoZhang alias for NanoBanana 2
+    const NATIVE_GEMINI_IMAGE_MODEL = 'gemini-3.1-flash-image'; // Valid on direct Gemini API
     const router = getRouter();
     const modelKey = selectedModel; // normalize: selectedModel IS the routing key
     console.log(`🎯 Image Generation: model=${modelKey}`);

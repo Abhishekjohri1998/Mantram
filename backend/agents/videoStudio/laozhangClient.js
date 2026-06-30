@@ -232,12 +232,12 @@ function getImageTimeout(model) {
 
 // ── Atlas Cloud Image Generation ─────────────────────────────────────────────
 // For OpenAI models (gpt-image-2): uses /v1/images/generations with b64_json
-// For Gemini models (gemini-3.1-flash-image-preview, nanobanana-2, etc.):
+// For Gemini models (gemini-3.1-flash-image, nanobanana-2, etc.):
 //   uses /v1/chat/completions which returns inline image data
 
 const GEMINI_IMAGE_MODELS = new Set([
-    'gemini-3.1-flash-image-preview', 'gemini-3-pro-image-preview',
-    'gemini-2.5-flash-preview-05-20', 'gemini-flash', 'nanobanana-2', 'nanobanana-pro',
+    'gemini-3.1-flash-image', 'gemini-3-pro-image-preview',
+    'gemini-2.5-flash', 'gemini-flash', 'nanobanana-2', 'nanobanana-pro',
 ]);
 
 async function _atlasImageGenerate(prompt, { model = 'gpt-image-2', size = '1024x1024' } = {}) {
@@ -334,7 +334,7 @@ async function _atlasImageGenerate(prompt, { model = 'gpt-image-2', size = '1024
 // Atlas Cloud is the primary and only proxy. No LaoZhang.
 // Falls back to native Gemini/Vertex if Atlas fails.
 
-export async function laozhangImageGenerate(prompt, { model = 'gemini-3.1-flash-image-preview', size = '1024x1024' } = {}) {
+export async function laozhangImageGenerate(prompt, { model = 'gemini-3.1-flash-image', size = '1024x1024' } = {}) {
     const timeoutMs = getImageTimeout(model);
     console.log(`🖼️  [ImageGen] model=${model}, size=${size}, timeout=${timeoutMs/1000}s`);
     console.log(`   📝 prompt (first 200): ${prompt?.substring(0, 200)}...`);
@@ -403,7 +403,7 @@ export async function laozhangGptImageWithRefs(prompt, imageUrls = [], { model =
 
     if (!refBuffer) {
         console.warn(`   ⚠️ [GPT-Image-2+Refs] All ref fetches failed — falling back to Gemini multimodal with same ref URLs`);
-        return laozhangMultimodalImageGenerate(prompt, imageUrls, { model: 'gemini-3.1-flash-image-preview', size });
+        return laozhangMultimodalImageGenerate(prompt, imageUrls, { model: 'gemini-3.1-flash-image', size });
     }
 
     // Build multipart/form-data for /images/edits
@@ -476,7 +476,7 @@ export async function laozhangGptImageWithRefs(prompt, imageUrls = [], { model =
 // MULTIMODAL IMAGE GENERATION — via /v1/chat/completions
 // ══════════════════════════════════════════════════════════════════════════════
 
-export async function laozhangMultimodalImageGenerate(prompt, imageUrls = [], { model = 'gemini-3.1-flash-image-preview', size = '1024x1024' } = {}) {
+export async function laozhangMultimodalImageGenerate(prompt, imageUrls = [], { model = 'gemini-3.1-flash-image', size = '1024x1024' } = {}) {
     try {
         const timeoutMs = getImageTimeout(model);
         if (!imageUrls || imageUrls.length === 0) return laozhangImageGenerate(prompt, { model, size });

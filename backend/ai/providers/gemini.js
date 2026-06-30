@@ -132,7 +132,7 @@ export class GeminiProvider extends BaseProvider {
      * Returns text + grounding citations (URLs, titles, snippets).
      */
     async generateTextWithSearch({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 4096, model }) {
-        const modelId = model || this.config.defaultModel || 'gemini-2.5-flash-preview-05-20';
+        const modelId = model || this.config.defaultModel || 'gemini-2.5-flash';
         const url = `${this.baseUrl}/models/${modelId}:generateContent?key=${this.apiKey}`;
 
         const startTime = Date.now();
@@ -220,7 +220,7 @@ export class GeminiProvider extends BaseProvider {
      * @yields {string} Each chunk of text as it arrives from the API
      */
     async *generateTextStream({ systemPrompt, userPrompt, temperature = 0.7, maxTokens = 4096, model }) {
-        const modelId = model || this.config.defaultModel || 'gemini-2.5-flash-preview-05-20';
+        const modelId = model || this.config.defaultModel || 'gemini-2.5-flash';
         const url = `${this.baseUrl}/models/${modelId}:streamGenerateContent?key=${this.apiKey}&alt=sse`;
 
         const response = await fetch(url, fetchOptions({
@@ -279,15 +279,15 @@ export class GeminiProvider extends BaseProvider {
 
     /**
      * Generate image using modern Gemini models (Flash/Pro) or older Imagen models.
-     * Supports gemini-3.1-flash-image-preview, imagen-3, etc.
+     * Supports gemini-3.1-flash-image, imagen-3, etc.
      */
     async generateImage({ prompt, aspectRatio = '1:1', model, imageParts = [], size = "1K", temperature = 0.4 }) {
         const startTime = Date.now();
         const imageKey = this.imageApiKey;
-        let modelId = model || this.config.defaultImageModel || 'gemini-2.5-flash-preview-05-20';
+        let modelId = model || this.config.defaultImageModel || 'gemini-3.1-flash-image';
 
         // Map custom model aliases to native Gemini API models
-        if (modelId === 'nanobanana-2' || modelId === 'nanobanana' || modelId === 'gemini-3.1-flash-image-preview' || modelId === 'gemini-flash') {
+        if (modelId === 'nanobanana-2' || modelId === 'nanobanana' || modelId === 'gemini-3.1-flash-image' || modelId === 'gemini-flash') {
             modelId = 'gemini-3.1-flash-image';
         } else if (modelId === 'nanobanana-pro') {
             modelId = 'gemini-3-pro-image';

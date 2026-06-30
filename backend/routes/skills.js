@@ -73,7 +73,7 @@ async function aiCall(systemPrompt, userPrompt, options = {}) {
         // Fallback: Gemini (REST API)
         const geminiKey = process.env.GEMINI_IMAGE_API_KEY || process.env.GEMINI_API_KEY;
         if (geminiKey) {
-            const models = ['gemini-2.5-flash', 'gemini-2.5-flash-preview-05-20'];
+            const models = ['gemini-2.5-flash'];
             for (const model of models) {
                 try {
                     const resp = await fetch(

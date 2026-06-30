@@ -815,7 +815,7 @@ export async function thumbnailDirectionNode({ video, analysis, seo, brandContex
  * auto-generated still. Instead, we use character visual descriptions from the
  * analysis to generate characters de-novo in the show's visual style.
  *
- * Models: PRIMARY = gemini-3.1-flash-image-preview via @google/genai SDK
+ * Models: PRIMARY = gemini-3.1-flash-image via @google/genai SDK
  *         FALLBACK = fal-ai/flux-pro/v1.1
  */
 export async function thumbnailGenerationNode({ thumbnailDirection, video, brandContext, template, characterPortraits = [], extractedFrames = [], primaryFaceUrl = null }) {
@@ -1140,7 +1140,7 @@ Return ONLY a JSON object, no markdown:
         }, { provider: 'gemini' });
 
         const rawUrl = typeof result === 'string' ? result : result.imageUrl;
-        const genModel = typeof result === 'string' ? 'gemini-3.1-flash-image-preview' : (result.model || 'gemini-3.1-flash-image-preview');
+        const genModel = typeof result === 'string' ? 'gemini-3.1-flash-image' : (result.model || 'gemini-3.1-flash-image');
         const finalUrl = await persistToS3(rawUrl || '', 'yt-studio/thumbnails');
         console.log(`✅ [thumbnailGenerationNode] Image generation success → S3: ${finalUrl?.substring(0, 80)}`);
         return { generatedThumbnailUrl: finalUrl || rawUrl, thumbnailGenerationError: null, generatorModel: genModel };

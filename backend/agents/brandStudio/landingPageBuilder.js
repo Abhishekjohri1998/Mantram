@@ -160,7 +160,7 @@ JSON SCHEMA (fill every field with real, product-specific content):
 
 // ── Phase 3: Generate only LIFESTYLE images (hero uses real product image) ──
 async function generateLifestyleImages(plan, productDNA, designContext, imageModel) {
-    const model = imageModel || 'gemini-3.1-flash-image-preview';
+    const model = imageModel || 'gemini-3.1-flash-image';
     const refImages = [
         productDNA?.heroImageUrl,
         ...(productDNA?.productRefImages || []).slice(0, 2)

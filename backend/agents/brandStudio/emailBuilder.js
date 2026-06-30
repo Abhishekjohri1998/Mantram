@@ -67,7 +67,7 @@ JSON SCHEMA:
 
 async function generateSectionImage(prompt, type, brandContext, referenceImage, tokens, designContext, imageModel) {
     if (!prompt) return null;
-    const model = imageModel || 'gemini-3.1-flash-image-preview';
+    const model = imageModel || 'gemini-3.1-flash-image';
     let style = "contemporary premium aesthetic.";
     if (brandContext.toLowerCase().match(/luxury|premium|high-end/)) style = "editorial luxury aesthetic, Vogue quality, highly refined layout.";
     if (tokens?.colors?.primary) style += ` Use a prominent color accent matching the hex code ${tokens.colors.primary}.`;

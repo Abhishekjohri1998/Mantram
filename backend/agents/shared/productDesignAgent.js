@@ -442,7 +442,7 @@ function buildFallbackProductDNA(productData, brief) {
  * @param {object} customMoodDirs    - AI-generated moods from generateProductMoodDirections (or FALLBACK)
  * @returns {{ moods: MoodImage[], moodDirections: object }}
  */
-export async function generateMoodBoardImages(productDNA, brandContext = '', customMoodDirs = null, imageModel = 'gemini-3.1-flash-image-preview') {
+export async function generateMoodBoardImages(productDNA, brandContext = '', customMoodDirs = null, imageModel = 'gemini-3.1-flash-image') {
     const moodDirections = customMoodDirs || FALLBACK_MOOD_DIRECTIONS;
     console.log(`PDI: Generating ${Object.keys(moodDirections).length} product-world mood boards...`);
 
@@ -584,7 +584,7 @@ CRITICAL: Do NOT render any readable text, words, letters, numbers, or typograph
             } else if (useMultimodal && laozhangMultimodalImageGenerate) {
                 // Gemini/NanoBanana path: chat/completions multimodal
                 result = await laozhangMultimodalImageGenerate(prompt, refImages, {
-                    model: imageModel || 'gemini-3.1-flash-image-preview',
+                    model: imageModel || 'gemini-3.1-flash-image',
                     size: '1344x768',
                 });
             } else {
@@ -756,7 +756,7 @@ export function injectDesignContext(basePrompt, designContext) {
  * @param {string} brandContext       — brand DNA string
  * @returns {{ postImageUrl, backgroundUrl, copy, palette }}
  */
-export async function generateQuickPost(productDNA, productData, selectedMoodDir, postType = 'promo', aspectRatio = '1:1', brandContext = '', imageModel = 'gemini-3.1-flash-image-preview') {
+export async function generateQuickPost(productDNA, productData, selectedMoodDir, postType = 'promo', aspectRatio = '1:1', brandContext = '', imageModel = 'gemini-3.1-flash-image') {
     console.log(`🎯 QuickPost: type=${postType} | ratio=${aspectRatio} | product="${productData?.title || 'unknown'}"`);
 
     const productTitle = productData?.title || productDNA?.productCategory || 'Product';
@@ -960,12 +960,12 @@ IMPORTANT: Do NOT recolor, stylize, cartoon-ize, or distort the product. It must
         let result;
         if (refImages.length > 0) {
             result = await laozhangMultimodalImageGenerate(designPrompt, refImages, {
-                model: imageModel || 'gemini-3.1-flash-image-preview',
+                model: imageModel || 'gemini-3.1-flash-image',
                 size: imageSize,
             });
         } else {
             result = await laozhangImageGenerate(designPrompt, {
-                model: imageModel || 'gemini-3.1-flash-image-preview',
+                model: imageModel || 'gemini-3.1-flash-image',
                 size: imageSize,
             });
         }
