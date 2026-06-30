@@ -511,6 +511,7 @@ export async function submitAtlasCloudVideoGeneration({
     referenceImages = [], qualityMode = 'fast', resolution = '720p',
     imageRole = 'face', // 'face' (default, UGC Pro) | 'product' (Q-Ads — no face registration)
     refAudio = null,    // TTS audio URL for native lip-sync (Seedance 2.0)
+    refVideo = null,    // Reference video for video-to-video / animation
     customCharacterNames = [],
     model = 'seedance-2.0'
 }) {
