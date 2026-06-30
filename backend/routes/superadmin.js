@@ -14,6 +14,7 @@ import Integration from '../models/Integration.js';
 import SeoAudit from '../models/SeoAudit.js';
 import Subscription from '../models/Subscription.js';
 import Coupon from '../models/Coupon.js';
+import Waitlist from '../models/Waitlist.js';
 import SubscriptionPackage from '../models/SubscriptionPackage.js';
 import SystemSettings, { getSetting, setSetting } from '../models/SystemSettings.js';
 import AuditLog from '../models/AuditLog.js';
@@ -32,13 +33,11 @@ import env from '../config/env.js';
 import { getOnPageProviderStatus } from '../utils/onpage-api.js';
 import { getDataForSEOProviderStatus } from '../utils/dataforseo.js';
 import { getRedisStatus } from '../utils/cache.js';
-import VideoProject from '../models/VideoProject.js';
 
 // Super Admin V2 Sub-routers
 import templateRoutes from './superadmin-templates.js';
 import qAdsRoutes from './superadmin-qads.js';
 import analyticsRoutes from './superadmin-analytics.js';
-import growthRoutes from './superadmin-growth.js';
 
 const router = Router();
 
@@ -64,7 +63,6 @@ router.use(protect, authorize('superadmin'), adminLimiter);
 router.use('/templates', templateRoutes);
 router.use('/qads', qAdsRoutes);
 router.use('/analytics', analyticsRoutes);
-router.use('/growth', growthRoutes);
 
 // ══════════════════════════════════════════════════════════════
 // AVATAR LIBRARY — Super Admin template avatar management
@@ -176,7 +174,7 @@ router.get('/provider-status', async (req, res) => {
 
 router.get('/stats', async (req, res) => {
     try {
-        const [totalUsers, totalBrands, totalContent, totalCreatives, totalProducts, totalIntegrations, totalSubscriptions, totalCoupons, totalFeedback, totalSeoAudits] = await Promise.all([
+        const [totalUsers, totalBrands, totalContent, totalCreatives, totalProducts, totalIntegrations, totalSubscriptions, totalCoupons, totalFeedback, totalSeoAudits, totalWaitlist] = await Promise.all([
             User.countDocuments(),
             Brand.countDocuments(),
             Content.countDocuments(),
@@ -187,6 +185,7 @@ router.get('/stats', async (req, res) => {
             Coupon.countDocuments({ isActive: true }),
             Feedback.countDocuments(),
             SeoAudit.countDocuments(),
+            Waitlist.countDocuments({ status: { $ne: 'registered' } }),
         ]);
 
         const planDistribution = await User.aggregate([
@@ -283,7 +282,7 @@ router.get('/stats', async (req, res) => {
             success: true,
             stats: {
                 totalUsers, totalBrands, totalContent, totalCreatives, totalProducts,
-                totalIntegrations, totalSubscriptions, totalCoupons, totalFeedback, totalSeoAudits,
+                totalIntegrations, totalSubscriptions, totalCoupons, totalFeedback, totalSeoAudits, totalWaitlist,
                 planDistribution,
                 totalRevenue: revenueData[0]?.totalRevenue || 0,
                 totalCreditsUsed: totalCreditsUsed[0]?.total || 0,
@@ -309,220 +308,6 @@ router.get('/stats', async (req, res) => {
 // ══════════════════════════════════════════════════════════════
 // 2. USER MANAGEMENT
 // ══════════════════════════════════════════════════════════════
-
-// Helper: compute segment label from lastActive date
-function getUserSegment(lastActive, creditsSpent30d, generationCount30d) {
-    const now = Date.now();
-    const ms = lastActive ? now - new Date(lastActive).getTime() : Infinity;
-    const days = ms / (1000 * 60 * 60 * 24);
-    if (days > 30) return 'dead';
-    if (days > 7) return 'churned';
-    if (creditsSpent30d > 200 || generationCount30d > 50) return 'power';
-    return 'active';
-}
-
-// GET /api/superadmin/users/segment-counts  — fast tab badge counts
-router.get('/users/segment-counts', async (req, res) => {
-    try {
-        const now = new Date();
-        const d7  = new Date(now - 7  * 24 * 60 * 60 * 1000);
-        const d30 = new Date(now - 30 * 24 * 60 * 60 * 1000);
-
-        const [total, active, churned, dead, power] = await Promise.all([
-            User.countDocuments({ role: { $ne: 'superadmin' } }),
-            User.countDocuments({ role: { $ne: 'superadmin' }, lastActive: { $gte: d7 } }),
-            User.countDocuments({ role: { $ne: 'superadmin' }, lastActive: { $gte: d30, $lt: d7 } }),
-            User.countDocuments({ role: { $ne: 'superadmin' }, $or: [{ lastActive: { $lt: d30 } }, { lastActive: { $exists: false } }] }),
-            // Power = active users with high credit usage in last 30 days
-            CreditUsage.aggregate([
-                { $match: { createdAt: { $gte: d30 } } },
-                { $group: { _id: '$user', total: { $sum: '$cost' }, count: { $sum: 1 } } },
-                { $match: { $or: [{ total: { $gt: 200 } }, { count: { $gt: 50 } }] } },
-                { $count: 'n' },
-            ]).then(r => r[0]?.n || 0),
-        ]);
-
-        res.json({ success: true, counts: { all: total, active, churned, dead, power } });
-    } catch (error) {
-        res.status(500).json({ success: false, error: safeErrorMessage(error) });
-    }
-});
-
-// GET /api/superadmin/users/analytics  — full enriched user list with all analytics columns
-router.get('/users/analytics', async (req, res) => {
-    try {
-        const {
-            page = 1, limit = 25, search, plan, segment = 'all',
-            sort = 'lastActive', order = 'desc',
-        } = req.query;
-
-        const now = new Date();
-        const d7  = new Date(now - 7  * 24 * 60 * 60 * 1000);
-        const d30 = new Date(now - 30 * 24 * 60 * 60 * 1000);
-
-        // 1. Build base filter
-        const filter = { role: { $ne: 'superadmin' } };
-        if (search) {
-            const safe = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            filter.$or = [
-                { name: new RegExp(safe, 'i') },
-                { email: new RegExp(safe, 'i') },
-                { company: new RegExp(safe, 'i') },
-            ];
-        }
-        if (plan) filter.plan = plan;
-        if (segment === 'active')  filter.lastActive = { $gte: d7 };
-        if (segment === 'churned') filter.lastActive = { $gte: d30, $lt: d7 };
-        if (segment === 'dead')    filter.$or = [...(filter.$or || []), ...[{ lastActive: { $lt: d30 } }, { lastActive: { $exists: false } }]];
-        // 'power' segment filtered post-aggregation
-
-        // 2. Sort map
-        const SORT_MAP = {
-            lastActive:      { lastActive: order === 'asc' ? 1 : -1 },
-            creditsSpent:    { creditsSpent30d: order === 'asc' ? 1 : -1 },
-            generations:     { generationCount30d: order === 'asc' ? 1 : -1 },
-            storageUsed:     { storageUsedMB: order === 'asc' ? 1 : -1 },
-            sessionDuration: { 'usage.sessionDurationMins': order === 'asc' ? 1 : -1 },
-            downloads:       { totalDownloads: order === 'asc' ? 1 : -1 },
-            shares:          { totalShares: order === 'asc' ? 1 : -1 },
-            createdAt:       { createdAt: order === 'asc' ? 1 : -1 },
-            creditsUsed:     { 'credits.used': order === 'asc' ? 1 : -1 },
-        };
-        const sortStage = SORT_MAP[sort] || SORT_MAP.lastActive;
-        const skip = (parseInt(page) - 1) * parseInt(limit);
-
-        // 3. Get CreditUsage stats per user for last 30 days
-        const creditStats = await CreditUsage.aggregate([
-            { $match: { createdAt: { $gte: d30 } } },
-            { $group: {
-                _id: '$user',
-                creditsSpent30d: { $sum: '$cost' },
-                generationCount30d: { $sum: 1 },
-                studios: { $push: '$studio' },
-            }},
-        ]);
-        const creditMap = {};
-        for (const c of creditStats) {
-            // compute top studio
-            const freq = {};
-            for (const s of c.studios) freq[s] = (freq[s] || 0) + 1;
-            const topStudio = Object.entries(freq).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
-            creditMap[c._id.toString()] = {
-                creditsSpent30d: c.creditsSpent30d,
-                generationCount30d: c.generationCount30d,
-                topStudio,
-            };
-        }
-
-        // 4. Get Creative stats per user
-        const creativeStats = await Creative.aggregate([
-            { $group: {
-                _id: '$user',
-                creativeCount: { $sum: 1 },
-                downloadCount: { $sum: { $ifNull: ['$downloadCount', 0] } },
-                shareCount:    { $sum: { $ifNull: ['$shareCount', 0] } },
-                fileSizeMB:    { $sum: { $ifNull: ['$fileSizeMB', 0] } },
-            }},
-        ]);
-        const creativeMap = {};
-        for (const c of creativeStats) creativeMap[c._id.toString()] = c;
-
-        // 5. Get VideoProject stats per user
-        const videoStats = await VideoProject.aggregate([
-            { $group: {
-                _id: '$user',
-                videoCount:       { $sum: 1 },
-                videosCompleted:  { $sum: { $cond: [{ $in: ['$status', ['done', 'completed']] }, 1, 0] } },
-                videoDownloads:   { $sum: { $ifNull: ['$downloadCount', 0] } },
-                videoSizeMB:      { $sum: { $ifNull: ['$fileSizeMB', 0] } },
-            }},
-        ]);
-        const videoMap = {};
-        for (const v of videoStats) videoMap[v._id.toString()] = v;
-
-        // 6. Get Content count per user
-        const contentStats = await Content.aggregate([
-            { $group: { _id: '$user', contentCount: { $sum: 1 } } },
-        ]);
-        const contentMap = {};
-        for (const c of contentStats) contentMap[c._id.toString()] = c.contentCount;
-
-        // 7. Fetch users
-        let users = await User.find(filter)
-            .select('-password -verificationToken -resetPasswordToken')
-            .populate('activeSubscription', 'status plan')
-            .lean();
-
-        // 8. Enrich each user
-        users = users.map(u => {
-            const uid = u._id.toString();
-            const cr = creditMap[uid] || { creditsSpent30d: 0, generationCount30d: 0, topStudio: '' };
-            const cv = creativeMap[uid] || { creativeCount: 0, downloadCount: 0, shareCount: 0, fileSizeMB: 0 };
-            const vd = videoMap[uid] || { videoCount: 0, videosCompleted: 0, videoDownloads: 0, videoSizeMB: 0 };
-            const contentCount = contentMap[uid] || 0;
-
-            const totalDownloads  = (u.usage?.downloadCount || 0) + cv.downloadCount + vd.videoDownloads;
-            const totalShares     = (u.usage?.shareCount || 0) + cv.shareCount;
-            const storageUsedMB   = parseFloat((cv.fileSizeMB + vd.videoSizeMB).toFixed(2));
-            const creditBalance   = getCreditBalance(u);
-            const seg             = getUserSegment(u.lastActive, cr.creditsSpent30d, cr.generationCount30d);
-
-            return {
-                _id: u._id, name: u.name, email: u.email, role: u.role,
-                plan: u.plan, company: u.company, avatar: u.avatar,
-                lastActive: u.lastActive, createdAt: u.createdAt,
-                credits: u.credits, creditBalance,
-                usage: u.usage,
-                // Analytics columns
-                creditsSpent30d:    cr.creditsSpent30d,
-                generationCount30d: cr.generationCount30d,
-                topStudio:          cr.topStudio,
-                contentCount,
-                creativeCount:      cv.creativeCount,
-                videoCount:         vd.videoCount,
-                videosCompleted:    vd.videosCompleted,
-                totalDownloads,
-                totalShares,
-                storageUsedMB,
-                sessionDurationMins: u.usage?.sessionDurationMins || 0,
-                segment: seg,
-                approvalStatus: u.approvalStatus,
-                activeSubscription: u.activeSubscription,
-                streak: u.streak,
-            };
-        });
-
-        // 9. Filter power segment post-enrichment
-        if (segment === 'power') {
-            users = users.filter(u => u.creditsSpent30d > 200 || u.generationCount30d > 50);
-        }
-
-        // 10. Sort in-memory (already have all aggregated data)
-        const sortKey = Object.keys(sortStage)[0];
-        const sortDir = Object.values(sortStage)[0];
-        users.sort((a, b) => {
-            const aVal = sortKey.includes('.') ? sortKey.split('.').reduce((o, k) => o?.[k], a) : a[sortKey];
-            const bVal = sortKey.includes('.') ? sortKey.split('.').reduce((o, k) => o?.[k], b) : b[sortKey];
-            if (aVal == null && bVal == null) return 0;
-            if (aVal == null) return 1;
-            if (bVal == null) return -1;
-            if (aVal instanceof Date || typeof aVal === 'string') {
-                return sortDir === 1
-                    ? new Date(aVal) - new Date(bVal)
-                    : new Date(bVal) - new Date(aVal);
-            }
-            return sortDir === 1 ? aVal - bVal : bVal - aVal;
-        });
-
-        const total = users.length;
-        const paged = users.slice(skip, skip + parseInt(limit));
-
-        res.json({ success: true, users: paged, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
-    } catch (error) {
-        console.error('[SA /users/analytics]', error);
-        res.status(500).json({ success: false, error: safeErrorMessage(error) });
-    }
-});
 
 router.get('/users', async (req, res) => {
     try {
@@ -567,29 +352,79 @@ router.get('/users', async (req, res) => {
     }
 });
 
-
-// Get single user with full details
-/**
- * GET /api/superadmin/users/studio-overrides
- * Fetch all users who have active per-user studio overrides
- */
-router.get('/users/studio-overrides', async (req, res) => {
+router.get('/waitlist', async (req, res) => {
     try {
-        const conditions = STUDIO_KEYS.map(key => ({
-            [`studioAccess.${key}`]: { $in: [true, false] }
-        }));
-        
-        const users = await User.find({ $or: conditions })
-            .select('name email plan studioAccess')
-            .lean();
-            
-        res.json({ success: true, overrides: users });
+        const { page = 1, limit = 50 } = req.query;
+        const filter = { status: { $ne: 'registered' } };
+        const entries = await Waitlist.find(filter)
+            .sort('-createdAt')
+            .limit(parseInt(limit))
+            .skip((parseInt(page) - 1) * parseInt(limit));
+        const total = await Waitlist.countDocuments(filter);
+        res.json({ success: true, waitlist: entries, total });
     } catch (error) {
         res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
+router.post('/waitlist/:id/approve', async (req, res) => {
+    try {
+        const entry = await Waitlist.findById(req.params.id);
+        if (!entry) return res.status(404).json({ success: false, error: 'Waitlist entry not found' });
 
+        // Generate invitation link (prioritize production URL over localhost)
+        const productionUrl = env.frontendUrl.find(url => url.includes('mantram.ai')) || env.frontendUrl[0] || 'https://mantram.ai';
+        const inviteLink = `${productionUrl}/signup?email=${encodeURIComponent(entry.email)}`;
+        
+        const mailOptions = {
+            from: `"Mantram AI" <${env.email.user}>`,
+            to: entry.email,
+            subject: 'Good news! Your early access to Mantram AI is here ✨',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+                    <h2 style="color: #6366f1;">You're off the waitlist! 🎉</h2>
+                    <p>Hi ${entry.name.split(' ')[0]},</p>
+                    <p>We're thrilled to invite you to join <strong>Mantram AI</strong>. Your early access request has been approved!</p>
+                    <p>You can now create your workspace and start building with our AI agents.</p>
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="${inviteLink}" style="background-color: #6366f1; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold;">Get Started Now</a>
+                    </div>
+                    <p>If you have any questions, just reply to this email.</p>
+                    <br>
+                    <p>See you inside,</p>
+                    <p><strong>The Mantram AI Team</strong></p>
+                </div>
+            `
+        };
+
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: { user: env.email.user, pass: env.email.pass }
+        });
+
+        await transporter.sendMail(mailOptions);
+        
+        // Update waitlist entry status
+        entry.status = 'invited';
+        entry.invitedAt = new Date();
+        await entry.save();
+        
+        res.json({ success: true, message: 'Invitation email sent successfully' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+router.delete('/waitlist/:id', async (req, res) => {
+    try {
+        await Waitlist.findByIdAndDelete(req.params.id);
+        res.json({ success: true, message: 'Waitlist entry deleted' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
+    }
+});
+
+// Get single user with full details
 router.get('/users/:id', async (req, res) => {
     try {
         const user = await User.findById(req.params.id).select('-password').populate('activeSubscription');
@@ -728,15 +563,7 @@ router.post('/users/:id/impersonate', async (req, res) => {
         if (!user) return res.status(404).json({ success: false, error: 'User not found' });
         if (user.role === 'superadmin') return res.status(403).json({ success: false, error: 'Cannot impersonate super admin' });
         
-        // SEC-002 (FIX-20): Short-lived impersonation token (1 hour, not 24h)
-        // Includes 'imp' claim to distinguish from normal login tokens.
-        const jwt = await import('jsonwebtoken');
-        const config = (await import('../config/env.js')).default;
-        const token = jwt.default.sign(
-            { id: user._id, v: user.tokenVersion || 0, imp: true, impBy: req.user._id },
-            config.jwtSecret,
-            { expiresIn: '1h' }
-        );
+        const token = generateToken(user._id);
 
         await logAudit(req, {
             action: 'IMPERSONATE_USER',
@@ -1525,15 +1352,6 @@ const VIDEO_PROVIDER_REGISTRY = {
         providers: [
             { id: 'laozhang', name: 'LaoZhang', envKey: 'LAOZHANG_API_KEY', costPerSecond: 0.06, description: 'Primary — cheapest, sync return', builtIn: true },
             { id: 'kie', name: 'kie.ai', envKey: 'KIE_API_KEY', costPerSecond: 0.08, description: 'Fallback — taskId-based async', builtIn: true },
-        ],
-    },
-    'veo-3.1-lite': {
-        name: 'Veo 3.1 Lite',
-        icon: 'smart_display',
-        category: 'fast',
-        defaultProvider: 'atlascloud',
-        providers: [
-            { id: 'atlascloud', name: 'Atlas Cloud', envKey: 'ATLASCLOUD_API_KEY', costPerSecond: 0.05, description: 'Only provider — direct pay-as-you-go workflow, native audio + ref images', builtIn: true },
         ],
     },
     'seedance-1.0': {
@@ -3010,209 +2828,59 @@ router.post('/packages/seed-defaults', async (req, res) => {
         // ════ May 2026 Refresh — Magnific-inspired 80%+ margin strategy ════
         const defaults = [
             {
-                name: 'Free',
-                slug: 'free',
-                tagline: 'Explore AI marketing for free',
-                description: 'Get started with 100 free credits every month. No credit card required.',
-                tier: 0,
-                studios: {
-                    contentStudio: true,
-                    creativeStudio: true,
-                    seoStudio: false,
-                    brainstormStudio: true,
-                    videoStudio: false,
-                    socialMediaStudio: true,
-                    conversationStudio: false,
-                    adStudio: false,
-                    funnelStudio: false,
-                    d2cAnalytics: false,
-                    skillsHub: false,
-                },
+                name: 'Free', slug: 'free', tagline: 'Explore AI marketing for free', tier: 0,
+                studios: { contentStudio: true, creativeStudio: true, seoStudio: false, brainstormStudio: true, videoStudio: false, socialMediaStudio: true },
                 credits: { monthly: 100, rollover: false, bonusOnSignup: 0 },
-                pricing: { monthly: 0, quarterly: 0, yearly: 0, currency: 'INR' },
                 limits: { maxBrands: 1, maxTeamMembers: 0, maxProducts: 10, maxScheduledPosts: 3, socialIntegrations: 1 },
-                badge: 'FREE',
-                color: '#94a3b8',
-                icon: 'person',
-                isDefault: true,
-                isActive: false, // Hidden from purchase/UI
-                watermarkEnabled: true,
-                displayOrder: 0,
-                contactForPricing: false,
-                features: [
-                    { name: '100 Credits / month', included: true },
-                    { name: '1 Brand Profile', included: true },
-                    { name: 'Content & Brainstorm Studio', included: true },
-                    { name: 'Creative Studio (with watermark)', included: true },
-                    { name: 'Social Media Studio', included: true },
-                    { name: 'Community Support', included: true },
-                ],
+                features: [{ name: '100 Credits / month', included: true }, { name: '1 Brand Profile', included: true }, { name: 'Content & Brainstorm Studio', included: true }, { name: 'Creative Studio (watermarked)', included: true }, { name: 'Community Support', included: true }],
+                pricing: { monthly: 0, quarterly: 0, yearly: 0, currency: 'INR' }, badge: 'FREE', color: '#94a3b8', icon: 'person', isDefault: true, watermarkEnabled: true, displayOrder: 0, contactForPricing: false,
                 createdBy: req.user._id,
             },
             {
-                name: 'Plus',
-                slug: 'plus',
-                tagline: 'For exploring',
-                description: 'Perfect for individual creators starting out with AI video and branding.',
-                tier: 1,
-                studios: {
-                    contentStudio: true,
-                    creativeStudio: true,
-                    seoStudio: true,
-                    brainstormStudio: true,
-                    videoStudio: false,
-                    socialMediaStudio: true,
-                    conversationStudio: false,
-                    adStudio: false,
-                    funnelStudio: false,
-                    d2cAnalytics: false,
-                    skillsHub: false,
-                },
-                credits: { monthly: 75, rollover: false, bonusOnSignup: 10 },
-                pricing: { monthly: 1800, quarterly: 4999, yearly: 18000, currency: 'INR' },
+                name: 'Creator', slug: 'creator', tagline: 'For solopreneurs & freelancers', tier: 1,
+                studios: { contentStudio: true, creativeStudio: true, seoStudio: true, brainstormStudio: true, videoStudio: false, socialMediaStudio: true },
+                credits: { monthly: 200, rollover: false, bonusOnSignup: 25 },
                 limits: { maxBrands: 1, maxTeamMembers: 0, maxProducts: 50, maxScheduledPosts: 20, socialIntegrations: 2 },
-                badge: '',
-                color: '#6366f1',
-                icon: 'person',
-                isDefault: false,
-                isActive: true,
-                watermarkEnabled: false,
-                displayOrder: 1,
-                contactForPricing: false,
-                features: [
-                    { name: '75 Credits / month', included: true },
-                    { name: 'Access to all AI models (Seedance 2.0, Veo 3.1 & Kling 3)', included: true },
-                    { name: 'Access to all AI workflows & video trends', included: true },
-                    { name: '4 AI avatars & voice clones', included: true },
-                    { name: 'Limited concurrency', included: true },
-                    { name: '20 GB storage & 100 iStock credits', included: true },
-                    { name: 'Unlimited exports without watermark', included: true },
-                ],
+                features: [{ name: '200 Credits / month', included: true }, { name: '+25 Bonus on signup', included: true }, { name: '1 Brand Profile', included: true }, { name: 'Content, Brainstorm & SEO Studios', included: true }, { name: 'Creative Studio (no watermark)', included: true }, { name: 'Email Support', included: true }],
+                pricing: { monthly: 1499, quarterly: 3999, yearly: 14990, currency: 'INR' }, badge: '', color: '#6366f1', icon: 'rocket_launch', watermarkEnabled: false, displayOrder: 1, contactForPricing: false,
                 createdBy: req.user._id,
             },
             {
-                name: 'Max',
-                slug: 'max',
-                tagline: 'For occasional use',
-                description: 'Complete AI marketing suite with 390 monthly credits, team seats, and full studio access.',
-                tier: 2,
-                studios: {
-                    contentStudio: true,
-                    creativeStudio: true,
-                    seoStudio: true,
-                    brainstormStudio: true,
-                    videoStudio: true,
-                    socialMediaStudio: true,
-                    conversationStudio: true,
-                    adStudio: true,
-                    funnelStudio: true,
-                    d2cAnalytics: false,
-                    skillsHub: false,
-                },
-                credits: { monthly: 390, rollover: true, bonusOnSignup: 50 },
-                pricing: { monthly: 9000, quarterly: 24999, yearly: 90000, currency: 'INR' },
+                name: 'Professional', slug: 'professional', tagline: 'For growing D2C brands & teams', tier: 2,
+                studios: { contentStudio: true, creativeStudio: true, seoStudio: true, brainstormStudio: true, videoStudio: true, socialMediaStudio: true, conversationStudio: true, adStudio: true, funnelStudio: true },
+                credits: { monthly: 600, rollover: true, bonusOnSignup: 75 },
                 limits: { maxBrands: 3, maxTeamMembers: 3, maxProducts: 200, maxScheduledPosts: 50, socialIntegrations: 5 },
-                badge: 'MOST POPULAR',
-                color: '#FF4D00',
-                icon: 'trending_up',
-                isDefault: false,
-                isActive: true,
-                watermarkEnabled: false,
-                displayOrder: 2,
-                contactForPricing: false,
-                features: [
-                    { name: '390 Credits / month + rollover', included: true },
-                    { name: 'Access to all AI models (Seedance 2.0, Veo 3.1 & Kling 3)', included: true },
-                    { name: 'Access to all AI workflows & video trends', included: true },
-                    { name: '16 AI avatars & voice clones', included: true },
-                    { name: '2x more concurrency than Plus', included: true },
-                    { name: '100 GB storage & 200 iStock credits', included: true },
-                    { name: 'Unlimited exports without watermark', included: true },
-                ],
+                features: [{ name: '600 Credits / month + rollover', included: true }, { name: '+75 Bonus on signup', included: true }, { name: '3 Brand Profiles', included: true }, { name: 'All Studios incl. Video & Q-Ads', included: true }, { name: '3 Team Seats', included: true }, { name: 'Priority Email Support', included: true }],
+                pricing: { monthly: 3499, quarterly: 9499, yearly: 34990, currency: 'INR' }, badge: 'POPULAR', color: '#FF4D00', icon: 'trending_up', watermarkEnabled: false, displayOrder: 2, contactForPricing: false,
                 createdBy: req.user._id,
             },
             {
-                name: 'Generative',
-                slug: 'generative',
-                tagline: 'For daily use',
-                description: 'Optimized for high-volume content generation with massive storage and priority concurrency.',
-                tier: 3,
-                studios: {
-                    contentStudio: true,
-                    creativeStudio: true,
-                    seoStudio: true,
-                    brainstormStudio: true,
-                    videoStudio: true,
-                    socialMediaStudio: true,
-                    conversationStudio: true,
-                    adStudio: true,
-                    funnelStudio: true,
-                    d2cAnalytics: true,
-                    skillsHub: true,
-                },
-                credits: { monthly: 800, rollover: true, bonusOnSignup: 100 },
-                pricing: { monthly: 18000, quarterly: 48000, yearly: 180000, currency: 'INR' },
+                name: 'Business', slug: 'business', tagline: 'For established brands & agencies', tier: 3,
+                studios: { contentStudio: true, creativeStudio: true, seoStudio: true, brainstormStudio: true, videoStudio: true, socialMediaStudio: true, conversationStudio: true, adStudio: true, funnelStudio: true, d2cAnalytics: true, skillsHub: true },
+                credits: { monthly: 2000, rollover: true, bonusOnSignup: 250 },
                 limits: { maxBrands: 10, maxTeamMembers: 10, maxProducts: 1000, maxScheduledPosts: 200, socialIntegrations: 10 },
-                badge: 'BEST VALUE',
-                color: '#10b981',
-                icon: 'auto_awesome',
-                isDefault: false,
-                isActive: true,
-                watermarkEnabled: false,
-                displayOrder: 3,
-                contactForPricing: false,
-                features: [
-                    { name: '800 Credits / month + rollover', included: true },
-                    { name: 'Access to all AI models (Seedance 2.0, Veo 3.1 & Kling 3)', included: true },
-                    { name: 'Access to all AI workflows & video trends', included: true },
-                    { name: '40 AI avatars & voice clones', included: true },
-                    { name: '10x more concurrency than Plus', included: true },
-                    { name: '2 TB storage & 1,000 iStock credits', included: true },
-                    { name: 'Unlimited exports without watermark', included: true },
-                ],
+                features: [{ name: '2,000 Credits / month + 2-month rollover', included: true }, { name: '+250 Bonus on signup', included: true }, { name: '10 Brands + D2C Analytics', included: true }, { name: 'All Studios + Avatar + Skills Hub', included: true }, { name: '10 Team Seats', included: true }, { name: 'Priority WhatsApp Support', included: true }],
+                pricing: { monthly: 7999, quarterly: 21999, yearly: 79990, currency: 'INR' }, badge: 'BEST VALUE', color: '#f59e0b', icon: 'business_center', watermarkEnabled: false, displayOrder: 3, contactForPricing: false,
                 createdBy: req.user._id,
             },
             {
-                name: 'Elite',
-                slug: 'elite',
-                tagline: 'For power creators',
-                description: 'Elite scale package for agencies, studios, and high-growth content teams.',
-                tier: 4,
-                studios: {
-                    contentStudio: true,
-                    creativeStudio: true,
-                    seoStudio: true,
-                    brainstormStudio: true,
-                    videoStudio: true,
-                    socialMediaStudio: true,
-                    conversationStudio: true,
-                    adStudio: true,
-                    funnelStudio: true,
-                    d2cAnalytics: true,
-                    skillsHub: true,
-                },
-                credits: { monthly: 4250, rollover: true, bonusOnSignup: 500 },
-                pricing: { monthly: 90000, quarterly: 256500, yearly: 972000, currency: 'INR' },
-                limits: { maxBrands: 999, maxTeamMembers: 999, maxProducts: 99999, maxScheduledPosts: 99999, socialIntegrations: 999 },
-                badge: 'ELITE',
-                color: '#7c3aed',
-                icon: 'diamond',
-                isDefault: false,
-                isActive: true,
-                watermarkEnabled: false,
-                displayOrder: 4,
-                contactForPricing: false,
-                features: [
-                    { name: '4,250 Credits / month + rollover', included: true },
-                    { name: 'Access to all AI models (Seedance 2.0, Veo 3.1 & Kling 3)', included: true },
-                    { name: 'Access to all AI workflows & video trends', included: true },
-                    { name: '200 AI avatars & voice clones', included: true },
-                    { name: '20x more concurrency than Plus', included: true },
-                    { name: '10 TB storage & 5,000 iStock credits', included: true },
-                    { name: 'Unlimited exports without watermark', included: true },
-                ],
+                name: 'Agency', slug: 'agency', tagline: 'For performance marketing agencies', tier: 4,
+                studios: { contentStudio: true, creativeStudio: true, seoStudio: true, brainstormStudio: true, videoStudio: true, socialMediaStudio: true, conversationStudio: true, adStudio: true, funnelStudio: true, d2cAnalytics: true, skillsHub: true },
+                credits: { monthly: 10000, rollover: true, bonusOnSignup: 1000 },
+                limits: { maxBrands: 999, maxTeamMembers: 50, maxProducts: 9999, maxScheduledPosts: 9999, socialIntegrations: 50 },
+                features: [{ name: 'Custom Credit Pool (from 10,000/mo)', included: true }, { name: 'Unlimited Brand Profiles', included: true }, { name: 'All Studios + API Access', included: true }, { name: 'Up to 50 Team Seats', included: true }, { name: 'White-Label Reports', included: true }, { name: 'Dedicated Account Manager', included: true }],
+                pricing: { monthly: 0, quarterly: 0, yearly: 0, currency: 'INR' }, badge: 'FOR AGENCIES', color: '#ec4899', icon: 'groups', watermarkEnabled: false, displayOrder: 4, contactForPricing: true, contactEmail: 'sales@mantram.ai',
                 createdBy: req.user._id,
-            }
+            },
+            {
+                name: 'Enterprise', slug: 'enterprise', tagline: 'Unlimited AI power for enterprises', tier: 5,
+                studios: { contentStudio: true, creativeStudio: true, seoStudio: true, brainstormStudio: true, videoStudio: true, socialMediaStudio: true, conversationStudio: true, adStudio: true, funnelStudio: true, d2cAnalytics: true, skillsHub: true },
+                credits: { monthly: 999999, rollover: true, bonusOnSignup: 0 },
+                limits: { maxBrands: 999, maxTeamMembers: 999, maxProducts: 99999, maxScheduledPosts: 99999, socialIntegrations: 999 },
+                features: [{ name: 'Unlimited Credits & Rollover', included: true }, { name: 'Unlimited Brand Profiles', included: true }, { name: 'All Studios + Custom Integrations', included: true }, { name: 'Unlimited Team Members', included: true }, { name: 'Full White-Label + Custom Domain', included: true }, { name: '24/7 Dedicated Support + SLA', included: true }],
+                pricing: { monthly: 0, quarterly: 0, yearly: 0, currency: 'INR' }, badge: 'ENTERPRISE', color: '#7c3aed', icon: 'diamond', watermarkEnabled: false, displayOrder: 5, contactForPricing: true, contactEmail: 'enterprise@mantram.ai',
+                createdBy: req.user._id,
+            },
         ];
 
 
@@ -4225,7 +3893,7 @@ router.put('/studio-visibility', async (req, res) => {
         }
 
         // Validate: only allow known keys and valid values
-        const validStates = ['public', 'hidden'];
+        const validStates = ['public', 'private', 'hidden'];
         const cleaned = {};
         for (const [key, val] of Object.entries(visibility)) {
             if (STUDIO_KEYS.includes(key) && validStates.includes(val)) {
@@ -4241,7 +3909,7 @@ router.put('/studio-visibility', async (req, res) => {
             action: 'UPDATE_STUDIO_VISIBILITY',
             targetModel: 'SystemSettings',
             targetId: 'studio_portal_visibility',
-            severity: 'warning',
+            severity: 'high',
             changes: { before, after },
         });
 

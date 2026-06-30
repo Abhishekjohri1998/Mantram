@@ -3,15 +3,13 @@
  */
 
 import config from '../../config/env.js';
-import { submitKieVideoGeneration, getKieGenerationStatus } from './kieClient.js';
-import { submitAtlasCloudVideoGeneration, submitAtlasCloudVideoExtend, submitHappyHorseVideoGeneration, getAtlasCloudGenerationStatus, submitGeminiFlashVideoGeneration } from './atlasClient.js';
-import { submitMuApiVideoGeneration, getMuApiGenerationStatus } from './muapiClient.js';
+import { submitKieVideoGeneration } from './kieClient.js';
+import { submitAtlasCloudVideoGeneration, submitAtlasCloudVideoExtend, submitHappyHorseVideoGeneration } from './atlasClient.js';
+import { submitMuApiVideoGeneration } from './muapiClient.js';
 import { ensureS3Url } from '../../utils/s3.js';
-import { isLaozhangAvailable, submitLaozhangVideoGeneration, getLaozhangVideoStatus } from './laozhangClient.js';
+import { isLaozhangAvailable, submitLaozhangVideoGeneration } from './laozhangClient.js';
 import { getSetting } from '../../models/SystemSettings.js';
 import { getActiveProvider } from '../../ai/providerRouting.js';
-import { fetchOptions } from '../../utils/network.js';
-import { sanitizePromptForProvider } from './promptSanitizer.js';
 
 const FAL_BASE_URL = 'https://queue.fal.run';
 const GROK_BASE_URL = 'https://api.x.ai/v1';
@@ -28,10 +26,9 @@ const MODEL_ENDPOINTS = {
 };
 
 export const MODEL_AVAILABLE = {
-    'kling-3.0-o': true, 'kling-3.0': true, 'veo-3.1': true, 'veo-3.1-fast': true, 'veo-3.1-lite': true,
-    'seedance-1.0': true, 'seedance-2.0': true, 'seedance-2.0-fast': true, 'seedance-2.0-mini': true, 'grok-imagine': true,
-    'hunyuan': true, 'sora-2': true, 'happyhorse-1.0': true, 'happyhorse-1.1': true, 'gemini-flash': true,
-    'gemini-omni-flash': true,
+    'kling-3.0-o': true, 'kling-3.0': true, 'veo-3.1': true, 'veo-3.1-fast': true,
+    'seedance-1.0': true, 'seedance-2.0': true, 'grok-imagine': true,
+    'hunyuan': true, 'sora-2': true, 'happyhorse-1.0': true,
 };
 
 export function getModelsInfo() {
@@ -43,42 +40,24 @@ export const COST_PER_SECOND = {
     'kling-3.0': { fast: 0.07, quality: 0.12 },
     'veo-3.1': { fast: 0.10, quality: 0.25 },
     'veo-3.1-fast': { fast: 0.06, quality: 0.10 },
-    'veo-3.1-lite': { fast: 0.05, quality: 0.08 },
-    'seedance-1.0': { fast: 0.08, quality: 0.12 },
-    // Atlas Cloud actual billing based on 1080p baseline:
-    // Seedance 2.0 Fast: 480p is $0.768/10s = $0.0768/sec.
-    // Assuming 1080p is the baseline (mult=1.0), 480p is mult=0.5, so 1080p base rate is $0.1536/sec.
-    // Seedance 2.0 Pro: typically ~1.5x fast.
-    'seedance-2.0': { fast: 0.23, quality: 0.35 },
-    'seedance-2.0-fast': { fast: 0.1536, quality: 0.1536 },
-    'seedance-2.0-mini': { fast: 0.08, quality: 0.08 },
+    'seedance-1.0': { fast: 0.05, quality: 0.08 },
+    'seedance-2.0': { fast: 0.05, quality: 0.10 },
     'grok-imagine': { fast: 0.08, quality: 0.08 },
     'hunyuan': { fast: 0.03, quality: 0.05 },
     'sora-2': { fast: 0.10, quality: 0.15 },
-    // HappyHorse and Gemini Flash (Atlas Cloud)
-    'happyhorse-1.0': { fast: 0.15, quality: 0.20 },
-    'happyhorse-1.1': { fast: 0.15, quality: 0.20 },
-    'gemini-flash': { fast: 0.15, quality: 0.15 },
-    'gemini-omni-flash': { fast: 0.15, quality: 0.15 },
+    'happyhorse-1.0': { fast: 0.06, quality: 0.10 },
 };
 
 const DURATION_LIMITS = {
     'kling-3.0': { min: 3, max: 15 },
-    'kling-3.0-o': { min: 5, max: 15 },
     'veo-3.1': { min: 5, max: 8 },
     'veo-3.1-fast': { min: 5, max: 8 },
-    'veo-3.1-lite': { min: 4, max: 8 },
     'seedance-1.0': { min: 5, max: 10 },
     'seedance-2.0': { min: 5, max: 15 },
-    'seedance-2.0-fast': { min: 5, max: 15 },
-    'seedance-2.0-mini': { min: 4, max: 15 },
     'grok-imagine': { min: 1, max: 15 },
     'hunyuan': { min: 3, max: 10 },
     'sora-2': { min: 5, max: 15 },
     'happyhorse-1.0': { min: 3, max: 15 },
-    'happyhorse-1.1': { min: 3, max: 15 },
-    'gemini-flash': { min: 4, max: 10 },
-    'gemini-omni-flash': { min: 4, max: 10 },
 };
 
 export const MODEL_CAPABILITIES = {
@@ -90,17 +69,7 @@ export const MODEL_CAPABILITIES = {
         resolutions: ['720p', '1080p', '4k'], aspectRatios: ['16:9', '9:16', '1:1'],
         features: { firstFrame: true, lastFrame: true, referenceImages: false, extendVideo: false, multiShot: true, nativeAudio: true, voiceIds: true, cameraControl: false },
         maxReferenceImages: 0, costPerSecond: COST_PER_SECOND['kling-3.0'], recommended: true,
-        maxPromptLength: 200000,
-    },
-    'kling-3.0-o': {
-        id: 'kling-3.0-o', name: 'Kling 3.0 Omni', icon: '✨', provider: 'fal',
-        description: 'Kling Omni — enhanced detail, multi-reference, premium quality',
-        bestFor: 'Fashion, luxury products, high-fidelity garment & character videos',
-        duration: { min: 5, max: 15, native: 10, step: 1 },
-        resolutions: ['720p', '1080p', '4k'], aspectRatios: ['16:9', '9:16', '1:1'],
-        features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: false, multiShot: false, nativeAudio: true, voiceIds: false, cameraControl: false },
-        maxReferenceImages: 3, costPerSecond: COST_PER_SECOND['kling-3.0'], recommended: false,
-        maxPromptLength: 200000,
+        maxPromptLength: 200000, // Kling 3.0 supports approx 2k-3k chars
     },
     'veo-3.1': {
         id: 'veo-3.1', name: 'Google Veo 3.1', icon: '🎬', provider: 'fal',
@@ -117,56 +86,26 @@ export const MODEL_CAPABILITIES = {
         description: 'Faster & cheaper Veo 3.1 — great for prototyping',
         bestFor: 'Quick iterations, content series, social video',
         duration: { min: 4, max: 8, native: 8, step: 2, extendChunk: 7, maxExtended: 60 },
-        resolutions: ['720p', '1080p', '4k'], aspectRatios: ['16:9', '9:16'],
+        resolutions: ['720p', '1080p'], aspectRatios: ['16:9', '9:16'],
         features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: true, multiShot: false, nativeAudio: true, voiceIds: false, cameraControl: false },
         maxReferenceImages: 3, costPerSecond: COST_PER_SECOND['veo-3.1-fast'], recommended: false,
-    },
-    'veo-3.1-lite': {
-        id: 'veo-3.1-lite', name: 'Veo 3.1 Lite', icon: '🎬', provider: 'atlascloud',
-        description: 'Google Veo 3.1 Lite — high efficiency cinematic video with native audio + ref images',
-        bestFor: 'High-volume cinematic social campaigns, product showcases',
-        duration: { min: 4, max: 8, native: 8, step: 2 },
-        resolutions: ['720p', '1080p'], aspectRatios: ['16:9', '9:16'],
-        features: { firstFrame: true, lastFrame: true, referenceImages: true, extendVideo: false, multiShot: false, nativeAudio: true, voiceIds: false, cameraControl: false },
-        maxReferenceImages: 9, costPerSecond: COST_PER_SECOND['veo-3.1-lite'], recommended: true,
-        maxPromptLength: 200000,
     },
     'seedance-2.0': {
         id: 'seedance-2.0', name: 'Seedance 2.0 Pro', icon: '🎞️', provider: 'dynamic',
         description: 'Cinematic video with native audio, camera control & physics',
         bestFor: 'Premium ads, product showcases, brand films',
         duration: { min: 4, max: 15, native: 15, step: 1 },
-        resolutions: ['720p', '1080p', '4k'], aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
+        resolutions: ['720p', '1080p'], aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
         features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: true, multiShot: true, nativeAudio: true, voiceIds: false, cameraControl: true },
         maxReferenceImages: 3, costPerSecond: COST_PER_SECOND['seedance-2.0'], recommended: false,
         maxPromptLength: 200000, // HARD LIMIT from MuAPI/Seedance
-    },
-    'seedance-2.0-fast': {
-        id: 'seedance-2.0-fast', name: 'Seedance 2.0 Fast', icon: '⚡', provider: 'dynamic',
-        description: 'Faster Seedance 2.0 generation',
-        bestFor: 'Prototyping, quick iterations',
-        duration: { min: 4, max: 15, native: 15, step: 1 },
-        resolutions: ['720p', '1080p', '4k'], aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
-        features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: true, multiShot: true, nativeAudio: true, voiceIds: false, cameraControl: true },
-        maxReferenceImages: 3, costPerSecond: COST_PER_SECOND['seedance-2.0-fast'], recommended: false,
-        maxPromptLength: 200000,
-    },
-    'seedance-2.0-mini': {
-        id: 'seedance-2.0-mini', name: 'Seedance 2.0 Mini', icon: '⚡', provider: 'atlascloud',
-        description: 'ByteDance Seedance 2.0 Mini — lightweight, low-cost video generation',
-        bestFor: 'High-volume social media ads, fast prototyping, rapid iterations',
-        duration: { min: 4, max: 15, native: 5, step: 1 },
-        resolutions: ['480p', '720p'], aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
-        features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: false, multiShot: true, nativeAudio: true, voiceIds: false, cameraControl: true },
-        maxReferenceImages: 9, costPerSecond: COST_PER_SECOND['seedance-2.0-mini'], recommended: true,
-        maxPromptLength: 200000,
     },
     'grok-imagine': {
         id: 'grok-imagine', name: 'Grok Imagine', icon: '🤖', provider: 'grok',
         description: 'xAI native video — fast, 1-15s, reference images, extend, I2V',
         bestFor: 'Social reels, product placement, character-consistent storytelling',
         duration: { min: 1, max: 15, native: 15, step: 1, extendChunk: 10, maxExtended: 25 },
-        resolutions: ['480p', '720p', '1080p', '4k'], aspectRatios: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'],
+        resolutions: ['480p', '720p', '1080p'], aspectRatios: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'],
         features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: true, multiShot: false, nativeAudio: true, voiceIds: false, cameraControl: false },
         maxReferenceImages: 7, costPerSecond: COST_PER_SECOND['grok-imagine'], recommended: true,
     },
@@ -175,7 +114,7 @@ export const MODEL_CAPABILITIES = {
         description: 'Tencent draft-tier — cheapest model, great for fast iterations',
         bestFor: 'Quick drafts, prototyping, budget-friendly iterations',
         duration: { min: 3, max: 10, native: 10, step: 1 },
-        resolutions: ['480p', '720p', '1080p', '4k'], aspectRatios: ['16:9', '9:16', '1:1'],
+        resolutions: ['480p', '720p', '1080p'], aspectRatios: ['16:9', '9:16', '1:1'],
         features: { firstFrame: true, lastFrame: false, referenceImages: false, extendVideo: false, multiShot: false, nativeAudio: false, voiceIds: false, cameraControl: false },
         maxReferenceImages: 0, costPerSecond: COST_PER_SECOND['hunyuan'], recommended: false,
         maxPromptLength: 200000, // Hunyuan is very sensitive to length
@@ -185,53 +124,19 @@ export const MODEL_CAPABILITIES = {
         description: 'OpenAI Sora 2 — cinematic storytelling, world-model understanding',
         bestFor: 'Cinematic ads, narrative storytelling, creative experiments',
         duration: { min: 5, max: 15, native: 15, step: 5 },
-        resolutions: ['720p', '1080p', '4k'], aspectRatios: ['16:9', '9:16', '1:1'],
+        resolutions: ['720p', '1080p'], aspectRatios: ['16:9', '9:16', '1:1'],
         features: { firstFrame: false, lastFrame: false, referenceImages: false, extendVideo: false, multiShot: false, nativeAudio: true, voiceIds: false, cameraControl: false },
         maxReferenceImages: 0, costPerSecond: COST_PER_SECOND['sora-2'], recommended: false,
     },
     'happyhorse-1.0': {
         id: 'happyhorse-1.0', name: 'HappyHorse 1.0', icon: '🐴', provider: 'atlascloud',
-        description: 'Alibaba HappyHorse 1.0 — cinematic motion, native audio, ref images, 1080p',
+        description: 'Alibaba HappyHorse — cinematic motion, native audio, ref images, 1080p',
         bestFor: 'Product demos, cinematic ads, brand films, animated content',
         duration: { min: 3, max: 15, native: 15, step: 1 },
-        resolutions: ['720p', '1080p', '4k'], aspectRatios: ['16:9', '9:16', '1:1'],
+        resolutions: ['720p', '1080p'], aspectRatios: ['16:9', '9:16', '1:1'],
         features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: false, multiShot: false, nativeAudio: true, voiceIds: false, cameraControl: false },
         maxReferenceImages: 9, costPerSecond: COST_PER_SECOND['happyhorse-1.0'], recommended: false,
         maxPromptLength: 200000,
-    },
-    'happyhorse-1.1': {
-        id: 'happyhorse-1.1', name: 'HappyHorse 1.1', icon: '🐴', provider: 'atlascloud',
-        description: 'Alibaba HappyHorse 1.1 — advanced cinematic motion, native audio, ref images, 1080p',
-        bestFor: 'Product demos, cinematic ads, brand films, animated content',
-        duration: { min: 3, max: 15, native: 15, step: 1 },
-        resolutions: ['720p', '1080p', '4k'], aspectRatios: ['16:9', '9:16', '1:1'],
-        features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: false, multiShot: false, nativeAudio: true, voiceIds: false, cameraControl: false },
-        maxReferenceImages: 9, costPerSecond: COST_PER_SECOND['happyhorse-1.1'], recommended: false,
-        maxPromptLength: 200000,
-    },
-    'gemini-flash': {
-        id: 'gemini-flash', name: 'Gemini Omni Flash', icon: '⚡', provider: 'atlascloud',
-        description: 'Google Gemini Omni Flash — up to 7 reference images, 20K prompt, cinematic subject-consistent video',
-        bestFor: 'UGC, product showcases, character-consistent storytelling, subject-anchored video',
-        // Durations: 4, 6, 8, 10s per generation (enum — not continuous). For long-form, chain segments.
-        duration: { min: 4, max: 10, native: 10, step: 2 },
-        resolutions: ['720p', '1080p', '4k'], aspectRatios: ['16:9', '9:16'],
-        // referenceImages: true — supports 1–7 reference images via `images[]` field
-        features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: false, multiShot: false, nativeAudio: false, voiceIds: false, cameraControl: false },
-        maxReferenceImages: 7, costPerSecond: COST_PER_SECOND['gemini-flash'], recommended: false,
-        maxPromptLength: 20000, // Atlas Cloud docs: up to 20,000 characters
-    },
-    'gemini-omni-flash': {
-        id: 'gemini-omni-flash', name: 'Gemini Omni Flash', icon: '⚡', provider: 'atlascloud',
-        description: 'Google Gemini Omni Flash — up to 7 reference images, 20K prompt, cinematic subject-consistent video',
-        bestFor: 'UGC, product showcases, character-consistent storytelling, subject-anchored video',
-        // Durations: 4, 6, 8, 10s per generation (enum — not continuous). For long-form, chain segments.
-        duration: { min: 4, max: 10, native: 10, step: 2 },
-        resolutions: ['720p', '1080p', '4k'], aspectRatios: ['16:9', '9:16'],
-        // referenceImages: true — supports 1–7 reference images via `images[]` field
-        features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: false, multiShot: false, nativeAudio: false, voiceIds: false, cameraControl: false },
-        maxReferenceImages: 7, costPerSecond: COST_PER_SECOND['gemini-flash'], recommended: false,
-        maxPromptLength: 20000, // Atlas Cloud docs: up to 20,000 characters
     },
 };
 
@@ -262,32 +167,15 @@ export function estimateCost(model = 'kling-3.0', durationSeconds = 5, resolutio
     const liveCost = LIVE_COST_PER_SECOND[model]?.[mode];
     const costPerSec = liveCost || (COST_PER_SECOND[model]?.[mode]) || 0.07;
     let resMult = 1.0;
-    
-    // Atlas Cloud models have specific resolution multipliers based on observed billing
-    const ATLAS_MODELS = ['seedance-2.0', 'seedance-2.0-fast', 'happyhorse-1.0', 'happyhorse-1.1', 'gemini-flash', 'gemini-omni-flash', 'veo-3.1-lite'];
-    if (ATLAS_MODELS.includes(model)) {
-        // e.g. 10s seedance-2.0-fast 480p is $0.768. If base is $0.1536/s -> $1.536 for 10s.
-        // So 480p multiplier is exactly 0.5.
-        // Assuming 720p is somewhere in between, say 0.6.
-        if (resolution === '480p') resMult = 0.5;
-        else if (resolution === '720p') resMult = 0.6;
-        else if (resolution === '1080p') resMult = 1.0;
-        else if (resolution === '4k') resMult = 2.0;
-    } else {
-        if (resolution === '480p') resMult = 0.5;
-        else if (resolution === '720p') resMult = 0.7;
-        else if (resolution === '4k') resMult = 2.0;
-    }
+    if (resolution === '480p') resMult = 0.5;
+    else if (resolution === '720p') resMult = 0.7;
+    else if (resolution === '4k') resMult = 2.0;
     
     const usd = Number((costPerSec * durationSeconds * resMult).toFixed(2));
     const inr = Number((usd * 93.21).toFixed(0));
-    
-    // Cost-to-cost pricing:
-    // $1 USD = ~₹83 INR.
-    // 1 credit = ₹5 INR.
-    // $1 USD = 83 / 5 = 16.6 credits. Let's use 20 for a tiny buffer against exchange rates/fees.
-    // ceil(USD * 20) = cost-to-cost.
-    const credits = Math.max(Math.ceil(usd * 20), 5);
+    // ⚡ Updated May 2026: ceil(USD × 170) → ~89% gross margin at ₹5/credit floor
+    // e.g. Kling 3.0, 5s 1080p fast: $0.35 → 60cr = ₹300; API cost ₹32.6 → 89% margin
+    const credits = Math.max(Math.ceil(usd * 170), 15);
     return { usd, inr, credits, model, resolution, mode, durationSeconds, maxDuration: DURATION_LIMITS[model]?.max || 15 };
 }
 
@@ -365,8 +253,8 @@ function buildPayload(model, { prompt, imageUrl, duration, resolution, mode, sho
 /**
  * Robust cascading poll for seedance-2.0
  */
-async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, generateAudio, mode, referenceImages, refAudio, refVideo, customCharacterNames = [], model = 'seedance-2.0' }) {
-    if (isLaozhangAvailable() && model !== 'seedance-2.0-mini') {
+async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, generateAudio, mode, referenceImages, refAudio, refVideo }) {
+    if (isLaozhangAvailable()) {
         try {
             const r = await submitLaozhangVideoGeneration({
                 model: 'seedance-2.0', prompt, imageUrl,
@@ -386,11 +274,10 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
     // Step 2: Try Atlas Cloud (supports image_url for I2V) BEFORE switching models
     try {
         const atlasResult = await submitAtlasCloudVideoGeneration({
-            model,
             prompt, imageUrl: imageUrl || null, duration,
             aspectRatio: aspectRatio || '16:9',
             generateAudio, referenceImages: referenceImages || [], qualityMode: mode || 'fast',
-            refAudio, refVideo, customCharacterNames,
+            refAudio, refVideo,
         });
         if (atlasResult?.taskId) {
             console.log('✅ [Cascade] Step 2 done: Atlas Cloud (seedance)');
@@ -439,31 +326,45 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
     throw new Error('All video providers exhausted: MuAPI, Atlas Cloud, Kie.ai, and LaoZhang are all unavailable or out of credits. Please try again in 30 minutes.');
 }
 
-export async function submitVideoGeneration({ model, prompt, imageUrl, duration, resolution, mode, shots, generateAudio, aspectRatio, referenceImages, refAudio, refVideo, imageRole, customCharacterNames = [] }) {
+export async function submitVideoGeneration({ model, prompt, imageUrl, duration, resolution, mode, shots, generateAudio, aspectRatio, referenceImages, refAudio, refVideo }) {
     if (!MODEL_AVAILABLE[model]) throw new Error(`Model '${model}' is not available.`);
+
+    // Enforce provider-specific prompt length limits
+    let safePrompt = truncatePrompt(prompt, model);
+
+    // 🧹 WATERMARK AVOIDANCE: For Seedance models, append negative-like instructions to the prompt
+    if (model.includes('seedance')) {
+        const watermarkRef = ' (no watermark, clean background, high quality, 4k)';
+        if (!safePrompt.includes('no watermark')) {
+            safePrompt += watermarkRef;
+        }
+    }
 
     const [s3ImageUrl, s3RefAudio, s3RefVideo, ...s3ReferenceImages] = await Promise.all([
         ensureS3Url(imageUrl, 'video-studio/generations'),
         ensureS3Url(refAudio, 'video-studio/references'),
         ensureS3Url(refVideo, 'video-studio/references'),
-        ...(referenceImages || []).map(img => {
-            const rawUrl = typeof img === 'object' && img ? img.url : img;
-            return ensureS3Url(rawUrl, 'video-studio/references');
-        })
+        ...(referenceImages || []).map(img => ensureS3Url(img, 'video-studio/references'))
     ]);
 
-    // 🛡️ CENTRALIZED @IMAGE TAG AND SAFETY / DEITY SANITIZER
+    // 🛡️ UNIVERSAL @IMAGE TAG SANITIZER
+    // Count total images that will actually be sent (firstFrame + refs)
     const totalImageCount = (s3ImageUrl ? 1 : 0) + s3ReferenceImages.filter(Boolean).length;
-    const { prompt: sanitizedPrompt, warnings: sanitizerWarnings } = sanitizePromptForProvider(
-        prompt,
-        model,
-        totalImageCount,
-        { customCharacterNames }
-    );
-    if (sanitizerWarnings.length > 0) {
-        console.warn(`⚠️ [Universal Video Sanitizer] ${sanitizerWarnings.join(' | ')}`);
+    if (totalImageCount > 0) {
+        safePrompt = safePrompt.replace(/@image(\d+)/g, (match, p1) => {
+            const idx = parseInt(p1, 10);
+            if (idx > totalImageCount) {
+                console.warn(`🛡️ [Universal] Stripping phantom ${match} from prompt (only ${totalImageCount} images available)`);
+                return '';
+            }
+            return match;
+        }).replace(/\s{2,}/g, ' ').trim();
+    } else {
+        // No images at all — strip ALL @image tags
+        const hadTags = /@image\d+/.test(safePrompt);
+        safePrompt = safePrompt.replace(/@image\d+/g, '').replace(/\(\s*Visual reference:\s*\)/g, '').replace(/\s{2,}/g, ' ').trim();
+        if (hadTags) console.warn(`🛡️ [Universal] Stripped all @image tags from T2V prompt (0 images provided)`);
     }
-    let safePrompt = sanitizedPrompt;
 
     let activeProvider = null;
     try {
@@ -471,21 +372,19 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     } catch (e) {
         console.warn('⚠️ Could not read video_provider from cache:', e.message);
     }
-    if (model === 'seedance-2.0' || model === 'seedance-2.0-fast' || model === 'seedance-2.0-mini') {
-        const seedanceMode = model === 'seedance-2.0-fast' ? 'fast' : (mode || 'quality');
-        const hasRealFaceRefs = s3ReferenceImages.filter(Boolean).length > 0 || !!s3RefVideo;
+    if (model === 'seedance-2.0') {
+        const hasRealFaceRefs = s3ReferenceImages.filter(Boolean).length > 0;
         
         // 👤 REAL FACE REFERENCE-TO-VIDEO: Bypass MuAPI/LaoZhang entirely
         // Only Atlas Cloud supports the reference-to-video model that locks real facial identity
         if (hasRealFaceRefs) {
-            console.log(`👤 [Seedance 2.0] Reference image(s) or video detected → forcing Atlas Cloud reference-to-video`);
+            console.log(`👤 [Seedance 2.0] ${s3ReferenceImages.length} reference image(s) detected → forcing Atlas Cloud reference-to-video`);
             try {
                 const result = await submitAtlasCloudVideoGeneration({
-                    model,
-                    prompt: safePrompt, imageUrl: s3ImageUrl, duration, resolution,
+                    prompt: safePrompt, imageUrl: s3ImageUrl, duration,
                     aspectRatio: aspectRatio || '16:9', generateAudio,
-                    referenceImages: s3ReferenceImages.filter(Boolean), qualityMode: seedanceMode,
-                    refAudio: s3RefAudio, refVideo: s3RefVideo, imageRole,
+                    referenceImages: s3ReferenceImages.filter(Boolean), qualityMode: mode || 'fast',
+                    refAudio: s3RefAudio, refVideo: s3RefVideo,
                 });
                 return {
                     requestId: result.taskId, endpoint: 'atlascloud-r2v',
@@ -499,16 +398,15 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         }
         
         // Standard routing (no face refs) — use active provider or cascade
-        const provider = 'atlascloud'; // Forced per user request (no muapi credits)
+        const provider = activeProvider || 'muapi';
         console.log(`🎬 [Seedance 2.0] Active Provider: ${provider}`);
         try {
             if (provider === 'muapi') {
                 const result = await submitMuApiVideoGeneration({
-                    prompt: safePrompt, imageUrl: s3ImageUrl, duration, resolution,
-                    aspectRatio: aspectRatio || '16:9', qualityMode: seedanceMode,
+                    prompt: safePrompt, imageUrl: s3ImageUrl, duration,
+                    aspectRatio: aspectRatio || '16:9', qualityMode: mode || 'fast',
                     generateAudio, referenceImages: s3ReferenceImages,
                     refAudio: s3RefAudio, refVideo: s3RefVideo,
-                    customCharacterNames,
                 });
                 return {
                     requestId: result.taskId, endpoint: 'muapi-seedance-2.0',
@@ -517,12 +415,10 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                 };
             } else if (provider === 'atlascloud' || provider === 'piapi') {
                 const result = await submitAtlasCloudVideoGeneration({
-                    model,
-                    prompt: safePrompt, imageUrl: s3ImageUrl, duration, resolution,
+                    prompt: safePrompt, imageUrl: s3ImageUrl, duration,
                     aspectRatio: aspectRatio || '16:9', generateAudio,
-                    referenceImages: s3ReferenceImages, qualityMode: seedanceMode,
-                    refAudio: s3RefAudio, refVideo: s3RefVideo, imageRole,
-                    customCharacterNames,
+                    referenceImages: s3ReferenceImages, qualityMode: mode || 'fast',
+                    refAudio: s3RefAudio, refVideo: s3RefVideo,
                 });
                 return {
                     requestId: result.taskId, endpoint: 'atlascloud-seedance-2.0',
@@ -549,10 +445,9 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
             console.error(`🛑 Primary provider (${provider}) failed:`, err.message);
             const cascade = await trySeedanceCascade({
                 prompt: safePrompt, imageUrl: s3ImageUrl, duration,
-                aspectRatio: aspectRatio || '16:9', generateAudio, mode: seedanceMode,
+                aspectRatio: aspectRatio || '16:9', generateAudio, mode,
                 referenceImages: s3ReferenceImages, 
                 refAudio: s3RefAudio, refVideo: s3RefVideo,
-                model,
             });
             return {
                 requestId: cascade.taskId || `lz-${Date.now()}`,
@@ -565,9 +460,8 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     }
 
     if (model === 'grok-imagine') {
-        // Always use native Grok API when GROK_API_KEY is set — never fall through to fal.ai
-        const grokApiKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
-        if (grokApiKey) {
+        const provider = activeProvider || 'grok';
+        if (provider === 'grok') {
             const result = await submitGrokVideoGeneration({
                 prompt: safePrompt,
                 imageUrl: s3ImageUrl,
@@ -575,7 +469,6 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                 resolution,
                 aspectRatio: aspectRatio || '16:9',
                 referenceImages: s3ReferenceImages.filter(Boolean),
-                customCharacterNames,
             });
             return {
                 requestId: result.requestId,
@@ -585,45 +478,12 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                 provider: 'grok'
             };
         }
-        console.warn(`⚠️ [Grok] GROK_API_KEY not set — falling through to fal.ai (may fail)`);
+        // If provider !== 'grok', it will fall through to fal.ai routing below.
     }
 
-    // Kling models — route directly to LaoZhang
-    if (model === 'kling-3.0' || model === 'kling-3.0-o') {
-        console.log(`🎬 [Kling] Routing to LaoZhang instead of fal.ai...`);
-        if (!isLaozhangAvailable()) {
-            throw new Error(`Kling generation requires LaoZhang API key, but it is not configured.`);
-        }
-        try {
-            const lzResult = await submitLaozhangVideoGeneration({
-                model, 
-                prompt: safePrompt, 
-                imageUrl: s3ImageUrl,
-                duration, 
-                aspectRatio: aspectRatio || '16:9',
-                generateAudio: generateAudio !== false,
-                referenceImages: s3ReferenceImages.filter(Boolean)
-            });
-            if (lzResult?.videoUrl) {
-                return {
-                    requestId: `lz-${Date.now()}`, 
-                    endpoint: `laozhang-${model}`,
-                    statusUrl: null, 
-                    resultUrl: null, 
-                    provider: 'laozhang',
-                    _laozhangVideoUrl: lzResult.videoUrl,
-                };
-            }
-            throw new Error(`LaoZhang returned an empty video URL`);
-        } catch (err) {
-            console.error(`❌ [Kling] LaoZhang submission failed: ${err.message}`);
-            throw new Error(`Kling generation via LaoZhang failed: ${err.message}`);
-        }
-    }
-
-    // HappyHorse 1.x — routes directly to Atlas Cloud
-    if (model === 'happyhorse-1.0' || model === 'happyhorse-1.1') {
-        console.log(`🐴 [${model.toUpperCase()}] Routing to Atlas Cloud...`);
+    // HappyHorse 1.0 — routes directly to Atlas Cloud
+    if (model === 'happyhorse-1.0') {
+        console.log(`🐴 [HappyHorse 1.0] Routing to Atlas Cloud...`);
         try {
             const result = await submitHappyHorseVideoGeneration({
                 prompt: safePrompt,
@@ -633,76 +493,18 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                 generateAudio: generateAudio !== false,
                 referenceImages: s3ReferenceImages.filter(Boolean),
                 resolution: resolution || '720p',
-                refAudio: s3RefAudio || null, // Pass TTS audio for lip-sync
-                model: model,
-                customCharacterNames,
             });
             return {
                 requestId: result.taskId,
-                endpoint: `atlascloud-${model}`,
+                endpoint: 'atlascloud-happyhorse-1.0',
                 statusUrl: null,
                 resultUrl: null,
                 provider: 'atlascloud',
                 _atlasCloudPayload: result._payload,
             };
         } catch (err) {
-            console.error(`❌ [${model.toUpperCase()}] Atlas Cloud submission failed: ${err.message}`);
-            throw new Error(`${model.toUpperCase()} generation failed: ${err.message}`);
-        }
-    }
-
-    // Gemini Flash Video — routes directly to Atlas Cloud
-    if (model === 'gemini-flash' || model === 'gemini-omni-flash') {
-        console.log(`⚡ [Gemini Flash Video] Routing to Atlas Cloud...`);
-        try {
-            const result = await submitGeminiFlashVideoGeneration({
-                prompt: safePrompt,
-                imageUrl: s3ImageUrl,
-                duration,
-                aspectRatio: aspectRatio || '16:9',
-                resolution: resolution || '720p',
-                referenceImages: s3ReferenceImages.filter(Boolean),
-                customCharacterNames,
-            });
-            return {
-                requestId: result.taskId,
-                endpoint: 'atlascloud-gemini-flash',
-                statusUrl: null,
-                resultUrl: null,
-                provider: 'atlascloud',
-                _atlasCloudPayload: result._payload,
-            };
-        } catch (err) {
-            console.error(`❌ [Gemini Flash] Atlas Cloud submission failed: ${err.message}`);
-            throw new Error(`Gemini Flash Video generation failed: ${err.message}`);
-        }
-    }
-
-    // Veo 3.1 Lite — routes directly to Atlas Cloud
-    if (model === 'veo-3.1-lite') {
-        console.log(`🎬 [Veo 3.1 Lite] Routing to Atlas Cloud...`);
-        try {
-            const result = await submitAtlasCloudVideoGeneration({
-                prompt: safePrompt,
-                imageUrl: s3ImageUrl,
-                duration,
-                aspectRatio: aspectRatio || '16:9',
-                resolution: resolution || '720p',
-                referenceImages: s3ReferenceImages.filter(Boolean),
-                customCharacterNames,
-                model: model,
-            });
-            return {
-                requestId: result.taskId,
-                endpoint: 'atlascloud-veo-3.1-lite',
-                statusUrl: null,
-                resultUrl: null,
-                provider: 'atlascloud',
-                _atlasCloudPayload: result._payload,
-            };
-        } catch (err) {
-            console.error(`❌ [Veo 3.1 Lite] Atlas Cloud submission failed: ${err.message}`);
-            throw new Error(`Veo 3.1 Lite generation failed: ${err.message}`);
+            console.error(`❌ [HappyHorse 1.0] Atlas Cloud submission failed: ${err.message}`);
+            throw new Error(`HappyHorse 1.0 generation failed: ${err.message}`);
         }
     }
 
@@ -724,12 +526,12 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         payload.images = s3ReferenceImages;
     }
 
-    const response = await fetch(`${FAL_BASE_URL}/${endpoint}`, fetchOptions({
+    const response = await fetch(`${FAL_BASE_URL}/${endpoint}`, {
         method: 'POST',
         headers: { 'Authorization': `Key ${apiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
         signal: AbortSignal.timeout(35000)
-    }));
+    });
     if (!response.ok) throw new Error(`fal.ai failed (${response.status})`);
     const data = await response.json();
     return { requestId: data.request_id, endpoint, statusUrl: data.status_url, resultUrl: data.response_url, provider: 'fal' };
@@ -738,7 +540,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
 export async function extendVideo({ videoUrl, prompt, duration = 7 }) {
     const apiKey = getApiKey();
     const safePrompt = truncatePrompt(prompt, 'veo-3.1'); // Extend is usually Veo
-    const response = await fetch(`${FAL_BASE_URL}/${MODEL_ENDPOINTS['veo-3.1'].extendVideo}`, fetchOptions({ method: 'POST', headers: { 'Authorization': `Key ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ video_url: videoUrl, prompt: safePrompt, duration: String(duration), generate_audio: true, auto_fix: true }) }));
+    const response = await fetch(`${FAL_BASE_URL}/${MODEL_ENDPOINTS['veo-3.1'].extendVideo}`, { method: 'POST', headers: { 'Authorization': `Key ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ video_url: videoUrl, prompt: safePrompt, duration: String(duration), generate_audio: true, auto_fix: true }) });
     if (!response.ok) throw new Error('fal.ai extend failed');
     const data = await response.json();
     return { requestId: data.request_id, provider: 'fal' };
@@ -758,27 +560,11 @@ export async function extendVideoGeneration({ model, parentTaskId, prompt, durat
     return await submitVideoGeneration({ model, prompt, duration, resolution: '1080p', mode: qualityMode, aspectRatio });
 }
 
-export async function getUnifiedGenerationStatus(provider, requestId, statusUrl, resultUrl) {
-    if (provider === 'muapi') {
-        return await getMuApiGenerationStatus(requestId);
-    } else if (provider === 'atlascloud') {
-        return await getAtlasCloudGenerationStatus(requestId);
-    } else if (provider === 'laozhang') {
-        return await getLaozhangVideoStatus(requestId);
-    } else if (provider === 'kie') {
-        return await getKieGenerationStatus(requestId);
-    } else if (provider === 'grok') {
-        return await getGrokGenerationStatus(requestId);
-    } else {
-        return await getGenerationStatus(requestId, statusUrl, resultUrl);
-    }
-}
-
 export async function getGenerationStatus(requestId, statusUrl, resultUrl) {
     const apiKey = getApiKey();
     if (!statusUrl) statusUrl = `${FAL_BASE_URL}/fal-ai/kling-video/requests/${requestId}/status`;
     if (!resultUrl) resultUrl = statusUrl.replace('/status', '');
-    const response = await fetch(statusUrl, fetchOptions({ headers: { 'Authorization': `Key ${apiKey}` } }));
+    const response = await fetch(statusUrl, { headers: { 'Authorization': `Key ${apiKey}` } });
     if (!response.ok) return { status: 'IN_PROGRESS', progress: 30 };
     const data = await response.json();
     if (data.status === 'COMPLETED') return await fetchFalResult(apiKey, resultUrl);
@@ -786,7 +572,7 @@ export async function getGenerationStatus(requestId, statusUrl, resultUrl) {
 }
 
 async function fetchFalResult(apiKey, resultUrl) {
-    const res = await fetch(resultUrl, fetchOptions({ headers: { 'Authorization': `Key ${apiKey}` } }));
+    const res = await fetch(resultUrl, { headers: { 'Authorization': `Key ${apiKey}` } });
     const data = await res.json();
     const videoUrl = data.video?.url || data.output?.url || data.video_url || data.url || data.images?.[0]?.url || data.data?.[0]?.url || '';
     if (!videoUrl) {
@@ -802,14 +588,11 @@ async function fetchFalResult(apiKey, resultUrl) {
  * Poll:   GET  /v1/videos/{request_id}   → status: pending | done | expired | failed
  * Result: data.video.url
  */
-export async function submitGrokVideoGeneration({ prompt, imageUrl, duration = 5, resolution = '720p', aspectRatio = '16:9', referenceImages = [], customCharacterNames = [] }) {
+export async function submitGrokVideoGeneration({ prompt, imageUrl, duration = 5, resolution = '720p', aspectRatio = '16:9', referenceImages = [] }) {
     const apiKey = getGrokApiKey();
-    const totalImageCount = (imageUrl ? 1 : 0) + (referenceImages?.length || 0);
-    const { prompt: sanitizedPrompt } = sanitizePromptForProvider(prompt, 'grok-imagine', totalImageCount, { customCharacterNames });
-
     const payload = {
         model: 'grok-imagine-video',
-        prompt: sanitizedPrompt,
+        prompt: truncatePrompt(prompt, 'grok-imagine'),
         duration: Math.min(Math.max(duration || 5, 1), 15),
         aspect_ratio: aspectRatio || '16:9',
         resolution: resolution === '1080p' ? '1080p' : resolution === '480p' ? '480p' : '720p',
@@ -829,12 +612,12 @@ export async function submitGrokVideoGeneration({ prompt, imageUrl, duration = 5
     }
 
     console.log(`🎬 [Grok] Submitting to /v1/videos/generations (duration=${payload.duration}s, ratio=${payload.aspect_ratio}, res=${payload.resolution})...`);
-    const response = await fetch(`${GROK_BASE_URL}/videos/generations`, fetchOptions({
+    const response = await fetch(`${GROK_BASE_URL}/videos/generations`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
         signal: AbortSignal.timeout(60000),
-    }));
+    });
     if (!response.ok) {
         const errText = await response.text();
         throw new Error(`xAI video generation failed (${response.status}): ${errText.substring(0, 300)}`);
@@ -852,10 +635,10 @@ export async function submitGrokVideoGeneration({ prompt, imageUrl, duration = 5
 export async function getGrokGenerationStatus(requestId) {
     const apiKey = getGrokApiKey();
     try {
-        const response = await fetch(`${GROK_BASE_URL}/videos/${requestId}`, fetchOptions({
+        const response = await fetch(`${GROK_BASE_URL}/videos/${requestId}`, {
             headers: { 'Authorization': `Bearer ${apiKey}` },
             signal: AbortSignal.timeout(15000),
-        }));
+        });
         if (!response.ok) {
             console.warn(`⚠️ [Grok] Poll failed: ${response.status}`);
             return { status: 'IN_PROGRESS', progress: 30, provider: 'grok' };
@@ -891,120 +674,16 @@ export async function extendGrokVideo({ videoUrl, prompt, duration = 6 }) {
         video: { url: videoUrl },
     };
     console.log(`🎬 [Grok] Extending video (duration=${payload.duration}s)...`);
-    const response = await fetch(`${GROK_BASE_URL}/videos/extensions`, fetchOptions({
+    const response = await fetch(`${GROK_BASE_URL}/videos/extensions`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
         signal: AbortSignal.timeout(60000),
-    }));
+    });
     if (!response.ok) {
         const errText = await response.text();
         throw new Error(`xAI video extend failed (${response.status}): ${errText.substring(0, 300)}`);
     }
     const data = await response.json();
     return { requestId: data.request_id, provider: 'grok' };
-}
-
-// ── Lip-Sync Post-Processing ─────────────────────────────────────────────────
-// For models that don't support refAudio, we generate the scene video first,
-// then run it through a lip-sync model to make the character's lips move
-// in sync with the TTS dialogue audio.
-
-const LIP_SYNC_ENDPOINT = 'fal-ai/sync-lipsync/v2';
-
-/**
- * Submit a lip-sync job to fal.ai Sync Lipsync v2.
- * Takes a scene video + TTS audio → returns video with lip-synced character.
- *
- * @param {string} videoUrl - S3/HTTP URL of the scene video
- * @param {string} audioUrl - S3/HTTP URL of the TTS audio (mp3/wav)
- * @returns {Promise<object>} - { requestId, statusUrl, resultUrl }
- */
-export async function submitLipSync(videoUrl, audioUrl) {
-    const apiKey = getApiKey();
-
-    console.log(`👄 [LipSync] Submitting to ${LIP_SYNC_ENDPOINT}...`);
-    console.log(`   video: ${videoUrl.substring(0, 80)}...`);
-    console.log(`   audio: ${audioUrl.substring(0, 80)}...`);
-
-    const response = await fetch(`${FAL_BASE_URL}/${LIP_SYNC_ENDPOINT}`, {
-        method: 'POST',
-        headers: { 'Authorization': `Key ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            video_url: videoUrl,
-            audio_url: audioUrl,
-            sync_mode: 'cut_off',
-        }),
-        signal: AbortSignal.timeout(35000),
-    });
-
-    if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`fal.ai lip-sync failed (${response.status}): ${errText.substring(0, 200)}`);
-    }
-
-    const data = await response.json();
-    console.log(`✅ [LipSync] Job queued: requestId=${data.request_id}`);
-
-    return {
-        requestId: data.request_id,
-        statusUrl: data.status_url,
-        resultUrl: data.response_url,
-        provider: 'fal',
-    };
-}
-
-/**
- * Poll a lip-sync job until it completes.
- * Returns the URL of the lip-synced video.
- *
- * @param {object} lipSyncResult - Output from submitLipSync
- * @param {number} maxWaitMs - Maximum time to wait (default 3 min)
- * @returns {Promise<string>} - URL of the lip-synced video
- */
-export async function pollLipSyncResult(lipSyncResult, maxWaitMs = 180000) {
-    const apiKey = getApiKey();
-    const { statusUrl, resultUrl } = lipSyncResult;
-    const startTime = Date.now();
-    const pollInterval = 3000;
-
-    while (Date.now() - startTime < maxWaitMs) {
-        await new Promise(r => setTimeout(r, pollInterval));
-
-        try {
-            const statusResp = await fetch(statusUrl, {
-                headers: { 'Authorization': `Key ${apiKey}` },
-                signal: AbortSignal.timeout(10000),
-            });
-
-            if (!statusResp.ok) {
-                console.warn(`👄 [LipSync] Poll status ${statusResp.status}, retrying...`);
-                continue;
-            }
-
-            const statusData = await statusResp.json();
-
-            if (statusData.status === 'COMPLETED') {
-                const resultResp = await fetch(resultUrl, {
-                    headers: { 'Authorization': `Key ${apiKey}` },
-                    signal: AbortSignal.timeout(10000),
-                });
-                const resultData = await resultResp.json();
-                const videoUrl = resultData.video?.url || resultData.output?.url || resultData.video_url || '';
-                if (!videoUrl) throw new Error('Lip-sync completed but no video URL in response');
-                console.log(`✅ [LipSync] Complete: ${videoUrl.substring(0, 80)}...`);
-                return videoUrl;
-            } else if (statusData.status === 'FAILED') {
-                throw new Error(`Lip-sync failed: ${statusData.error || 'Unknown error'}`);
-            }
-
-            const elapsed = Math.round((Date.now() - startTime) / 1000);
-            console.log(`👄 [LipSync] Processing... (${elapsed}s elapsed)`);
-        } catch (err) {
-            if (err.message.includes('Lip-sync failed')) throw err;
-            console.warn(`👄 [LipSync] Poll error: ${err.message}`);
-        }
-    }
-
-    throw new Error(`Lip-sync timed out after ${maxWaitMs / 1000}s`);
 }

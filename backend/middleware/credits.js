@@ -7,44 +7,15 @@
  * Falls back to defaults if DB settings not found.
  * 
  * Video credits are DYNAMIC — calculated per request based on model, duration,
- * resolution, and quality mode using: credits = ceil(USD_cost × 70)
+ * resolution, and quality mode using: credits = ceil(USD_cost × 34)
  * This ensures ≥50% margin at the ₹5/credit floor price.
- * 
- * Dynamic actions: videoGenerate, ugcProGenerate, qAdsGenerate
  */
 
 import mongoose from 'mongoose';
-import crypto from 'crypto';
 import User from '../models/User.js';
 import SystemSettings, { getSetting, setSetting } from '../models/SystemSettings.js';
 import CreditUsage from '../models/CreditUsage.js';
-import ActivityLog from '../models/ActivityLog.js';
 import { estimateCost } from '../agents/videoStudio/falClient.js';
-import { invalidateUserCache } from './auth.js';
-
-
-// ── Batch Accumulator Pattern for Logs ──
-const creditUsageQueue = [];
-const activityLogQueue = [];
-
-setInterval(async () => {
-    if (creditUsageQueue.length > 0) {
-        const batch = creditUsageQueue.splice(0, 100);
-        try {
-            await CreditUsage.insertMany(batch);
-        } catch (err) {
-            console.warn('Batch CreditUsage log failed:', err.message);
-        }
-    }
-    if (activityLogQueue.length > 0) {
-        const batch = activityLogQueue.splice(0, 100);
-        try {
-            await ActivityLog.insertMany(batch);
-        } catch (err) {
-            console.warn('Batch ActivityLog failed:', err.message);
-        }
-    }
-}, 5000);
 
 // Human-readable labels for actions
 const ACTION_LABELS = {
@@ -77,10 +48,6 @@ const ACTION_LABELS = {
     qAdsDirector:  'Q-Ads Prompt Director (Stage 2 — legacy)',
     qAdsGenerate:  'Q-Ads Video Generation',
     avatarGenerate: 'Avatar Generation (3 Variants)',
-    viralityPredict: 'Virality Prediction (3-Model AI Pipeline)',
-    storyboardCreate: 'Storyboard Director + Frames (AI Ad Film)',
-    storyboardAnimate: 'Storyboard Animation (I2V per shot)',
-    storyboardAnimateLongForm: 'Storyboard Long-Form Animation (multi-segment I2V + FFmpeg stitch)',
 };
 
 // Provider credit multipliers — Claude is premium (higher API cost to us)
@@ -124,7 +91,6 @@ const DEFAULT_CREDIT_COSTS = {
     videoBrainstorm: 2,
     videoGenerate: 'dynamic',      // DYNAMIC — ceil(USD_cost × 170) ensures 89% gross margin
     videoEdit: 20,
-
     socialMedia: 3,
     socialMediaCalendar: 3,
     socialMediaAudit: 4,
@@ -142,22 +108,15 @@ const DEFAULT_CREDIT_COSTS = {
     voiceTranscribe: 1,
     promptEnhance: 1,
     imageEnhance: 2,
-    ugcProGenerate: 'dynamic',     // DYNAMIC — Seedance 2.0 via Atlas Cloud; ceil(USD × 170) → 89% margin
-
+    ugcProGenerate: 50,            // ↑ from 40 — Seedance 2.0 via Atlas Cloud ($0.50/5s ≈ ₹46.6)
     ugcProAnalyze: 1,              // Product intelligence analysis
     monthlyStrategy: 25,           // ↑ from 15 — Full Claude strategy pipeline (value-based pricing)
     monthlyBrief: 0,               // Brief execution charged at target studio's own rate
     qAdsPrompt:    4,              // Q-Ads single Claude call — brand DNA + MCP + 3 cinematic variants
     qAdsEnhance:   2,              // Q-Ads Stage 1 legacy — kept for backward compat
     qAdsDirector:  1,              // Q-Ads Stage 2 legacy — kept for backward compat
-    qAdsGenerate:  'dynamic',      // DYNAMIC — Q-Ads Seedance 2.0 video; ceil(USD × 170) → 81%+ margin
+    qAdsGenerate:  50,             // ↑↑ CRITICAL FIX from 8 — Q-Ads Seedance 2.0 video (5s ≈ ₹46); 50cr × ₹5 = ₹250 → 81% margin
     avatarGenerate: 6,             // ↑ from 4 — Avatar Studio: 3 variants via LaoZhang NanoBanana 2
-    viralityPredict: 3,            // Virality Predictor: Gemini vision + Grok research + Claude synthesis
-    storyboardCreate: 8,           // Storyboard Director (Claude) + Gemini frame gen for all shots
-    storyboardAnimate: 'dynamic',  // DYNAMIC — Seedance 2.0 I2V per shot
-    // Long-form (>15s) storyboard: per-segment dynamic charge.
-    // 30s → 3 segs (~45cr) | 60s → 6 segs (~90cr) | 90s → 9 segs (~135cr) | 120s → 12 segs (~180cr)
-    storyboardAnimateLongForm: 'dynamic',
 };
 
 // Cache for credit costs (refresh every 5 minutes)
@@ -208,14 +167,7 @@ export const requireCredits = (actionOrCost = 1) => {
             // ── Background Job Bypass ──
             // When runCreativeJobAsync calls /generate internally, credits are
             // already deducted at POST /jobs time. Skip re-deduction.
-            // SECURITY: Requires a server-only secret (min 32 chars) to prevent client-side forgery.
-            // SEC-002: Uses timing-safe comparison and minimum length guard.
-            const internalJobSecret = process.env.INTERNAL_JOB_SECRET;
-            const clientSecret = req.headers['x-internal-secret'];
-            if (internalJobSecret && internalJobSecret.length >= 32
-                && clientSecret && typeof clientSecret === 'string' && clientSecret.length === internalJobSecret.length
-                && crypto.timingSafeEqual(Buffer.from(internalJobSecret), Buffer.from(clientSecret))
-                && req.headers['x-job-id']) {
+            if (req.headers['x-skip-credits'] === 'true' && req.headers['x-job-id']) {
                 console.log(`⚡ [CREDITS] Skipping deduction for internal job call ${req.headers['x-job-id']}`);
                 req.creditsDeducted = 0; // Signal to handler: already deducted
                 return next();
@@ -231,60 +183,13 @@ export const requireCredits = (actionOrCost = 1) => {
                 const rawCost = costs[actionOrCost];
 
                 // Dynamic video credits — calculated per request
-                // Applies to: videoGenerate, ugcProGenerate, qAdsGenerate, storyboardAnimate, storyboardAnimateLongForm
-                const DYNAMIC_VIDEO_ACTIONS = ['videoGenerate', 'ugcProGenerate', 'qAdsGenerate', 'storyboardAnimate', 'storyboardAnimateLongForm'];
-                if (rawCost === 'dynamic' && DYNAMIC_VIDEO_ACTIONS.includes(actionOrCost)) {
-
-                    // ── Long-Form Storyboard: per-segment dynamic pricing ──
-                    if (actionOrCost === 'storyboardAnimateLongForm') {
-                        const totalDuration = parseInt(req.body.duration || req.body.totalDuration) || 30;
-                        const segModel     = req.body.model || 'seedance-2.0-fast';
-                        const OPTIMAL_SEG  = segModel === 'gemini-flash' ? 6 : (['veo-3.1', 'veo-3.1-fast', 'hunyuan'].includes(segModel) ? 8 : 10);
-                        const segCount     = Math.ceil(totalDuration / OPTIMAL_SEG);
-                        const segResolution = req.body.resolution || '720p';
-                        const segQuality   = segModel.includes('quality') || segModel === 'seedance-2.0' ? 'quality' : 'fast';
-                        const segEstimate  = estimateCost(segModel, Math.min(OPTIMAL_SEG, totalDuration), segResolution, segQuality);
-                        const perSeg       = segEstimate.credits;
-                        cost = perSeg * segCount;
-                        console.log(`🎬 Dynamic storyboard long-form credits: ${totalDuration}s → ${segCount} segs × ${perSeg}cr = ${cost} credits`);
-
-                    // ── Single-shot Storyboard Animate ──
-                    } else if (actionOrCost === 'storyboardAnimate') {
-                        const dur          = parseInt(req.body.duration) || 10;
-                        const sbModel      = req.body.model || 'seedance-2.0-fast';
-                        const sbResolution = req.body.resolution || '720p';
-                        const sbQuality    = sbModel === 'seedance-2.0' ? 'quality' : 'fast';
-                        const sbEstimate   = estimateCost(sbModel, Math.min(dur, 15), sbResolution, sbQuality);
-                        cost = sbEstimate.credits;
-                        console.log(`🎬 Dynamic storyboard animate credits: ${dur}s ${sbModel} → $${sbEstimate.usd} → ${cost} credits`);
-
-                    } else {
-                        // UGC Pro and Q-Ads always use seedance-2.0 via Atlas Cloud
-                        const defaultModel = (actionOrCost === 'ugcProGenerate' || actionOrCost === 'qAdsGenerate')
-                            ? 'seedance-2.0' : 'kling-3.0';
-                        const defaultDuration = (actionOrCost === 'qAdsGenerate') ? 8 : 5;
-                        const { model = defaultModel, duration = defaultDuration,
-                            resolution = '720p', qualityMode = 'fast' } = req.body;
-                        // Parse parameters from settings for UGC Pro / Q-Ads if encapsulated
-                        let parsedDuration = parseInt(duration) || defaultDuration;
-                        let parsedResolution = resolution;
-                        let parsedModel = model;
-                        let parsedQuality = qualityMode;
-                        if (req.body.settings) {
-                            try {
-                                const s = typeof req.body.settings === 'string' ? JSON.parse(req.body.settings) : req.body.settings;
-                                if (s.duration) parsedDuration = parseInt(s.duration) || parsedDuration;
-                                if (s.resolution) parsedResolution = s.resolution;
-                                if (s.model) parsedModel = s.model;
-                                if (s.qualityMode || s.quality) parsedQuality = s.qualityMode || s.quality;
-                            } catch (e) {
-                                console.warn('⚠️ [credits.js] Failed to parse settings in credit check:', e.message);
-                            }
-                        }
-                        const estimate = estimateCost(parsedModel || defaultModel, parsedDuration, parsedResolution, parsedQuality);
-                        cost = estimate.credits;
-                        console.log(`🎬 Dynamic video credits [${actionOrCost}]: ${parsedModel || defaultModel} ${parsedDuration}s ${parsedResolution} ${parsedQuality} → $${estimate.usd} → ${cost} credits`);
-                    }
+                if (rawCost === 'dynamic' && actionOrCost === 'videoGenerate') {
+                    const { model = 'kling-3.0', duration = 5,
+                        resolution = '1080p', qualityMode = 'fast' } = req.body;
+                    const estimate = estimateCost(model, duration, resolution, qualityMode);
+                    // ceil(USD × 70) ensures ~75% margin at ₹5/credit floor
+                    cost = Math.max(Math.ceil(estimate.usd * 70), 5);
+                    console.log(`🎬 Dynamic video credits: ${model} ${duration}s ${resolution} ${qualityMode} → $${estimate.usd} → ${cost} credits`);
                 } else {
                     cost = (typeof rawCost === 'number' ? rawCost : null) || 1;
                 }
@@ -300,10 +205,9 @@ export const requireCredits = (actionOrCost = 1) => {
             }
             req.providerMultiplier = providerMultiplier;
 
-            // Bypass credit checks for Superadmins and Enterprise plans
-            // NOTE: 'admin' role is intentionally excluded — admins follow normal credit rules.
-            const isCreditExempt = user.role === 'superadmin' || user.plan === 'enterprise';
-            if (isCreditExempt) {
+            // Bypass credit checks for Superadmins and Enterprise early
+            const isSuperAdmin = user.role === 'superadmin' || user.role === 'admin' || user.plan === 'enterprise';
+            if (isSuperAdmin) {
                 console.log(`🛡️ [CREDITS] ${user.email} (Role: ${user.role}, Plan: ${user.plan}) is bypassing credits for "${actionName}" (Cost: ${cost})`);
                 CreditUsage.create({
                     user: new mongoose.Types.ObjectId(user._id),
@@ -319,48 +223,30 @@ export const requireCredits = (actionOrCost = 1) => {
                     },
                 }).catch(err => console.warn('Credit usage log (bypass) failed:', err.message));
 
-                req.creditsDeducted = 0;
-                req.creditsBypassed = cost;
+                req.creditsDeducted = cost;
                 return next();
             }
 
             // Include topUp credits if not expired
             const topUp = (user.credits?.topUp > 0 && user.credits?.topUpExpiry && new Date(user.credits.topUpExpiry) > new Date())
                 ? user.credits.topUp : 0;
+            const remaining = (user.credits?.total || 0) + (user.credits?.bonus || 0) + topUp - (user.credits?.used || 0);
 
-            // Atomic deduction with balance precondition
-            const updatedUser = await User.findOneAndUpdate(
-                {
-                    _id: user._id,
-                    $expr: {
-                        $gte: [
-                            { $subtract: [
-                                { $add: [{ $ifNull: ['$credits.total', 0] }, { $ifNull: ['$credits.bonus', 0] }, topUp > 0 ? topUp : 0] },
-                                { $ifNull: ['$credits.used', 0] }
-                            ] },
-                            cost
-                        ]
-                    }
-                },
-                { $inc: { 'credits.used': cost } },
-                { returnDocument: 'after' }
-            );
-
-            if (!updatedUser) {
-                const freshUser = await User.findById(user._id);
-                const freshTopUp = (freshUser?.credits?.topUp > 0 && freshUser?.credits?.topUpExpiry && new Date(freshUser.credits.topUpExpiry) > new Date()) ? freshUser.credits.topUp : 0;
-                const freshRemaining = (freshUser?.credits?.total || 0) + (freshUser?.credits?.bonus || 0) + freshTopUp - (freshUser?.credits?.used || 0);
-                console.warn(`❌ [CREDITS] ${user.email} (Remaining: ${freshRemaining}) has insufficient credits for "${actionName}" (Cost: ${cost} | Mult: ${providerMultiplier}x)`);
+            if (remaining < cost) {
+                console.warn(`❌ [CREDITS] ${user.email} (Remaining: ${remaining}) has insufficient credits for "${actionName}" (Cost: ${cost} | Mult: ${providerMultiplier}x)`);
                 return res.status(403).json({
                     success: false,
                     error: 'Insufficient credits',
                     creditsRequired: cost,
-                    creditsRemaining: Math.max(0, freshRemaining),
+                    creditsRemaining: Math.max(0, remaining),
                     upgradeRequired: true,
                 });
             }
 
-            const updateOps = [Promise.resolve(updatedUser)];
+            // Deduct credits immediately
+            const updateOps = [
+                User.findByIdAndUpdate(user._id, { $inc: { 'credits.used': cost } }, { returnDocument: 'after' })
+            ];
 
             // If user has an active subscription, sync deduction there too
             if (user.activeSubscription) {
@@ -374,11 +260,10 @@ export const requireCredits = (actionOrCost = 1) => {
             const updTopUp = (updated.credits?.topUp > 0 && updated.credits?.topUpExpiry && new Date(updated.credits.topUpExpiry) > new Date()) ? updated.credits.topUp : 0;
             const balanceAfter = (updated.credits?.total || 0) + (updated.credits?.bonus || 0) + updTopUp - (updated.credits?.used || 0);
             // Detect studio from action name
-            const studioMap = { content: 'content', contentRefine: 'content', creative: 'creative', photoshoot: 'creative', brainstorm: 'brainstorm', brainstormRefine: 'brainstorm', brainstormChat: 'brainstorm', brainstormScreenplay: 'brainstorm', trendRefresh: 'brainstorm', research: 'research', videoBrainstorm: 'video', videoGenerate: 'video', videoEdit: 'video', socialMedia: 'social', socialMediaCalendar: 'social', socialMediaAudit: 'social', socialMediaCompetitor: 'social', socialMediaScore: 'social', canvasGenerate: 'creative', canvasBgRemove: 'creative', canvasExtend: 'creative', fidatoCanvas: 'creative', fidatoCanvasClaude: 'creative', creativeCampaign: 'creative', creativeCritique: 'creative', adCreative: 'performance', voiceClone: 'voice', voiceTranscribe: 'voice', promptEnhance: 'creative', imageEnhance: 'video', monthlyStrategy: 'brainstorm', monthlyBrief: 'brainstorm', qAdsPrompt: 'video', qAdsEnhance: 'video', qAdsDirector: 'video', qAdsGenerate: 'video', ugcProGenerate: 'video', ugcProAnalyze: 'video', avatarGenerate: 'creative', viralityPredict: 'virality', storyboardCreate: 'video', storyboardAnimate: 'video', storyboardAnimateLongForm: 'video' };
+            const studioMap = { content: 'content', contentRefine: 'content', creative: 'creative', photoshoot: 'creative', brainstorm: 'brainstorm', brainstormRefine: 'brainstorm', brainstormChat: 'brainstorm', brainstormScreenplay: 'brainstorm', trendRefresh: 'brainstorm', research: 'research', videoBrainstorm: 'video', videoGenerate: 'video', videoEdit: 'video', socialMedia: 'social', socialMediaCalendar: 'social', socialMediaAudit: 'social', socialMediaCompetitor: 'social', socialMediaScore: 'social', canvasGenerate: 'creative', canvasBgRemove: 'creative', canvasExtend: 'creative', fidatoCanvas: 'creative', fidatoCanvasClaude: 'creative', creativeCampaign: 'creative', creativeCritique: 'creative', adCreative: 'performance', voiceClone: 'voice', voiceTranscribe: 'voice', promptEnhance: 'creative', imageEnhance: 'video', monthlyStrategy: 'brainstorm', monthlyBrief: 'brainstorm', qAdsPrompt: 'video', qAdsEnhance: 'video', qAdsDirector: 'video', qAdsGenerate: 'video', ugcProGenerate: 'video', ugcProAnalyze: 'video', avatarGenerate: 'creative' };
             const studio = studioMap[actionName] || (actionName?.startsWith('seo') ? 'seo' : 'unknown');
 
-
-            creditUsageQueue.push({
+            CreditUsage.create({
                 user: user._id,
                 action: actionName || 'unknown',
                 cost,
@@ -393,20 +278,7 @@ export const requireCredits = (actionOrCost = 1) => {
                     provider: requestedProvider || undefined,
                     providerMultiplier: providerMultiplier > 1 ? providerMultiplier : undefined,
                 },
-            });
-
-            // Activity Log — fire-and-forget entry for team dashboards
-            activityLogQueue.push({
-                user: user._id,
-                userName: user.name || user.email,
-                brand: req.body?.brandId || req.params?.brandId || undefined,
-                brandName: req.body?.brandName || '',
-                action: `${studio}.generated`,
-                studio,
-                details: `${ACTION_LABELS[actionName] || actionName} (${cost} credits)`,
-                creditCost: cost,
-                metadata: { provider: requestedProvider || undefined },
-            });
+            }).catch(err => console.warn('Credit usage log failed:', err.message));
 
             // Store reference for downstream token usage logging
             req.creditAction = actionName;
@@ -414,9 +286,6 @@ export const requireCredits = (actionOrCost = 1) => {
 
             // Attach info for downstream use
             req.creditsDeducted = cost;
-
-            // PERF-001: Invalidate cached user so the next request gets fresh credit data
-            invalidateUserCache(user._id);
 
             next();
         } catch (error) {
@@ -429,15 +298,12 @@ export const requireCredits = (actionOrCost = 1) => {
 /**
  * Deduct credits manually — for use inside handlers where credit deduction 
  * depends on logic (e.g. only deduct if AI call succeeds)
- * 
- * SEC-002 (FIX-01): Uses atomic $expr balance precondition — identical to requireCredits.
- * Returns null if user has insufficient credits (callers MUST handle this).
  */
 export const deductCredits = async (userId, actionOrCost, amount = 1, brandId = null) => {
-    if (!userId) return null;
+    if (!userId) return;
     try {
         const user = await User.findById(userId);
-        if (!user) return null;
+        if (!user) return;
 
         // Bypass for superadmin
         if (user.role === 'superadmin' || user.plan === 'enterprise') {
@@ -451,44 +317,23 @@ export const deductCredits = async (userId, actionOrCost, amount = 1, brandId = 
             cost = costs[actionOrCost] || amount;
         }
 
-        // SEC-002: Atomic balance check — prevents race condition where concurrent
-        // requests each pass the balance check individually and all succeed.
-        const topUp = (user.credits?.topUp > 0 && user.credits?.topUpExpiry && new Date(user.credits.topUpExpiry) > new Date())
-            ? user.credits.topUp : 0;
-
-        const updated = await User.findOneAndUpdate(
-            {
-                _id: userId,
-                $expr: {
-                    $gte: [
-                        { $subtract: [
-                            { $add: [{ $ifNull: ['$credits.total', 0] }, { $ifNull: ['$credits.bonus', 0] }, topUp > 0 ? topUp : 0] },
-                            { $ifNull: ['$credits.used', 0] }
-                        ] },
-                        cost
-                    ]
-                }
-            },
-            { $inc: { 'credits.used': cost } },
-            { returnDocument: 'after' }
-        );
-
-        if (!updated) {
-            console.warn(`❌ [CREDITS] Atomic deductCredits failed — insufficient balance for user ${userId} (action: ${actionOrCost}, cost: ${cost})`);
-            return null; // Callers MUST handle this
-        }
+        const updateOps = [
+            User.findByIdAndUpdate(userId, { $inc: { 'credits.used': cost } }, { returnDocument: 'after' })
+        ];
 
         // If user has an active subscription, sync deduction there too
         if (user.activeSubscription) {
             const Subscription = (await import('../models/Subscription.js')).default;
-            Subscription.findByIdAndUpdate(user.activeSubscription, { $inc: { 'credits.used': cost } }).catch(() => {});
+            updateOps.push(Subscription.findByIdAndUpdate(user.activeSubscription, { $inc: { 'credits.used': cost } }));
         }
+
+        const [updated] = await Promise.all(updateOps);
 
         // Log usage
         const updTopUp = (updated.credits?.topUp > 0 && updated.credits?.topUpExpiry && new Date(updated.credits.topUpExpiry) > new Date()) ? updated.credits.topUp : 0;
         const balanceAfter = (updated.credits?.total || 0) + (updated.credits?.bonus || 0) + updTopUp - (updated.credits?.used || 0);
 
-        creditUsageQueue.push({
+        CreditUsage.create({
             user: userId,
             action: typeof actionOrCost === 'string' ? actionOrCost : 'manual_deduction',
             cost,
@@ -496,16 +341,12 @@ export const deductCredits = async (userId, actionOrCost, amount = 1, brandId = 
             description: ACTION_LABELS[actionOrCost] || actionOrCost || 'AI Operation',
             studio: (typeof actionOrCost === 'string' && actionOrCost.startsWith('seo')) ? 'seo' : 'unknown',
             metadata: { brandId },
-        });
-
-        // Invalidate user cache after deduction
-        invalidateUserCache(userId);
+        }).catch(err => console.warn('Manual credit usage log failed:', err.message));
 
         console.log(`💰 Manually deducted ${cost} credits from user ${userId} for ${actionOrCost}`);
         return updated;
     } catch (e) {
         console.error('Manual credit deduction failed:', e.message);
-        return null;
     }
 };
 
@@ -565,7 +406,7 @@ let MODEL_COSTS = {
     'claude-3-7-sonnet-20250219': { input: 0.1, output: 0.5 },
     'sarvam-m': { input: 0.02, output: 0.08 },
     // ── Image models (flat cost per image in USD cents) ──
-    'gemini-3.1-flash-image': { flatCost: 4.0, type: 'image' },
+    'gemini-3.1-flash-image-preview': { flatCost: 4.0, type: 'image' },
     'gemini-1.5-flash-latest': { flatCost: 4.0, type: 'image' },
     'gemini-2.5-flash-image': { flatCost: 4.0, type: 'image' },
     'imagen-3.0-generate-001': { flatCost: 4.0, type: 'image' },
@@ -671,25 +512,13 @@ export { MODEL_COSTS };
 export const refundCredits = async (userId, amount, actionName, description, studio = 'unknown', metadata = {}) => {
     if (!userId || !amount || amount <= 0) return;
     try {
-        // Query the user to verify roles and activeSubscription
-        const user = await User.findById(userId).select('activeSubscription credits role plan email');
-        if (!user) {
-            console.warn(`❌ [REFUND] User ${userId} not found, skipping refund.`);
-            return;
-        }
-
-        // Bypass checks for exempt users: never refund since they never paid credits
-        const isCreditExempt = user.role === 'superadmin' || user.plan === 'enterprise';
-        if (isCreditExempt) {
-            console.log(`🛡️ [REFUND] Skipping refund for credit-exempt user ${user.email || userId} (Role: ${user.role}, Plan: ${user.plan})`);
-            return;
-        }
-
         const updateOps = [
             User.findByIdAndUpdate(userId, { $inc: { 'credits.used': -amount } }, { returnDocument: 'after' })
         ];
 
-        if (user.activeSubscription) {
+        // We need the user to check activeSubscription
+        const user = await User.findById(userId).select('activeSubscription credits');
+        if (user?.activeSubscription) {
             const Subscription = (await import('../models/Subscription.js')).default;
             updateOps.push(Subscription.findByIdAndUpdate(user.activeSubscription, { $inc: { 'credits.used': -amount } }));
         }
@@ -728,17 +557,8 @@ export const logTokenUsage = async (userId, tokenData, meta = {}) => {
     if (!userId || !tokenData) return;
     const { inputTokens = 0, outputTokens = 0, model = '', provider = '' } = tokenData;
     const totalTokens = inputTokens + outputTokens;
-    
-    const baseCost = MODEL_COSTS[model] || { input: 0.05, output: 0.15 };
-    const modelCost = {
-        input: typeof baseCost.input === 'number' ? baseCost.input : 0.05,
-        output: typeof baseCost.output === 'number' ? baseCost.output : 0.15,
-        flatCost: typeof baseCost.flatCost === 'number' ? baseCost.flatCost : 0
-    };
-    
-    const estimatedCost = modelCost.flatCost > 0
-        ? modelCost.flatCost
-        : Math.round(((inputTokens / 1000) * modelCost.input + (outputTokens / 1000) * modelCost.output) * 100) / 100;
+    const modelCost = MODEL_COSTS[model] || { input: 0.05, output: 0.15 };
+    const estimatedCost = Math.round(((inputTokens / 1000) * modelCost.input + (outputTokens / 1000) * modelCost.output) * 100) / 100;
 
     try {
         // 1. Update the most recent CreditUsage record if it exists

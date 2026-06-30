@@ -4,7 +4,6 @@ import DashboardLayout from '../components/DashboardLayout'
 import SEOHead from '../components/SEOHead'
 import { credits as creditsAPI, payments as paymentsAPI, rewards as rewardsAPI } from '../services/api'
 import { useRazorpay } from '../hooks/useRazorpay'
-import { useShopify } from '../context/ShopifyContext'
 
 
 const ACTION_ICONS = {
@@ -94,101 +93,11 @@ export default function CreditsPage() {
     const [showCheckout, setShowCheckout] = useState(false)
     const [checkoutItem, setCheckoutItem] = useState(null) // { type: 'topup' | 'subscription', ...item }
     const { loadRazorpay } = useRazorpay()
-    const [billingProvider, setBillingProvider] = useState(null)
-    const [shopDomain, setShopDomain] = useState(null)
-
-    const shopifyContext = useShopify() || {};
-    const { isEmbedded } = shopifyContext;
-    const activeBillingProvider = isEmbedded ? 'shopify' : billingProvider;
 
 
 
-    useEffect(() => { loadSummary(); loadUsage(); loadStoreVisibility(); loadSubStatus(); detectBillingProvider() }, [])
+    useEffect(() => { loadSummary(); loadUsage(); loadStoreVisibility(); loadSubStatus() }, [])
     useEffect(() => { loadUsage() }, [page])
-
-    useEffect(() => {
-        const billingResult = searchParams.get('shopify_billing')
-        const topupResult = searchParams.get('shopify_topup')
-        const errorResult = searchParams.get('error')
-        const detailResult = searchParams.get('detail')
-
-        if (billingResult === 'success') {
-            const plan = searchParams.get('plan') || ''
-            alert(`Successfully subscribed to the ${plan} plan via Shopify!`)
-        } else if (topupResult === 'success') {
-            const credits = searchParams.get('credits') || ''
-            alert(`Successfully added ${credits} credits via Shopify!`)
-        } else if (errorResult) {
-            let msg = 'Billing failed: '
-            if (errorResult === 'charge_not_approved') msg += 'Charge not approved.'
-            else if (errorResult === 'integration_not_found') msg += 'Shopify integration not found.'
-            else if (errorResult === 'subscription_inactive') msg += 'Subscription not active.'
-            else if (errorResult === 'purchase_inactive') msg += 'Purchase not active.'
-            else msg += errorResult
-            if (detailResult) msg += ` (${detailResult})`
-            alert(msg)
-        }
-    }, [searchParams])
-
-    const detectBillingProvider = async () => {
-        try {
-            const data = await paymentsAPI.billingProvider()
-            if (data.success && data.provider) {
-                setBillingProvider(data.provider)
-                setShopDomain(data.shopDomain)
-            }
-        } catch (e) {
-            console.error('Failed to detect billing provider:', e)
-        }
-    }
-
-    const getDisplayPrice = (item, type, cycle = billingCycle) => {
-        if (activeBillingProvider === 'shopify') {
-            if (type === 'subscription') {
-                const usdPrices = {
-                    plus: { monthly: 20.00, quarterly: 55.00, yearly: 200.00 },
-                    max: { monthly: 100.00, quarterly: 270.00, yearly: 1000.00 },
-                    generative: { monthly: 200.00, quarterly: 540.00, yearly: 2000.00 },
-                    elite: { monthly: 1000.00, quarterly: 2850.00, yearly: 10800.00 }
-                };
-                const slug = item.slug;
-                if (usdPrices[slug] && usdPrices[slug][cycle]) {
-                    return { amount: usdPrices[slug][cycle], currency: 'USD', symbol: '$' };
-                }
-                const inrPrice = item.pricing?.[cycle] || item.pricing?.monthly || 0;
-                return { amount: parseFloat((inrPrice / 90).toFixed(2)), currency: 'USD', symbol: '$' };
-            } else {
-                const usdPrices = {
-                    'festive-special': 29.99,
-                    'micro': 1.99,
-                    'spark': 3.99,
-                    'boost': 9.99,
-                    'power': 19.99,
-                    'ultra': 24.99,
-                    'stellar': 29.99,
-                    'mega': 49.99,
-                    'elite': 99.99,
-                    'enterprise-pack': 179.99,
-                };
-                const slug = item.slug;
-                if (usdPrices[slug]) {
-                    return { amount: usdPrices[slug], currency: 'USD', symbol: '$' };
-                }
-                const inrPrice = item.price || 0;
-                return { amount: parseFloat((inrPrice / 90).toFixed(2)), currency: 'USD', symbol: '$' };
-            }
-        }
-        const amount = type === 'subscription' 
-            ? (item.pricing?.[cycle] || item.pricing?.monthly || 0)
-            : (item.price || 0);
-        return { amount, currency: 'INR', symbol: '₹' };
-    };
-
-    const getPerCredit = (pack, usdPriceObj) => {
-        const total = pack.total || (pack.credits + (pack.bonusCredits || 0));
-        if (total === 0) return 0;
-        return parseFloat((usdPriceObj.amount / total).toFixed(4));
-    };
 
     const loadSummary = async () => {
         try {
@@ -276,19 +185,6 @@ export default function CreditsPage() {
     }
 
     const confirmUpgrade = async (pkg) => {
-        if (activeBillingProvider === 'shopify') {
-            try {
-                const data = await paymentsAPI.shopifyCreateSubscription(pkg._id, billingCycle)
-                if (data.success && data.confirmationUrl) {
-                    window.location.href = data.confirmationUrl
-                } else {
-                    alert('Failed to initialize Shopify billing redirect')
-                }
-            } catch (e) {
-                alert('Failed to initialize Shopify billing: ' + e.message)
-            }
-            return
-        }
         try {
             const { orderId, amount, currency, proRata } = await paymentsAPI.createOrder(pkg._id, billingCycle, appliedCoupon?.coupon?.code)
             const options = {
@@ -320,10 +216,7 @@ export default function CreditsPage() {
     const handleCancelSubscription = async () => {
         setCancelLoading(true)
         try {
-            const isShopify = subStatus?.paymentMethod === 'shopify'
-            const data = isShopify 
-                ? await paymentsAPI.shopifyCancelSubscription(cancelReason)
-                : await paymentsAPI.cancelSubscription(cancelReason)
+            const data = await paymentsAPI.cancelSubscription(cancelReason)
             setCancelModal({
                 step: data.retentionOffer ? 'offer' : 'done',
                 ...data,
@@ -361,19 +254,6 @@ export default function CreditsPage() {
     }
 
     const confirmTopup = async (pack) => {
-        if (activeBillingProvider === 'shopify') {
-            try {
-                const data = await paymentsAPI.shopifyCreateTopup(pack.id || pack._id)
-                if (data.success && data.confirmationUrl) {
-                    window.location.href = data.confirmationUrl
-                } else {
-                    alert('Failed to initialize Shopify payment redirect')
-                }
-            } catch (e) {
-                alert('Failed to initialize Shopify payment: ' + e.message)
-            }
-            return
-        }
         try {
             const { orderId, amount, currency, creditsToAdd } = await paymentsAPI.createTopupOrder(pack.id, appliedCoupon?.coupon?.code)
             const options = {
@@ -693,31 +573,13 @@ export default function CreditsPage() {
                                                     )}
                                                 </div>
                                                 <p className="text-xs text-[var(--sys-text-muted)] mb-2">
-                                                    {(() => {
-                                                        const priceObj = getDisplayPrice(pack, 'topup');
-                                                        const perCredit = getPerCredit(pack, priceObj);
-                                                        return `${priceObj.symbol}${perCredit} / credit, valid for ${pack.validityDays} days`;
-                                                    })()}
+                                                    ₹{pack.perCredit} / credit, valid for {pack.validityDays} days
                                                 </p>
                                                 {pack.promoOriginalPrice > 0 && (
-                                                    <p className="text-xs text-[var(--sys-text-muted)] line-through mb-1">
-                                                        {(() => {
-                                                            const originalPriceObj = activeBillingProvider === 'shopify' 
-                                                                ? { amount: parseFloat((pack.promoOriginalPrice / 90).toFixed(2)), symbol: '$' } 
-                                                                : { amount: pack.promoOriginalPrice, symbol: '₹' };
-                                                            return `${originalPriceObj.symbol}${originalPriceObj.amount.toLocaleString(undefined, { minimumFractionDigits: activeBillingProvider === 'shopify' ? 2 : 0 })}`;
-                                                        })()}
-                                                    </p>
+                                                    <p className="text-xs text-[var(--sys-text-muted)] line-through mb-1">₹{pack.promoOriginalPrice?.toLocaleString()}</p>
                                                 )}
                                                 <div className="flex items-center justify-between mt-auto pt-3">
-                                                    {(() => {
-                                                        const priceObj = getDisplayPrice(pack, 'topup');
-                                                        return (
-                                                            <span className="text-xl font-black text-[var(--sys-text)]">
-                                                                {priceObj.symbol} {priceObj.currency === 'USD' ? priceObj.amount.toFixed(2) : priceObj.amount.toLocaleString()}
-                                                            </span>
-                                                        );
-                                                    })()}
+                                                    <span className="text-xl font-black text-[var(--sys-text)]">₹ {pack.price?.toLocaleString()}</span>
                                                     <button
                                                         onClick={() => handleTopup(pack)}
                                                         className="px-5 py-2 rounded-lg text-sm font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all"
@@ -763,28 +625,17 @@ export default function CreditsPage() {
                                             )}
                                         </div>
                                         <div className="flex items-center justify-between mt-3 pt-3 border-t border-[var(--sys-border)]">
-                                            {(() => {
-                                                const priceObj = getDisplayPrice(pack, 'topup');
-                                                const perCredit = getPerCredit(pack, priceObj);
-                                                return (
-                                                    <>
-                                                        <div>
-                                                            <span className="text-lg font-black text-[var(--sys-text)]">
-                                                                {priceObj.symbol} {priceObj.currency === 'USD' ? priceObj.amount.toFixed(2) : priceObj.amount.toLocaleString()}
-                                                            </span>
-                                                            <p className="text-[10px] text-[var(--sys-text-muted)]">
-                                                                {priceObj.symbol}{perCredit}/cr • {pack.validityDays}d
-                                                            </p>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => handleTopup(pack)}
-                                                            className="px-5 py-2 rounded-lg text-sm font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all"
-                                                        >
-                                                            Purchase
-                                                        </button>
-                                                    </>
-                                                );
-                                            })()}
+                                            <div>
+                                                <span className="text-lg font-black text-[var(--sys-text)]">₹ {pack.price?.toLocaleString()}</span>
+
+                                                <p className="text-[10px] text-[var(--sys-text-muted)]">₹{pack.perCredit}/cr • {pack.validityDays}d</p>
+                                            </div>
+                                            <button
+                                                onClick={() => handleTopup(pack)}
+                                                className="px-5 py-2 rounded-lg text-sm font-bold bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] hover:bg-[var(--sys-surface)] transition-all"
+                                            >
+                                                Purchase
+                                            </button>
                                         </div>
                                     </div>
                                 ))}
@@ -974,56 +825,57 @@ export default function CreditsPage() {
                             </div>
 
                             {/* Coupon Section (Plans) */}
-                            {activeBillingProvider !== 'shopify' && (
-                                <div className="glass-panel p-6 rounded-2xl border border-[var(--sys-border)] flex flex-wrap items-center justify-between gap-4">
-                                    <div className="flex items-center gap-3">
-                                        <span className="material-symbols-outlined text-2xl text-primary">local_offer</span>
-                                        <div>
-                                            <h4 className="text-sm font-bold text-[var(--sys-text)]">Have a Coupon?</h4>
-                                            <p className="text-xs text-[var(--sys-text-muted)]">Get additional discounts on your subscription.</p>
-                                        </div>
+                            <div className="glass-panel p-6 rounded-2xl border border-[var(--sys-border)] flex flex-wrap items-center justify-between gap-4">
+                                <div className="flex items-center gap-3">
+                                    <span className="material-symbols-outlined text-2xl text-primary">local_offer</span>
+                                    <div>
+                                        <h4 className="text-sm font-bold text-[var(--sys-text)]">Have a Coupon?</h4>
+                                        <p className="text-xs text-[var(--sys-text-muted)]">Get additional discounts on your subscription.</p>
                                     </div>
-                                    {appliedCoupon ? (
-                                        <div className="flex items-center gap-3 bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] px-4 py-2 rounded-xl">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-sm font-bold text-primary">{appliedCoupon.coupon.code}</span>
-                                                <span className="text-xs text-primary">Applied</span>
-                                            </div>
-                                            <button onClick={removeCoupon} className="material-symbols-outlined text-sm text-primary hover:text-[var(--sys-text)] transition-all">cancel</button>
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center gap-2">
-                                            <input 
-                                                type="text" 
-                                                placeholder="Enter code..." 
-                                                value={couponInput}
-                                                onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
-                                                className="bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-2 text-sm text-[var(--sys-text)] focus:outline-none focus:border-primary/50"
-                                            />
-                                            <button 
-                                                onClick={handleApplyCoupon}
-                                                disabled={couponLoading || !couponInput.trim()}
-                                                className="px-4 py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl text-sm font-bold hover:bg-primary/20 transition-all disabled:opacity-50"
-                                            >
-                                                {couponLoading ? '...' : 'Apply'}
-                                            </button>
-                                        </div>
-                                    )}
-                                    {couponError && <p className="w-full text-xs text-primary">{couponError}</p>}
                                 </div>
-                            )}
+                                {appliedCoupon ? (
+                                    <div className="flex items-center gap-3 bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] px-4 py-2 rounded-xl">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-bold text-primary">{appliedCoupon.coupon.code}</span>
+                                            <span className="text-xs text-primary">Applied</span>
+                                        </div>
+                                        <button onClick={removeCoupon} className="material-symbols-outlined text-sm text-primary hover:text-[var(--sys-text)] transition-all">cancel</button>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-2">
+                                        <input 
+                                            type="text" 
+                                            placeholder="Enter code..." 
+                                            value={couponInput}
+                                            onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                                            className="bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl px-4 py-2 text-sm text-[var(--sys-text)] focus:outline-none focus:border-primary/50"
+                                        />
+                                        <button 
+                                            onClick={handleApplyCoupon}
+                                            disabled={couponLoading || !couponInput.trim()}
+                                            className="px-4 py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl text-sm font-bold hover:bg-primary/20 transition-all disabled:opacity-50"
+                                        >
+                                            {couponLoading ? '...' : 'Apply'}
+                                        </button>
+                                    </div>
+                                )}
+                                {couponError && <p className="w-full text-xs text-primary">{couponError}</p>}
+                            </div>
 
                             {packagesLoading ? (
                                 <div className="flex items-center justify-center h-64">
                                     <div className="size-8 border border-primary border-t-transparent rounded-full animate-spin" />
                                 </div>
                             ) : (
-                                <>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                     {packages.map((pkg) => {
                                         const isCurrent = pkg.slug === balance?.plan;
                                         const currentTier = packages.find(p => p.slug === balance?.plan)?.tier || 0;
                                         const isUpgrade = pkg.tier > currentTier;
+                                        const price = pkg.pricing?.[billingCycle] || pkg.pricing?.monthly || 0;
+                                        const monthlyEquiv = billingCycle === 'yearly' ? Math.round(price / 12) : billingCycle === 'quarterly' ? Math.round(price / 3) : price;
+                                        const monthlyPrice = pkg.pricing?.monthly || 0;
+                                        const savings = billingCycle !== 'monthly' && monthlyPrice > 0 && price > 0 ? Math.round((1 - monthlyEquiv / monthlyPrice) * 100) : 0;
 
                                         // ── Contact-for-pricing card (Agency / Enterprise) ──
                                         if (pkg.contactForPricing) {
@@ -1101,32 +953,19 @@ export default function CreditsPage() {
                                                     </div>
                                                     <p className="text-sm text-[var(--sys-text-muted)] mb-6">{pkg.description}</p>
                                                     <div className="mb-6">
-                                                        {(() => {
-                                                            const priceObj = getDisplayPrice(pkg, 'subscription', billingCycle);
-                                                            const price = priceObj.amount;
-                                                            const monthlyEquiv = billingCycle === 'yearly' ? (price / 12) : billingCycle === 'quarterly' ? (price / 3) : price;
-                                                            const monthlyPriceObj = getDisplayPrice(pkg, 'subscription', 'monthly');
-                                                            const monthlyPrice = monthlyPriceObj.amount;
-                                                            const savings = billingCycle !== 'monthly' && monthlyPrice > 0 && price > 0 ? Math.round((1 - (price / (billingCycle === 'yearly' ? 12 : 3)) / monthlyPrice) * 100) : 0;
-                                                            return (
-                                                                <>
-                                                                    <span className="text-3xl font-black text-[var(--sys-text)]">
-                                                                        {priceObj.symbol}{priceObj.currency === 'USD' ? price.toFixed(2) : price.toLocaleString()}
-                                                                    </span>
-                                                                    <span className="text-[var(--sys-text-muted)] text-sm">/{billingCycle === 'yearly' ? 'yr' : billingCycle === 'quarterly' ? 'qtr' : 'mo'}</span>
-                                                                    {savings > 0 && (
-                                                                        <span className="ml-2 px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary text-xs font-bold">
-                                                                            Save {savings}%
-                                                                        </span>
-                                                                    )}
-                                                                    {billingCycle !== 'monthly' && monthlyEquiv > 0 && (
-                                                                        <p className="text-xs text-[var(--sys-text-muted)] mt-1">
-                                                                            ≈ {priceObj.symbol}{priceObj.currency === 'USD' ? monthlyEquiv.toFixed(2) : Math.round(monthlyEquiv).toLocaleString()}/mo
-                                                                        </p>
-                                                                    )}
-                                                                </>
-                                                            );
-                                                        })()}
+                                                        <>
+                                                            <span className="text-3xl font-black text-[var(--sys-text)]">{pkg.pricing.currency === 'INR' ? '₹' : '$'}{price?.toLocaleString()}</span>
+                                                            <span className="text-[var(--sys-text-muted)] text-sm">/{billingCycle === 'yearly' ? 'yr' : billingCycle === 'quarterly' ? 'qtr' : 'mo'}</span>
+                                                        </>
+
+                                                        {savings > 0 && (
+                                                            <span className="ml-2 px-2 py-0.5 rounded-full bg-[var(--sys-primary-dim)] text-primary text-xs font-bold">
+                                                                Save {savings}%
+                                                            </span>
+                                                        )}
+                                                        {billingCycle !== 'monthly' && monthlyEquiv > 0 && (
+                                                            <p className="text-xs text-[var(--sys-text-muted)] mt-1">≈ ₹{monthlyEquiv?.toLocaleString()}/mo</p>
+                                                        )}
                                                     </div>
                                                     <ul className="space-y-3 mb-8">
                                                         <li className="flex items-center gap-2 text-sm text-[var(--sys-text-muted)]">
@@ -1167,22 +1006,6 @@ export default function CreditsPage() {
                                     })}
                                 </div>
 
-                                {/* All paid plans include info box */}
-                                <div className="mt-8 p-6 rounded-2xl border border-[var(--sys-border)] bg-[var(--sys-surface)]/10 backdrop-blur-md relative overflow-hidden">
-                                    <div className="absolute inset-0 opacity-[0.02] pointer-events-none bg-gradient-to-r from-primary to-transparent" />
-                                    <div className="flex items-center gap-2 mb-4">
-                                        <span className="material-symbols-outlined text-primary text-lg">auto_awesome</span>
-                                        <h4 className="text-sm font-bold text-[var(--sys-text)]">All paid plans include:</h4>
-                                    </div>
-                                    <div className="space-y-2.5 pl-6 text-xs text-[var(--sys-text-muted)] leading-relaxed">
-                                        <p>Access to 200+ image, video, audio, music models including <strong className="text-[var(--sys-text)] font-semibold">Seedance 2.0, Veo 3.1, Kling 3.0, Nano banana pro & Elevenlabs music</strong>.</p>
-                                        <p>Access to Mantram v4 agent that can create up to 30 mins of video from a single prompt.</p>
-                                        <p>Access to top stock providers like iStock, Storyblocks & more.</p>
-                                        <p>Model & agent prices are subject to change.</p>
-                                        <p>On-demand credit top-ups available.</p>
-                                    </div>
-                                </div>
-                                </>
                             )}
                         </div>
                     ) : (
@@ -1394,99 +1217,86 @@ export default function CreditsPage() {
 
                     <div className="p-6 space-y-6">
                         {/* Item Summary */}
-                        {(() => {
-                            const priceObj = getDisplayPrice(checkoutItem, checkoutItem.type, checkoutItem.type === 'subscription' ? billingCycle : undefined);
-                            const displayPriceStr = `${priceObj.symbol}${priceObj.currency === 'USD' ? priceObj.amount.toFixed(2) : priceObj.amount.toLocaleString()}`;
-                            const subtotal = priceObj.amount;
-                            const totalAmount = appliedCoupon?.finalPrice || subtotal;
-                            
-                            return (
-                                <>
-                                    <div className="bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-2xl p-4 flex items-center gap-4">
-                                        <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                                            <span className="material-symbols-outlined text-2xl text-primary">
-                                                {checkoutItem.type === 'subscription' ? 'diamond' : (checkoutItem.icon || 'token')}
-                                            </span>
-                                        </div>
-                                        <div className="flex-1">
-                                            <h4 className="text-[var(--sys-text)] font-bold">{checkoutItem.name || (checkoutItem.type === 'subscription' ? 'Subscription Upgrade' : `${checkoutItem.total} Credits`)}</h4>
-                                            <p className="text-xs text-[var(--sys-text-muted)]">
-                                                {checkoutItem.type === 'subscription' ? `Billed ${billingCycle}` : `${checkoutItem.validityDays} Days Validity`}
+                        <div className="bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-2xl p-4 flex items-center gap-4">
+                            <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                                <span className="material-symbols-outlined text-2xl text-primary">
+                                    {checkoutItem.type === 'subscription' ? 'diamond' : (checkoutItem.icon || 'token')}
+                                </span>
+                            </div>
+                            <div className="flex-1">
+                                <h4 className="text-[var(--sys-text)] font-bold">{checkoutItem.name || (checkoutItem.type === 'subscription' ? 'Subscription Upgrade' : `${checkoutItem.total} Credits`)}</h4>
+                                <p className="text-xs text-[var(--sys-text-muted)]">
+                                    {checkoutItem.type === 'subscription' ? `Billed ${billingCycle}` : `${checkoutItem.validityDays} Days Validity`}
+                                </p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-lg font-black text-[var(--sys-text)]">₹{(checkoutItem.type === 'subscription' ? (checkoutItem.pricing?.[billingCycle] || checkoutItem.pricing?.monthly) : checkoutItem.price)?.toLocaleString()}</p>
+                            </div>
+                        </div>
+
+                        {/* Coupon Section */}
+                        <div className="space-y-3">
+                            <h4 className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider px-1">Promo Code</h4>
+                            {appliedCoupon ? (
+                                <div className="flex items-center justify-between bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] px-4 py-3 rounded-2xl">
+                                    <div className="flex items-center gap-3">
+                                        <span className="material-symbols-outlined text-primary">local_offer</span>
+                                        <div>
+                                            <p className="text-sm font-bold text-primary">{appliedCoupon.coupon.code}</p>
+                                            <p className="text-[10px] text-primary/80">
+                                                {appliedCoupon.coupon.discountType === 'percentage' 
+                                                    ? `${appliedCoupon.coupon.discountValue}% OFF Applied` 
+                                                    : `₹${appliedCoupon.coupon.discountValue} OFF Applied`}
                                             </p>
                                         </div>
-                                        <div className="text-right">
-                                            <p className="text-lg font-black text-[var(--sys-text)]">{displayPriceStr}</p>
-                                        </div>
                                     </div>
+                                    <button 
+                                        onClick={removeCoupon}
+                                        className="text-xs font-bold text-primary hover:text-primary transition-all"
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="relative group">
+                                    <input 
+                                        type="text" 
+                                        placeholder="Enter coupon code..." 
+                                        value={couponInput}
+                                        onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                                        className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-2xl px-5 py-3.5 pr-24 text-sm text-[var(--sys-text)] focus:outline-none focus:border-primary/50 transition-all"
+                                    />
+                                    <button 
+                                        onClick={handleApplyCoupon}
+                                        disabled={couponLoading || !couponInput.trim()}
+                                        className="absolute right-2 top-2 bottom-2 px-4 bg-primary/10 text-primary border border-primary/20 rounded-xl text-xs font-bold hover:bg-primary/20 transition-all disabled:opacity-50"
+                                    >
+                                        {couponLoading ? '...' : 'Apply'}
+                                    </button>
+                                </div>
+                            )}
+                            {couponError && <p className="text-[10px] text-primary px-1">{couponError}</p>}
+                        </div>
 
-                                    {/* Coupon Section */}
-                                    {activeBillingProvider !== 'shopify' && (
-                                        <div className="space-y-3">
-                                            <h4 className="text-xs font-bold text-[var(--sys-text-muted)] uppercase tracking-wider px-1">Promo Code</h4>
-                                            {appliedCoupon ? (
-                                                <div className="flex items-center justify-between bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] px-4 py-3 rounded-2xl">
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="material-symbols-outlined text-primary">local_offer</span>
-                                                        <div>
-                                                            <p className="text-sm font-bold text-primary">{appliedCoupon.coupon.code}</p>
-                                                            <p className="text-[10px] text-primary/80">
-                                                                {appliedCoupon.coupon.discountType === 'percentage' 
-                                                                    ? `${appliedCoupon.coupon.discountValue}% OFF Applied` 
-                                                                    : `₹${appliedCoupon.coupon.discountValue} OFF Applied`}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                    <button 
-                                                        onClick={removeCoupon}
-                                                        className="text-xs font-bold text-primary hover:text-primary transition-all"
-                                                    >
-                                                        Remove
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                <div className="relative group">
-                                                    <input 
-                                                        type="text" 
-                                                        placeholder="Enter coupon code..." 
-                                                        value={couponInput}
-                                                        onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
-                                                        className="w-full bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-2xl px-5 py-3.5 pr-24 text-sm text-[var(--sys-text)] focus:outline-none focus:border-primary/50 transition-all"
-                                                    />
-                                                    <button 
-                                                        onClick={handleApplyCoupon}
-                                                        disabled={couponLoading || !couponInput.trim()}
-                                                        className="absolute right-2 top-2 bottom-2 px-4 bg-primary/10 text-primary border border-primary/20 rounded-xl text-xs font-bold hover:bg-primary/20 transition-all disabled:opacity-50"
-                                                    >
-                                                        {couponLoading ? '...' : 'Apply'}
-                                                    </button>
-                                                </div>
-                                            )}
-                                            {couponError && <p className="text-[10px] text-primary px-1">{couponError}</p>}
-                                        </div>
-                                    )}
-
-                                    {/* Totals */}
-                                    <div className="space-y-3 pt-2">
-                                        <div className="flex justify-between text-sm text-[var(--sys-text-muted)]">
-                                            <span>Subtotal</span>
-                                            <span>{displayPriceStr}</span>
-                                        </div>
-                                        {appliedCoupon && (
-                                            <div className="flex justify-between text-sm text-primary">
-                                                <span>Discount ({appliedCoupon.coupon.code})</span>
-                                                <span>-{priceObj.symbol}{appliedCoupon.discount?.toLocaleString()}</span>
-                                            </div>
-                                        )}
-                                        <div className="flex justify-between items-center pt-3 border-t border-[var(--sys-border)]">
-                                            <span className="text-[var(--sys-text)] font-bold">Total Amount</span>
-                                            <span className="text-2xl font-black text-[var(--sys-text)]">
-                                                {priceObj.symbol}{priceObj.currency === 'USD' ? totalAmount.toFixed(2) : totalAmount.toLocaleString()}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </>
-                            );
-                        })()}
+                        {/* Totals */}
+                        <div className="space-y-3 pt-2">
+                            <div className="flex justify-between text-sm text-[var(--sys-text-muted)]">
+                                <span>Subtotal</span>
+                                <span>₹{(checkoutItem.type === 'subscription' ? (checkoutItem.pricing?.[billingCycle] || checkoutItem.pricing?.monthly) : checkoutItem.price)?.toLocaleString()}</span>
+                            </div>
+                            {appliedCoupon && (
+                                <div className="flex justify-between text-sm text-primary">
+                                    <span>Discount ({appliedCoupon.coupon.code})</span>
+                                    <span>-₹{appliedCoupon.discount?.toLocaleString()}</span>
+                                </div>
+                            )}
+                            <div className="flex justify-between items-center pt-3 border-t border-[var(--sys-border)]">
+                                <span className="text-[var(--sys-text)] font-bold">Total Amount</span>
+                                <span className="text-2xl font-black text-[var(--sys-text)]">
+                                    ₹{(appliedCoupon?.finalPrice || (checkoutItem.type === 'subscription' ? (checkoutItem.pricing?.[billingCycle] || checkoutItem.pricing?.monthly) : checkoutItem.price))?.toLocaleString()}
+                                </span>
+                            </div>
+                        </div>
 
                         {/* Action */}
                         <button 
@@ -1501,7 +1311,7 @@ export default function CreditsPage() {
                         </button>
                         
                         <p className="text-[10px] text-[var(--sys-text-muted)] text-center">
-                            By proceeding, you agree to our Terms of Service. Payments are processed securely via {activeBillingProvider === 'shopify' ? 'Shopify Billing' : 'Razorpay'}.
+                            By proceeding, you agree to our Terms of Service. Payments are processed securely via Razorpay.
                         </p>
                     </div>
                 </div>
