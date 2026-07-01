@@ -17,7 +17,7 @@
 import fetch from 'node-fetch';
 import config from '../../config/env.js';
 import sharp from 'sharp';
-import { uploadToS3, ensureS3Url } from '../../utils/s3.js';
+import { uploadToS3, ensureS3Url, getSignedUrlForPath } from '../../utils/s3.js';
 import { fetchOptions } from '../../utils/network.js';
 import { sanitizePromptForProvider } from './promptSanitizer.js';
 
@@ -161,7 +161,8 @@ async function resizeToAspectRatio(base64DataUri, targetRatio) {
 async function ensureAssetCompatible(imageUrl) {
     if (!imageUrl || !imageUrl.startsWith('http')) return imageUrl;
     try {
-        const res = await fetch(imageUrl, fetchOptions({}));
+        const signedImageUrl = await getSignedUrlForPath(imageUrl);
+        const res = await fetch(signedImageUrl, fetchOptions({}));
         const buffer = Buffer.from(await res.arrayBuffer());
         const contentType = res.headers.get('content-type') || '';
         
@@ -210,7 +211,8 @@ async function uploadMediaToAtlasCDN(imageUrl) {
         console.log(`📸 [Atlas CDN] Uploading to Atlas media storage: ${rawUrl.substring(0, 60)}...`);
         // Pre-process: ensure format + resolution are compatible before CDN upload
         const compatibleUrl = await ensureAssetCompatible(rawUrl);
-        const imageRes = await fetch(compatibleUrl, fetchOptions({}));
+        const signedCompatibleUrl = await getSignedUrlForPath(compatibleUrl);
+        const imageRes = await fetch(signedCompatibleUrl, fetchOptions({}));
         const arrayBuffer = await imageRes.arrayBuffer();
         const contentType = imageRes.headers.get('content-type') || 'image/jpeg';
         
@@ -269,11 +271,12 @@ async function uploadFaceAsset(imageUrl, name = 'face_ref') {
     try {
         // Pre-process: convert unsupported formats + ensure min 300x300 resolution
         const compatibleUrl = await ensureAssetCompatible(imageUrl);
+        const signedCompatibleUrl = await getSignedUrlForPath(compatibleUrl);
         console.log(`👤 [Atlas Asset] Registering face asset: ${compatibleUrl.substring(0, 80)}...`);
         const res = await fetch(`${ATLAS_CONSOLE_BASE}/sd/assets`, fetchOptions({
             method: 'POST',
             headers: authHeaders(),
-            body: JSON.stringify({ url: compatibleUrl, name }),
+            body: JSON.stringify({ url: signedCompatibleUrl, name }),
         }));
         const json = await res.json();
         const assetId       = json?.data?.id || json?.id;
@@ -682,11 +685,11 @@ export async function submitAtlasCloudVideoGeneration({
 
     const finalReferenceImages = [...registeredAssetUris, ...rawFallbackUrls];
     if (finalReferenceImages.length > 0) {
-        taskInput.reference_images = finalReferenceImages;
+        taskInput.reference_images = await Promise.all(finalReferenceImages.map(async u => (u && !u.startsWith('asset://')) ? await getSignedUrlForPath(u) : u));
     }
     
     if (firstFrameAssetUris.length > 0) {
-        taskInput.image_urls = firstFrameAssetUris;
+        taskInput.image_urls = await Promise.all(firstFrameAssetUris.map(async u => (u && !u.startsWith('asset://')) ? await getSignedUrlForPath(u) : u));
     }
 
     const payload = { model: model === 'veo-3.1-lite' ? 'veo-3.1-lite' : 'seedance', task_type: modelName, input: taskInput };
@@ -734,7 +737,7 @@ export async function submitAtlasCloudImageToVideo({
 
     const payload = {
         model: model === 'veo-3.1-lite' ? 'veo-3.1-lite' : 'seedance', task_type: modelName,
-        input: { prompt: finalPrompt, image_urls: [hostedUrl, ...hostedRefs.filter(Boolean)], aspect_ratio: aspectRatio || '16:9', duration: dur },
+        input: { prompt: finalPrompt, image_urls: await Promise.all([hostedUrl, ...hostedRefs.filter(Boolean)].map(u => getSignedUrlForPath(u))), aspect_ratio: aspectRatio || '16:9', duration: dur },
     };
     const taskId = await submitAtlasCloudPayload(payload);
     return { taskId, provider: 'atlascloud', model, mode: 'i2v', _payload: payload, type: 'generation' };
