@@ -186,13 +186,32 @@ export const requireCredits = (actionOrCost = 1) => {
                 const rawCost = costs[actionOrCost];
 
                 // Dynamic video credits — calculated per request
-                if (rawCost === 'dynamic' && (actionOrCost === 'videoGenerate' || actionOrCost === 'storyboardAnimate')) {
+                if (rawCost === 'dynamic' && actionOrCost === 'videoGenerate') {
                     const { model = 'seedance-2.0-fast', duration = 5,
                         resolution = '720p', qualityMode = 'fast' } = req.body;
                     const estimate = estimateCost(model, duration, resolution, qualityMode);
                     // ceil(USD × 70) ensures ~75% margin at ₹5/credit floor
                     cost = Math.max(Math.ceil(estimate.usd * 70), 5);
-                    console.log(`🎬 Dynamic video credits for ${actionOrCost}: ${model} ${duration}s ${resolution} ${qualityMode} → ${cost} credits`);
+                    console.log(`🎬 Dynamic video credits: ${model} ${duration}s ${resolution} ${qualityMode} → ${cost} credits`);
+                } else if (rawCost === 'dynamic' && actionOrCost === 'storyboardAnimate') {
+                    const { model = 'seedance-2.0-fast', resolution = '720p', qualityMode = 'fast', projectId, segmentIndex } = req.body;
+                    let duration = parseInt(req.body.duration) || 5;
+                    if (projectId && segmentIndex !== undefined) {
+                        try {
+                            const VideoProject = mongoose.models.VideoProject || (await import('../models/VideoProject.js')).default;
+                            const project = await VideoProject.findById(projectId).lean();
+                            const scenes = project?.storyboard?.scenes || [];
+                            const idx = parseInt(segmentIndex);
+                            if (scenes[idx]?.duration) {
+                                duration = scenes[idx].duration;
+                            }
+                        } catch (e) {
+                            console.warn(`[Credits Middleware] Failed to get segment duration: ${e.message}`);
+                        }
+                    }
+                    const estimate = estimateCost(model, duration, resolution, qualityMode);
+                    cost = Math.max(Math.ceil(estimate.usd * 70), 5);
+                    console.log(`🎬 Dynamic storyboardAnimate credits: ${model} ${duration}s ${resolution} ${qualityMode} → ${cost} credits`);
                 } else if (rawCost === 'dynamic' && actionOrCost === 'storyboardAnimateLongForm') {
                     // Long-form! Calculate cost based on duration, model, and subtract skipped segments if projectId is provided!
                     const { model = 'seedance-2.0-fast', duration = 30,
@@ -204,9 +223,9 @@ export const requireCredits = (actionOrCost = 1) => {
                     const perSegCost = segEstimate.credits;
                     let activeSegCount = segCount;
                     
-                    if (projectId && mongoose.models.VideoProject) {
+                    if (projectId) {
                         try {
-                            const VideoProject = mongoose.models.VideoProject;
+                            const VideoProject = mongoose.models.VideoProject || (await import('../models/VideoProject.js')).default;
                             const project = await VideoProject.findById(projectId).lean();
                             const existingUrls = project?.storyboard?.segmentUrls || {};
                             let skippedCount = 0;
