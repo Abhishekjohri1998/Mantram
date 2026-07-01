@@ -401,6 +401,14 @@ export class GeminiProvider extends BaseProvider {
                         };
                     }
                 }
+                
+                // If we get here, no image was found in the parts.
+                console.error('❌ Gemini GenerateContent returned no image. Full raw response:');
+                console.error(JSON.stringify(data, null, 2));
+                
+                if (data.candidates?.[0]?.finishReason) {
+                    throw new Error(`Gemini returned no image (finishReason: ${data.candidates[0].finishReason})`);
+                }
                 throw new Error('Gemini returned no image in response');
             } 
             

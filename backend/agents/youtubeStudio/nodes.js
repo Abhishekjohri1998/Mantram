@@ -1133,11 +1133,21 @@ Return ONLY a JSON object, no markdown:
 
     try {
         console.log(`🚀 [thumbnailGenerationNode] Using AI generation with strict face preservation...`);
-        const result = await router.generateImage({
-            prompt: finalPrompt,
-            aspectRatio: '16:9',
-            imageParts: imageParts,
-        }, { provider: 'gemini' });
+        let result;
+        try {
+            result = await router.generateImage({
+                prompt: finalPrompt,
+                aspectRatio: '16:9',
+                imageParts: imageParts,
+            }, { provider: 'gemini' });
+        } catch (geminiErr) {
+            console.warn(`⚠️ Gemini image generation failed (${geminiErr.message}). Falling back to OpenAI...`);
+            result = await router.generateImage({
+                prompt: finalPrompt,
+                aspectRatio: '16:9',
+                imageParts: imageParts,
+            }, { provider: 'openai' });
+        }
 
         const rawUrl = typeof result === 'string' ? result : result.imageUrl;
         const genModel = typeof result === 'string' ? 'gemini-3.1-flash-image' : (result.model || 'gemini-3.1-flash-image');
