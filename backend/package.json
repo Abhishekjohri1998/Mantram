@@ -5,7 +5,7 @@
     "main": "index.js",
     "scripts": {
         "start": "node index.js",
-        "dev": "node --watch index.js",
+        "dev": "node --watch-path=routes --watch-path=agents --watch-path=utils --watch-path=models --watch-path=index.js index.js",
         "test": "node --experimental-vm-modules --test __tests__/unit.test.js __tests__/presets.test.js __tests__/promptEnhancer.test.js",
         "backup": "node scripts/syncS3ToLocal.js && node scripts/backupMongoToLocal.js",
         "backup:auto": "node scripts/cronBackup.js",
