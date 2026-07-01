@@ -41,6 +41,9 @@ import { getRedisStatus } from '../utils/cache.js';
 import templateRoutes from './superadmin-templates.js';
 import qAdsRoutes from './superadmin-qads.js';
 import analyticsRoutes from './superadmin-analytics.js';
+import growthRoutes from './superadmin-growth.js';
+import imagesRoutes from './superadmin-images.js';
+import videoStudioRoutes from './superadmin-video-studio.js';
 
 const router = Router();
 
@@ -66,6 +69,9 @@ router.use(protect, authorize('superadmin'), adminLimiter);
 router.use('/templates', templateRoutes);
 router.use('/qads', qAdsRoutes);
 router.use('/analytics', analyticsRoutes);
+router.use('/growth', growthRoutes);
+router.use('/images', imagesRoutes);
+router.use('/video-studio', videoStudioRoutes);
 
 // ══════════════════════════════════════════════════════════════
 // AVATAR LIBRARY — Super Admin template avatar management

@@ -80,9 +80,7 @@ import notificationRoutes from './routes/notifications.js';
 import jobsRoutes from './routes/jobs.js';
 import templatesRoutes from './routes/templates.js';
 import avatarStudioRoutes from './routes/avatar-studio.js';
-import superadminTemplatesRoutes from './routes/superadmin-templates.js';
-import superadminImagesRoutes from './routes/superadmin-images.js';
-import superadminVideoStudioRoutes from './routes/superadmin-video-studio.js';
+
 import commentRepliesRoutes from './routes/comment-replies.js';
 import viralityPredictorRoutes from './routes/virality-predictor.js';
 import activityLogRoutes from './routes/activity-log.js';
