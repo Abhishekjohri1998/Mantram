@@ -684,12 +684,10 @@ export async function submitAtlasCloudVideoGeneration({
     }
 
     const finalReferenceImages = [...registeredAssetUris, ...rawFallbackUrls];
-    if (finalReferenceImages.length > 0) {
-        taskInput.reference_images = await Promise.all(finalReferenceImages.map(async u => (u && !u.startsWith('asset://')) ? await getSignedUrlForPath(u) : u));
-    }
+    const combinedImages = [...firstFrameAssetUris, ...finalReferenceImages];
     
-    if (firstFrameAssetUris.length > 0) {
-        taskInput.image_urls = await Promise.all(firstFrameAssetUris.map(async u => (u && !u.startsWith('asset://')) ? await getSignedUrlForPath(u) : u));
+    if (combinedImages.length > 0) {
+        taskInput.image_urls = await Promise.all(combinedImages.map(async u => (u && !u.startsWith('asset://')) ? await getSignedUrlForPath(u) : u));
     }
 
     const payload = { model: model === 'veo-3.1-lite' ? 'veo-3.1-lite' : 'seedance', task_type: modelName, input: taskInput };
