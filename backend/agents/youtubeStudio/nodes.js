@@ -1814,9 +1814,37 @@ export async function highlightFrameExtractionNode({ videoId, analysis, duration
         }
     }
     
-    // ── FALLBACK: If storyboard failed, use YouTube CDN auto-frames ──────────
+    // ── FALLBACK 1: Try Playwright direct screenshot extraction ──────────
     if (highlightFrames.length === 0) {
-        console.log(`   ℹ️ No storyboard frames — using YouTube CDN auto-frames as fallback`);
+        console.log(`   ℹ️ No storyboard frames — attempting Playwright fallback for exact frames`);
+        try {
+            const { extractFramesWithPlaywright } = await import('../../utils/frameExtraction.js');
+            const pwFrames = await extractFramesWithPlaywright(videoId, allMoments, duration || 600);
+            
+            if (pwFrames && pwFrames.length > 0) {
+                const { uploadToS3 } = await import('../../utils/s3.js');
+                for (let i = 0; i < pwFrames.length; i++) {
+                    const f = pwFrames[i];
+                    if (f.localBuffer) {
+                        const key = `youtube-studio-uploads/frames/${videoId}/pw_${f.timestamp.replace(/:/g, '')}.jpg`;
+                        const s3Url = await uploadToS3(f.localBuffer, key, 'image/jpeg');
+                        highlightFrames.push({
+                            url: s3Url,
+                            label: `${f.label} [${f.timestamp}]`,
+                            score: f.score,
+                            timestamp: f.timestamp,
+                        });
+                    }
+                }
+            }
+        } catch (pwErr) {
+            console.warn(`   ⚠️ Playwright extraction failed: ${pwErr.message}`);
+        }
+    }
+
+    // ── FALLBACK 2: If Playwright failed, use YouTube CDN auto-frames ──────────
+    if (highlightFrames.length === 0) {
+        console.log(`   ℹ️ No Playwright frames — using YouTube CDN auto-frames as fallback`);
         const videoDuration = duration || 600;
         
         for (const moment of allMoments) {

@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import sharp from 'sharp';
 import { uploadToS3 } from './s3.js';
 import ffmpegPath from 'ffmpeg-static';
+import { chromium } from 'playwright';
 
 const execPromise = util.promisify(exec);
 
@@ -182,8 +183,6 @@ export async function intelligentFrameExtraction(videoId, videoUrl, duration, ch
             });
         }
 
-        return frames;
-
     } catch (err) {
         console.error('❌ [frameExtraction] Failed:', err);
         return [];
@@ -195,4 +194,112 @@ export async function intelligentFrameExtraction(videoId, videoUrl, duration, ch
             console.error('Error cleaning up temp files:', e);
         }
     }
+}
+
+/**
+ * Extracts exact frames using a headless browser (Playwright) when FFMPEG/stream extraction fails.
+ * Bypasses stream resolution blocks by acting as a real browser.
+ */
+export async function extractFramesWithPlaywright(videoId, moments = [], durationSecs = 120) {
+    let browser;
+    const extractedFrames = [];
+    try {
+        console.log(`🎬 [frameExtraction] Launching Playwright to extract frames directly from YouTube player...`);
+        browser = await chromium.launch({ headless: true });
+        const context = await browser.newContext({
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            viewport: { width: 1280, height: 720 }
+        });
+        
+        // Attempt to load cookies if available to bypass consent screens
+        const cookiePath = [
+            path.join(process.cwd(), 'youtube-cookies.txt'),
+            '/home/ec2-user/secrets/youtube-cookies.txt',
+            '/home/ec2-user/deployments/20260701_120903/backend/youtube-cookies.txt'
+        ].find(p => fs.existsSync(p));
+        
+        if (cookiePath) {
+            try {
+                const cookieTxt = fs.readFileSync(cookiePath, 'utf8');
+                const parsedCookies = [];
+                cookieTxt.split('\n').forEach(line => {
+                    if (line.trim() && !line.startsWith('#')) {
+                        const parts = line.split('\t');
+                        if (parts.length === 7) {
+                            parsedCookies.push({
+                                domain: parts[0],
+                                path: parts[2],
+                                secure: parts[3] === 'TRUE',
+                                expires: parseInt(parts[4]),
+                                name: parts[5],
+                                value: parts[6].replace('\r', '')
+                            });
+                        }
+                    }
+                });
+                if (parsedCookies.length > 0) await context.addCookies(parsedCookies);
+            } catch (e) {
+                console.warn(`⚠️ [frameExtraction] Failed to parse cookies for Playwright: ${e.message}`);
+            }
+        }
+
+        const page = await context.newPage();
+        await page.goto(`https://www.youtube.com/watch?v=${videoId}`, { waitUntil: 'domcontentloaded', timeout: 15000 });
+        
+        // Try to click accept on cookie dialogs if present
+        try { await page.click('button[aria-label="Accept all"]', { timeout: 2000 }); } catch (e) {}
+        
+        // Wait for video element to be available and play it so it buffers
+        await page.waitForSelector('video', { timeout: 10000 });
+        
+        for (const moment of moments) {
+            try {
+                let tsSecs = 0;
+                if (typeof moment.timestamp === 'string') {
+                    const parts = moment.timestamp.split(':').map(Number);
+                    if (parts.length === 2) tsSecs = parts[0] * 60 + parts[1];
+                    else if (parts.length === 3) tsSecs = parts[0] * 3600 + parts[1] * 60 + parts[2];
+                } else if (typeof moment.timestamp === 'number') {
+                    tsSecs = moment.timestamp;
+                }
+                
+                if (tsSecs <= 0) continue;
+                
+                console.log(`📸 [frameExtraction] Seeking Playwright to ${tsSecs}s for "${moment.label}"...`);
+                await page.evaluate((ts) => {
+                    const video = document.querySelector('video');
+                    if (video) {
+                        video.pause();
+                        video.currentTime = ts;
+                    }
+                }, tsSecs);
+                
+                // Wait for the video to seek and buffer the frame
+                await page.waitForTimeout(1500); 
+                
+                // Take screenshot of the video element specifically to avoid UI overlays
+                const videoEl = await page.$('video');
+                if (videoEl) {
+                    const buffer = await videoEl.screenshot({ type: 'jpeg', quality: 90 });
+                    if (buffer && buffer.length > 1024) {
+                        extractedFrames.push({
+                            label: moment.label,
+                            timestamp: moment.timestamp,
+                            score: moment.score || 85,
+                            localBuffer: buffer
+                        });
+                        console.log(`   ✅ Extracted frame at ${tsSecs}s (${Math.round(buffer.length/1024)}KB)`);
+                    }
+                }
+            } catch (e) {
+                console.warn(`   ⚠️ Playwright screenshot failed for ${moment.timestamp}: ${e.message}`);
+            }
+        }
+    } catch (err) {
+        console.error(`❌ [frameExtraction] Playwright fallback failed: ${err.message}`);
+    } finally {
+        if (browser) await browser.close();
+    }
+    
+    return extractedFrames;
 }
