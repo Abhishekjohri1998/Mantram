@@ -145,9 +145,9 @@ router.post('/health-check', protect, requireStudio('seoStudio'), requireCredits
     // This replaces researchDomain + manual fallback with a deterministic validation layer.
     let [reportData, siteIntel, pageSpeedData, backlinkData, mozData] = await Promise.all([
       buildSeoHealthReport(website, { 
-        jobId, // PASS JOB ID for diagnostics
-        maxPages: 500, // Increased from 200 for user request
-        timeout: 300000, // 5 minutes (user requested exhaustive)
+        jobId, 
+        maxPages: 50, 
+        timeout: 30000, 
         brandContext 
       }),
       isOnPageConfigured() ? getInstantSiteIntelligence(brandDomain, { country }).catch(e => {
@@ -347,7 +347,7 @@ Generate 8-15 critical, high-impact issues. Be STRATEGIC — every issue must ha
     const userPrompt = `Analyze site: ${website}`;
     let parsed;
     try {
-        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: remainingBudget });
+        const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 4096, timeout: remainingBudget });
         // Log token usage from this AI call
         if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: req.creditAction || 'seoHealthCheck', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
         parsed = parseJSON(result);
@@ -1014,7 +1014,7 @@ router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seo
     try { trafficDomain = new URL(website.startsWith('http') ? website : `https://${website}`).hostname.replace(/^www\./, ''); } catch { trafficDomain = website; }
     
     const [siteResearch, domainRankings, keywordIntel, paaData] = await Promise.all([
-      researchDomain(website, { maxPages: 50, timeout: 30000, skipCfSolve: true }).catch(e => {
+      researchDomain(website, { maxPages: 15, timeout: 10000, skipCfSolve: true }).catch(e => {
         console.error(`❌ Light crawl failed: ${e.message}`);
         return { url: website, pages: [], homepage: {}, siteIntelligence: { totalPages: 0 }, error: e.message };
       }),
@@ -1191,7 +1191,7 @@ router.post('/traffic', protect, requireStudio('seoStudio'), requireCredits('seo
     const userPrompt = 'Find traffic opportunities for: ' + website;
     let parsed;
     try {
-      const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: remainingBudget });
+      const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 4096, timeout: remainingBudget });
       if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoTraffic', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
       parsed = parseJSON(result);
     } catch (aiErr) {
@@ -1321,7 +1321,7 @@ router.post('/competitors', protect, requireStudio('seoStudio'), requireCredits(
     const compCountry = dna2.targetMarket || dna2.country || 'India';
 
     const [siteResearch, competitorResults, brandBacklinks, mozBatchData, brandRankings, serpCompData, ...compBacklinks] = await Promise.all([
-      researchDomain(website, { maxPages: 50, timeout: 30000, skipCfSolve: true }).catch(e => {
+      researchDomain(website, { maxPages: 15, timeout: 10000, skipCfSolve: true }).catch(e => {
         console.error(`❌ Light crawl failed: ${e.message}`);
         return { url: website, pages: [], homepage: {}, siteIntelligence: { totalPages: 0 }, error: e.message };
       }),
@@ -1454,7 +1454,7 @@ Respond in JSON:
 Be STRATEGIC and SPECIFIC. Every insight must have a WHY and an actionable HOW. Think like a competitive intelligence firm, not a scraping tool.`;
 
     const userPrompt = `Competitive analysis for: ${website}`;
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192, timeout: remainingBudget });
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 4096, timeout: remainingBudget });
     const parsed = parseJSON(result);
     parsed.researchSources = [
       ...(siteResearch.pages?.map(p => p.url) || [website]),
@@ -1527,7 +1527,7 @@ router.post('/ai-visibility', protect, requireStudio('seoStudio'), requireCredit
     const aiCountry = aiDna.targetMarket || aiDna.country || 'India';
     
     const [siteResearch, aiRankings] = await Promise.all([
-      researchDomain(website, { maxPages: 50, timeout: 30000, skipCfSolve: true }).catch(e => {
+      researchDomain(website, { maxPages: 15, timeout: 10000, skipCfSolve: true }).catch(e => {
         console.error(`❌ Light crawl failed: ${e.message}`);
         return { url: website, pages: [], homepage: {}, siteIntelligence: { totalPages: 0 }, error: e.message };
       }),
@@ -1677,7 +1677,7 @@ STRATEGIC RULES (MANDATORY):
     }
 
     const [result, geoProbeResult] = await Promise.all([
-      aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 8192, timeout: remainingBudget }),
+      aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.5, maxTokens: 4096, timeout: remainingBudget }),
       probeAIVisibility(brandName, industry, location, website, competitors, customPrompts || [], previousProbe, null, serviceAreas).catch(err => {
         console.warn('GEO Probe failed (non-blocking):', err.message);
         return null;
@@ -2387,7 +2387,7 @@ router.post('/competitor-warroom', protect, requireStudio('seoStudio'), requireC
     const wrCountry = wrDna.targetMarket || wrDna.country || 'India';
 
     const [siteResearch, competitorResults, brandRankingsWR, serpCompWR, ...competitorOverlaps] = await Promise.all([
-      researchDomain(website, { maxPages: 50, timeout: 30000, skipCfSolve: true }).catch(e => {
+      researchDomain(website, { maxPages: 15, timeout: 10000, skipCfSolve: true }).catch(e => {
         console.error(`❌ Light crawl failed: ${e.message}`);
         return { url: website, pages: [], homepage: {}, siteIntelligence: { totalPages: 0 }, error: e.message };
       }),
@@ -2467,7 +2467,7 @@ Respond in STRICT JSON:
     const userPrompt = `Build 90-day war room plan for: ${website}`;
     const currentElapsed = Date.now() - (req.startTime || requestStart);
     const finalBudget = Math.max(300000, 600000 - currentElapsed);
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 8192, timeout: finalBudget });
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.6, maxTokens: 4096, timeout: finalBudget });
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoWarRoom', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
     parsed.researchSources = siteResearch.pages?.map(p => p.url) || [website];
@@ -2741,7 +2741,7 @@ CRITICAL: If the list of issues is long (>15), prioritize and solve ONLY the mos
     const userPrompt = `Generate auto-fix code for: ${website}`;
     const elapsed = Date.now() - (req.startTime || Date.now());
     const remainingBudget = Math.max(300000, 600000 - elapsed);
-    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.4, maxTokens: 8192, timeout: remainingBudget });
+    const result = await aiCall(systemPrompt, userPrompt, { json: true, temperature: 0.4, maxTokens: 4096, timeout: remainingBudget });
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoAutoFix', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(result);
 
@@ -2874,7 +2874,7 @@ Generate 15-20 mined prompts. Be specific to this brand's industry. Think about 
     // STEP 3: AI call enriched with real autocomplete data
     const elapsed = Date.now() - (req.startTime || Date.now());
     const remainingBudget = Math.max(300000, 600000 - elapsed);
-    const aiResult = await aiCall(systemPrompt, userPrompt + autocompleteContext, { json: true, temperature: 0.6, maxTokens: 8192, timeout: remainingBudget });
+    const aiResult = await aiCall(systemPrompt, userPrompt + autocompleteContext, { json: true, temperature: 0.6, maxTokens: 4096, timeout: remainingBudget });
     if (req.user && lastTokenUsage) logTokenUsage(req.user._id, lastTokenUsage, { action: 'seoPromptMining', studio: 'seo', route: req.originalUrl, brandId: brand?._id });
     const parsed = parseJSON(aiResult);
     parsed.researchSources = [website];

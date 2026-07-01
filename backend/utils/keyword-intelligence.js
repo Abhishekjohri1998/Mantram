@@ -243,7 +243,7 @@ Respond in JSON:
         model: 'claude',
         success: true,
         data: safeParseJSON(text),
-        tokens: useAtlas ? (data.usage?.total_tokens || 0) : ((data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0)),
+        tokens: ((data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0)),
       };
     } catch (e) {
       console.warn('Claude strategist failed, falling back to GPT:', e.message);

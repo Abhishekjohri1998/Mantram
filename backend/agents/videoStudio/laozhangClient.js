@@ -256,20 +256,39 @@ async function _atlasImageGenerate(prompt, { model = 'gpt-image-2', size = '1024
     
     if (isGeminiModel) {
         console.log(`🔄 [Atlas] Routing Gemini image model through /chat/completions`);
-        const response = await fetch(`${ATLAS_IMAGE_BASE_URL}/chat/completions`, fetchOptions({
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${atlasKey}` },
-            body: JSON.stringify({
-                model,
-                messages: [{ role: 'user', content: [{ type: 'text', text: finalPrompt }] }],
-                size,
-            }),
-            signal: AbortSignal.timeout(timeoutMs),
-        }));
+        let response;
+        let errText = '';
+        const maxRetries = 3;
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                response = await fetch(`${ATLAS_IMAGE_BASE_URL}/chat/completions`, fetchOptions({
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${atlasKey}` },
+                    body: JSON.stringify({
+                        model,
+                        messages: [{ role: 'user', content: [{ type: 'text', text: finalPrompt }] }],
+                        size,
+                    }),
+                    signal: AbortSignal.timeout(timeoutMs),
+                }));
 
-        if (!response.ok) {
-            const errText = await response.text();
-            throw new Error(`Atlas Gemini image failed (${response.status}): ${errText.substring(0, 300)}`);
+                if (response.ok) break;
+                
+                errText = await response.text();
+                if (response.status < 500) break; // Do not retry 4xx errors
+                
+                console.warn(`⚠️ [Atlas] Gemini image attempt ${attempt} failed (${response.status}). Retrying in 2s...`);
+                if (attempt < maxRetries) await new Promise(r => setTimeout(r, 2000));
+            } catch (error) {
+                console.warn(`⚠️ [Atlas] Gemini image attempt ${attempt} threw error: ${error.message}. Retrying in 2s...`);
+                if (attempt === maxRetries) throw error;
+                await new Promise(r => setTimeout(r, 2000));
+            }
+        }
+
+        if (!response || !response.ok) {
+            throw new Error(`Atlas Gemini image failed (${response?.status || 'network'}): ${(errText || '').substring(0, 300)}`);
         }
 
         const data = await response.json();
@@ -305,16 +324,35 @@ async function _atlasImageGenerate(prompt, { model = 'gpt-image-2', size = '1024
     }
 
     // ── OpenAI models (gpt-image-2, etc.): use /images/generations ──
-    const response = await fetch(`${ATLAS_IMAGE_BASE_URL}/images/generations`, fetchOptions({
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${atlasKey}` },
-        body: JSON.stringify({ model, prompt: finalPrompt, n: 1, size, response_format: 'b64_json' }),
-        signal: AbortSignal.timeout(timeoutMs),
-    }));
+    let response;
+    let errText = '';
+    const maxRetries = 3;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            response = await fetch(`${ATLAS_IMAGE_BASE_URL}/images/generations`, fetchOptions({
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${atlasKey}` },
+                body: JSON.stringify({ model, prompt: finalPrompt, n: 1, size, response_format: 'b64_json' }),
+                signal: AbortSignal.timeout(timeoutMs),
+            }));
 
-    if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`Atlas image failed (${response.status}): ${errText.substring(0, 300)}`);
+            if (response.ok) break;
+            
+            errText = await response.text();
+            if (response.status < 500) break; // Do not retry 4xx errors
+            
+            console.warn(`⚠️ [Atlas] Image attempt ${attempt} failed (${response.status}). Retrying in 2s...`);
+            if (attempt < maxRetries) await new Promise(r => setTimeout(r, 2000));
+        } catch (error) {
+            console.warn(`⚠️ [Atlas] Image attempt ${attempt} threw error: ${error.message}. Retrying in 2s...`);
+            if (attempt === maxRetries) throw error;
+            await new Promise(r => setTimeout(r, 2000));
+        }
+    }
+
+    if (!response || !response.ok) {
+        throw new Error(`Atlas image failed (${response?.status || 'network'}): ${(errText || '').substring(0, 300)}`);
     }
 
     const data = await response.json();
@@ -525,17 +563,36 @@ export async function laozhangMultimodalImageGenerate(prompt, imageUrls = [], { 
         const arInstruction = size !== '1024x1024' ? `\n\n[CRITICAL REQUIREMENT: Generate this exact aspect ratio/size: ${size}]` : '';
         contentParts.push({ type: 'text', text: prompt + arInstruction });
 
-        const response = await fetch(`${baseUrl}/chat/completions`, fetchOptions({
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-            body: JSON.stringify({ model, messages: [{ role: 'user', content: contentParts }], size }),
-            signal: AbortSignal.timeout(timeoutMs),
-            }));
+        let response;
+        let errText = '';
+        const maxRetries = 3;
+        const payload = { model, messages: [{ role: 'user', content: contentParts }], size };
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                response = await fetch(`${baseUrl}/chat/completions`, fetchOptions({
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                    body: JSON.stringify(payload),
+                    signal: AbortSignal.timeout(timeoutMs),
+                }));
 
-        if (!response.ok) {
-            const errText = await response.text();
-            console.error(`❌ [${providerName}-Multimodal] Image failed (${response.status}):`, errText);
-            throw new Error(`${providerName} multimodal image failed (${response.status}): ${errText}`);
+                if (response.ok) break;
+                
+                errText = await response.text();
+                if (response.status < 500) break; // Do not retry 4xx errors
+                
+                console.warn(`⚠️ [${providerName}] Image attempt ${attempt} failed (${response.status}). Retrying in 2s...`);
+                if (attempt < maxRetries) await new Promise(r => setTimeout(r, 2000));
+            } catch (error) {
+                console.warn(`⚠️ [${providerName}] Image attempt ${attempt} threw error: ${error.message}. Retrying in 2s...`);
+                if (attempt === maxRetries) throw error;
+                await new Promise(r => setTimeout(r, 2000));
+            }
+        }
+
+        if (!response || !response.ok) {
+            throw new Error(`${providerName} multimodal image failed (${response?.status || 'network'}): ${(errText || '').substring(0, 300)}`);
         }
 
         const data = await response.json();
