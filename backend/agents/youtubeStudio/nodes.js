@@ -1145,6 +1145,7 @@ Return ONLY a JSON object, no markdown:
             result = await router.generateImage({
                 prompt: finalPrompt,
                 aspectRatio: '16:9',
+                model: 'gpt-image-2'
             }, { provider: 'openai' });
         }
 
@@ -1250,11 +1251,21 @@ export async function characterPortraitNode({ analysis, video, brandContext, kno
                     const router = getRouter();
                     const portraitPrompt = `A clean, professional close-up studio portrait photo of ${char.label} (Role: ${char.role || 'character'}). Visual details to match from reference image: ${char.visualDescription || 'person'}. Focus strictly on the face/portrait, neutral solid background, cinematic studio lighting, photorealistic, high likeness, clear features, no text overlays, no frames.`;
                     
-                    const result = await router.generateImage({
-                        prompt: portraitPrompt,
-                        aspectRatio: '1:1', // 1:1 is perfect for portraits
-                        imageParts: [inlinePart],
-                    }, { provider: 'gemini' });
+                    let result;
+                    try {
+                        result = await router.generateImage({
+                            prompt: portraitPrompt,
+                            aspectRatio: '1:1', // 1:1 is perfect for portraits
+                            imageParts: [inlinePart],
+                        }, { provider: 'gemini' });
+                    } catch (geminiErr) {
+                        console.warn(`   ⚠️ Gemini failed for ${char.label} (${geminiErr.message}). Falling back to gpt-image-2...`);
+                        result = await router.generateImage({
+                            prompt: portraitPrompt,
+                            aspectRatio: '1:1',
+                            model: 'gpt-image-2'
+                        }, { provider: 'openai' });
+                    }
 
                     const rawPortraitUrl = typeof result === 'string' ? result : result.imageUrl;
                     if (rawPortraitUrl) {
