@@ -264,7 +264,7 @@ export async function transcriptNode({ videoId, videoUrl, isYT = true }) {
                 language: null,
                 source: 'none'
             },
-            duration: null
+            duration: await getUploadedVideoDuration(videoUrl)
         };
     }
 
@@ -1727,9 +1727,28 @@ export async function highlightFrameExtractionNode({ videoId, analysis, duration
                     if (!sheetUrl) { console.warn(`   ⚠️ No URL for sheet ${sheetIdx}`); continue; }
                     
                     console.log(`   📥 Sheet ${sheetIdx}: ${sheetUrl.substring(0, 100)}...`);
+                    
+                    let cookieHeader = '';
+                    const { getCookiesPath } = await import('../../utils/youtube.js');
+                    const cookiePath = getCookiesPath();
+                    if (cookiePath) {
+                        try {
+                            const fs = await import('fs');
+                            const cookieContent = fs.readFileSync(cookiePath, 'utf8');
+                            // Extract Netscape format cookies into standard HTTP Cookie header format if needed, 
+                            // or just pass as is if youtube accepts it, or just use a basic generic cookie.
+                            // Actually, yt-dlp cookie files are Netscape format. We need to parse it.
+                            // To be safe and simple, let's just pass CONSENT and SOCS which usually bypasses basic 403s.
+                        } catch(e) {}
+                    }
+
                     const res = await fetch(sheetUrl, { 
                         signal: AbortSignal.timeout(15000),
-                        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+                        headers: { 
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                            'Referer': `https://www.youtube.com/watch?v=${videoId}`,
+                            'Cookie': 'CONSENT=YES+cb; SOCS=CAESEwgDEgk2MTQyNzEyNjUaAmVuIAEaBgiA_LyaBg'
+                        }
                     });
                     
                     if (res.ok) {
