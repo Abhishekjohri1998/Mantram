@@ -1141,11 +1141,10 @@ Return ONLY a JSON object, no markdown:
                 imageParts: imageParts,
             }, { provider: 'gemini' });
         } catch (geminiErr) {
-            console.warn(`⚠️ Gemini image generation failed (${geminiErr.message}). Falling back to OpenAI...`);
+            console.warn(`⚠️ Gemini image generation failed (${geminiErr.message}). Falling back to OpenAI without reference images to avoid edits endpoint...`);
             result = await router.generateImage({
                 prompt: finalPrompt,
                 aspectRatio: '16:9',
-                imageParts: imageParts,
             }, { provider: 'openai' });
         }
 
