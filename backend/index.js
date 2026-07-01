@@ -640,9 +640,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/jobs', jobsRoutes);
 app.use('/api/templates', templatesRoutes);
 app.use('/api/avatar-studio', avatarStudioRoutes);
-app.use('/api/superadmin/templates', superadminTemplatesRoutes);
-app.use('/api/superadmin/images', superadminImagesRoutes);
-app.use('/api/superadmin/video-studio', superadminVideoStudioRoutes);
+
 app.use('/api/comment-replies', commentRepliesRoutes);
 app.use('/api/virality', viralityPredictorRoutes);
 app.use('/api/activity', activityLogRoutes);
