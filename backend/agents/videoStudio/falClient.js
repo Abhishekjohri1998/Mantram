@@ -26,9 +26,10 @@ const MODEL_ENDPOINTS = {
 };
 
 export const MODEL_AVAILABLE = {
-    'kling-3.0-o': true, 'kling-3.0': true, 'veo-3.1': true, 'veo-3.1-fast': true,
-    'seedance-1.0': true, 'seedance-2.0': true, 'seedance-2.0-mini': true, 'grok-imagine': true,
-    'hunyuan': true, 'sora-2': true, 'happyhorse-1.0': true,
+    'kling-3.0-o': true, 'kling-3.0': true, 'veo-3.1': true, 'veo-3.1-fast': true, 'veo-3.1-lite': true,
+    'seedance-1.0': true, 'seedance-2.0': true, 'seedance-2.0-fast': true, 'seedance-2.0-mini': true, 'grok-imagine': true,
+    'hunyuan': true, 'sora-2': true, 'happyhorse-1.0': true, 'happyhorse-1.1': true,
+    'gemini-flash': true, 'gemini-omni-flash': true,
 };
 
 export function getModelsInfo() {
@@ -40,26 +41,36 @@ export const COST_PER_SECOND = {
     'kling-3.0': { fast: 0.07, quality: 0.12 },
     'veo-3.1': { fast: 0.10, quality: 0.25 },
     'veo-3.1-fast': { fast: 0.06, quality: 0.10 },
+    'veo-3.1-lite': { fast: 0.05, quality: 0.08 },
     'seedance-1.0': { fast: 0.05, quality: 0.08 },
     'seedance-2.0': { fast: 0.05, quality: 0.10 },
+    'seedance-2.0-fast': { fast: 0.04, quality: 0.08 },
     'seedance-2.0-mini': { fast: 0.03, quality: 0.06 },
     'grok-imagine': { fast: 0.08, quality: 0.08 },
     'hunyuan': { fast: 0.03, quality: 0.05 },
     'sora-2': { fast: 0.10, quality: 0.15 },
     'happyhorse-1.0': { fast: 0.06, quality: 0.10 },
+    'happyhorse-1.1': { fast: 0.06, quality: 0.10 },
+    'gemini-flash': { fast: 0.02, quality: 0.04 },
+    'gemini-omni-flash': { fast: 0.02, quality: 0.04 },
 };
 
 const DURATION_LIMITS = {
     'kling-3.0': { min: 3, max: 15 },
     'veo-3.1': { min: 5, max: 8 },
     'veo-3.1-fast': { min: 5, max: 8 },
+    'veo-3.1-lite': { min: 4, max: 15 },
     'seedance-1.0': { min: 5, max: 10 },
     'seedance-2.0': { min: 5, max: 15 },
+    'seedance-2.0-fast': { min: 5, max: 15 },
     'seedance-2.0-mini': { min: 4, max: 15 },
     'grok-imagine': { min: 1, max: 15 },
     'hunyuan': { min: 3, max: 10 },
     'sora-2': { min: 5, max: 15 },
     'happyhorse-1.0': { min: 3, max: 15 },
+    'happyhorse-1.1': { min: 3, max: 15 },
+    'gemini-flash': { min: 5, max: 15 },
+    'gemini-omni-flash': { min: 5, max: 15 },
 };
 
 export const MODEL_CAPABILITIES = {
@@ -149,6 +160,53 @@ export const MODEL_CAPABILITIES = {
         features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: false, multiShot: false, nativeAudio: true, voiceIds: false, cameraControl: false },
         maxReferenceImages: 9, costPerSecond: COST_PER_SECOND['happyhorse-1.0'], recommended: false,
         maxPromptLength: 200000,
+    },
+    'veo-3.1-lite': {
+        id: 'veo-3.1-lite', name: 'Veo 3.1 Lite', icon: '⚡', provider: 'atlascloud',
+        description: 'Google Veo 3.1 Lite — lightweight premium video model',
+        bestFor: 'Quick social clips, fast preview generation',
+        duration: { min: 4, max: 15, native: 15, step: 1 },
+        resolutions: ['480p', '720p', '1080p'], aspectRatios: ['16:9', '9:16'],
+        features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: true, multiShot: false, nativeAudio: true, voiceIds: false, cameraControl: false },
+        maxReferenceImages: 3, costPerSecond: COST_PER_SECOND['veo-3.1-lite'], recommended: false,
+    },
+    'seedance-2.0-fast': {
+        id: 'seedance-2.0-fast', name: 'Seedance 2.0 Fast', icon: '🎞️', provider: 'dynamic',
+        description: 'Fast preset for Seedance 2.0 with stable face tracking',
+        bestFor: 'High-speed storyboard iterations, draft cinematic videos',
+        duration: { min: 5, max: 15, native: 15, step: 1 },
+        resolutions: ['720p', '1080p'], aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
+        features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: true, multiShot: true, nativeAudio: true, voiceIds: false, cameraControl: true },
+        maxReferenceImages: 3, costPerSecond: COST_PER_SECOND['seedance-2.0-fast'], recommended: false,
+        maxPromptLength: 200000,
+    },
+    'happyhorse-1.1': {
+        id: 'happyhorse-1.1', name: 'HappyHorse 1.1', icon: '🐴', provider: 'atlascloud',
+        description: 'Updated Alibaba HappyHorse — premium motion and style',
+        bestFor: 'Style-consistent character animation, aesthetic brand films',
+        duration: { min: 3, max: 15, native: 15, step: 1 },
+        resolutions: ['720p', '1080p'], aspectRatios: ['16:9', '9:16', '1:1'],
+        features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: false, multiShot: false, nativeAudio: true, voiceIds: false, cameraControl: false },
+        maxReferenceImages: 9, costPerSecond: COST_PER_SECOND['happyhorse-1.1'], recommended: false,
+        maxPromptLength: 200000,
+    },
+    'gemini-flash': {
+        id: 'gemini-flash', name: 'Gemini 3.5 Flash', icon: '♊', provider: 'atlascloud',
+        description: 'Google Gemini Flash-driven video generation (fastest & cheapest)',
+        bestFor: 'High-volume draft sequences, rapid storyboarding',
+        duration: { min: 5, max: 15, native: 15, step: 1 },
+        resolutions: ['480p', '720p', '1080p'], aspectRatios: ['16:9', '9:16', '1:1'],
+        features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: false, multiShot: false, nativeAudio: true, voiceIds: false, cameraControl: false },
+        maxReferenceImages: 7, costPerSecond: COST_PER_SECOND['gemini-flash'], recommended: false,
+    },
+    'gemini-omni-flash': {
+        id: 'gemini-omni-flash', name: 'Gemini Omni Flash', icon: '♊', provider: 'atlascloud',
+        description: 'Google Gemini Omni Flash-driven cinematic video model',
+        bestFor: 'Vernacular voice integration, fast multishot rendering',
+        duration: { min: 5, max: 15, native: 15, step: 1 },
+        resolutions: ['480p', '720p', '1080p'], aspectRatios: ['16:9', '9:16', '1:1'],
+        features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: false, multiShot: false, nativeAudio: true, voiceIds: false, cameraControl: false },
+        maxReferenceImages: 7, costPerSecond: COST_PER_SECOND['gemini-omni-flash'], recommended: false,
     },
 };
 
