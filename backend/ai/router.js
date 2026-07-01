@@ -695,8 +695,8 @@ class ModelRouter {
         try {
             const timeoutPromise = new Promise((_, reject) => {
                 timeoutId = setTimeout(() => {
-                    reject(new Error(`TIMEOUT: Image provider ${provider.name} timed out after 25 seconds.`));
-                }, 25000);
+                    reject(new Error(`TIMEOUT: Image provider ${provider.name} timed out after 60 seconds.`));
+                }, 60000);
             });
 
             const result = await Promise.race([
