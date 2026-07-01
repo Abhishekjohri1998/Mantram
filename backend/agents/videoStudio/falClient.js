@@ -323,11 +323,11 @@ function buildPayload(model, { prompt, imageUrl, duration, resolution, mode, sho
 /**
  * Robust cascading poll for seedance-2.0
  */
-async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, generateAudio, mode, referenceImages, refAudio, refVideo }) {
+async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, generateAudio, mode, referenceImages, refAudio, refVideo, model }) {
     if (isLaozhangAvailable()) {
         try {
             const r = await submitLaozhangVideoGeneration({
-                model: 'seedance-2.0', prompt, imageUrl,
+                model: model || 'seedance-2.0', prompt, imageUrl,
                 duration: duration || 5, aspectRatio: aspectRatio || '16:9',
                 generateAudio: generateAudio !== false,
                 referenceImages: referenceImages || [],
@@ -347,7 +347,7 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
             prompt, imageUrl: imageUrl || null, duration,
             aspectRatio: aspectRatio || '16:9',
             generateAudio, referenceImages: referenceImages || [], qualityMode: mode || 'fast',
-            refAudio, refVideo,
+            refAudio, refVideo, model
         });
         if (atlasResult?.taskId) {
             console.log('✅ [Cascade] Step 2 done: Atlas Cloud (seedance)');
@@ -363,7 +363,7 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
     // Step 3: Try KIE (supports imageUrl for I2V)
     try {
         const kieResult = await submitKieVideoGeneration({
-            model: 'seedance-2.0', prompt,
+            model: model || 'seedance-2.0', prompt,
             imageUrl: imageUrl || null,
             duration: duration || 5,
             aspectRatio: aspectRatio || '16:9',
@@ -442,7 +442,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     } catch (e) {
         console.warn('⚠️ Could not read video_provider from cache:', e.message);
     }
-    if (model === 'seedance-2.0') {
+    if (model === 'seedance-2.0' || model === 'seedance-2.0-mini' || model === 'seedance-2.0-fast') {
         const hasRealFaceRefs = s3ReferenceImages.filter(Boolean).length > 0;
         
         // 👤 REAL FACE REFERENCE-TO-VIDEO: Bypass MuAPI/LaoZhang entirely
@@ -455,6 +455,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                     aspectRatio: aspectRatio || '16:9', generateAudio,
                     referenceImages: s3ReferenceImages.filter(Boolean), qualityMode: mode || 'fast',
                     refAudio: s3RefAudio, refVideo: s3RefVideo,
+                    model
                 });
                 return {
                     requestId: result.taskId, endpoint: 'atlascloud-r2v',
@@ -489,6 +490,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                     aspectRatio: aspectRatio || '16:9', generateAudio,
                     referenceImages: s3ReferenceImages, qualityMode: mode || 'fast',
                     refAudio: s3RefAudio, refVideo: s3RefVideo,
+                    model
                 });
                 return {
                     requestId: result.taskId, endpoint: 'atlascloud-seedance-2.0',
@@ -497,7 +499,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                 };
             } else if (provider === 'laozhang' && isLaozhangAvailable()) {
                 const lzResult = await submitLaozhangVideoGeneration({
-                    model: 'seedance-2.0', prompt: safePrompt, imageUrl: s3ImageUrl,
+                    model, prompt: safePrompt, imageUrl: s3ImageUrl,
                     duration: duration || 5, aspectRatio: aspectRatio || '16:9',
                     generateAudio: generateAudio !== false,
                     referenceImages: s3ReferenceImages,
@@ -518,6 +520,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                 aspectRatio: aspectRatio || '16:9', generateAudio, mode,
                 referenceImages: s3ReferenceImages, 
                 refAudio: s3RefAudio, refVideo: s3RefVideo,
+                model
             });
             return {
                 requestId: cascade.taskId || `lz-${Date.now()}`,
@@ -551,9 +554,8 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         // If provider !== 'grok', it will fall through to fal.ai routing below.
     }
 
-    // HappyHorse 1.0 — routes directly to Atlas Cloud
-    if (model === 'happyhorse-1.0') {
-        console.log(`🐴 [HappyHorse 1.0] Routing to Atlas Cloud...`);
+    if (model === 'happyhorse-1.0' || model === 'happyhorse-1.1') {
+        console.log(`🐴 [${model}] Routing to Atlas Cloud...`);
         try {
             const result = await submitHappyHorseVideoGeneration({
                 prompt: safePrompt,
@@ -563,6 +565,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                 generateAudio: generateAudio !== false,
                 referenceImages: s3ReferenceImages.filter(Boolean),
                 resolution: resolution || '720p',
+                model
             });
             return {
                 requestId: result.taskId,
@@ -575,6 +578,48 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
         } catch (err) {
             console.error(`❌ [HappyHorse 1.0] Atlas Cloud submission failed: ${err.message}`);
             throw new Error(`HappyHorse 1.0 generation failed: ${err.message}`);
+        }
+    }
+
+    if (model === 'veo-3.1-lite') {
+        console.log(`⚡ [Veo 3.1 Lite] Routing to Atlas Cloud...`);
+        try {
+            const result = await submitAtlasCloudVideoGeneration({
+                prompt: safePrompt, imageUrl: s3ImageUrl, duration,
+                aspectRatio: aspectRatio || '16:9', generateAudio,
+                referenceImages: s3ReferenceImages.filter(Boolean), qualityMode: mode || 'fast',
+                refAudio: s3RefAudio, refVideo: s3RefVideo,
+                model
+            });
+            return {
+                requestId: result.taskId, endpoint: 'atlascloud-veo-3.1-lite',
+                statusUrl: null, resultUrl: null, provider: 'atlascloud',
+                _atlasCloudPayload: result._payload,
+            };
+        } catch (err) {
+            console.error(`❌ [Veo 3.1 Lite] Atlas Cloud submission failed: ${err.message}`);
+            throw new Error(`Veo 3.1 Lite generation failed: ${err.message}`);
+        }
+    }
+
+    if (model === 'gemini-flash' || model === 'gemini-omni-flash') {
+        console.log(`♊ [Gemini Video] Routing to Atlas Cloud...`);
+        try {
+            const result = await submitAtlasCloudVideoGeneration({
+                prompt: safePrompt, imageUrl: s3ImageUrl, duration,
+                aspectRatio: aspectRatio || '16:9', generateAudio,
+                referenceImages: s3ReferenceImages.filter(Boolean), qualityMode: mode || 'fast',
+                refAudio: s3RefAudio, refVideo: s3RefVideo,
+                model
+            });
+            return {
+                requestId: result.taskId, endpoint: `atlascloud-${model}`,
+                statusUrl: null, resultUrl: null, provider: 'atlascloud',
+                _atlasCloudPayload: result._payload,
+            };
+        } catch (err) {
+            console.error(`❌ [Gemini Video] Atlas Cloud submission failed: ${err.message}`);
+            throw new Error(`${model} generation failed: ${err.message}`);
         }
     }
 
