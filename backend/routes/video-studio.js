@@ -851,7 +851,7 @@ router.post('/agent/create', protect, requireCredits('videoGenerate'), async (re
                         const audioBlob = new Blob([audioBuffer], { type: audioMime });
                         form.append('file', audioBlob, `audio.${ext}`);
                         form.append('model', 'whisper-1');
-                        form.append('response_format', 'json');
+                        form.append('response_format', 'verbose_json');
 
                         const whisperResp = await fetch('https://api.openai.com/v1/audio/transcriptions', {
                             method: 'POST',
@@ -861,8 +861,14 @@ router.post('/agent/create', protect, requireCredits('videoGenerate'), async (re
 
                         if (whisperResp.ok) {
                             const whisperData = await whisperResp.json();
-                            audioTranscript = whisperData.text || '';
-                            console.log(`   ✅ Audio transcribed (${audioTranscript.length} chars): "${audioTranscript.substring(0, 80)}..."`);
+                            if (whisperData.segments && Array.isArray(whisperData.segments)) {
+                                audioTranscript = whisperData.segments.map(seg => 
+                                    `[${seg.start.toFixed(1)}s - ${seg.end.toFixed(1)}s] ${seg.text.trim()}`
+                                ).join('\n');
+                            } else {
+                                audioTranscript = whisperData.text || '';
+                            }
+                            console.log(`   ✅ Audio transcribed with timecodes (${audioTranscript.length} chars): "${audioTranscript.substring(0, 100)}..."`);
                         } else {
                             console.warn('   ⚠️ Whisper transcription failed:', (await whisperResp.json().catch(() => ({}))).error?.message);
                         }
@@ -965,15 +971,14 @@ FULL AUDIO TRANSCRIPT:
 ESTIMATED AUDIO DURATION: ~${estimatedAudioDuration} seconds
 
 CRITICAL AUDIO-VISUAL SYNC RULES:
-1. Split the transcript into SEMANTIC segments — break at natural sentence/paragraph boundaries, NOT arbitrary time cuts
-2. Each segment becomes one scene. The scene's voiceoverText = that exact segment of transcript (verbatim, no rewording)
-3. The voiceoverScript = the full transcript exactly as provided
-4. Each scene's visualPrompt must DIRECTLY ILLUSTRATE what is being said in that segment
-   - If audio says "a horse galloped across the plains" → visual shows a horse galloping across plains
-   - If audio says "she smiled warmly" → visual shows the character smiling
-   - Do NOT create generic/abstract visuals — they must match the SPECIFIC words
-5. Scene duration = proportional to the segment's word count (total video ≈ ${estimatedAudioDuration}s)
-6. Scene transitions should align with natural narrative beats
+1. Split the transcript into scenes matching the timecode markers (e.g. [0.0s - 4.5s]). Each timecoded segment becomes exactly one scene.
+2. The duration of each scene MUST be calculated directly from its timecode marker (endTime - startTime). Round to the nearest integer second. For example, if a dialogue line is marked "[12.5s - 16.0s]", the duration of that scene MUST be exactly 4 seconds.
+3. The scene's voiceoverText must be the exact dialogue text of that segment, omitting the brackets and timecodes (verbatim, no rewording).
+4. The voiceoverScript must contain the entire transcript text (omitting all timecodes).
+5. Each scene's visualPrompt must DIRECTLY ILLUSTRATE what is being said in that segment.
+   - If audio says "a small grey rat sits atop the Shiva Lingam" → visual MUST show a small grey rat on a Shiva Lingam.
+   - Do NOT create generic/abstract visuals — they must match the SPECIFIC words spoken.
+6. Do NOT invent your own timings or distribute durations equally. Follow the timecodes strictly.
 7. Maintain visual continuity — same setting should look the same across consecutive scenes` : `
 - Split the audio timeline into scene segments matching the mood/content
 - Total video duration must match the audio`}

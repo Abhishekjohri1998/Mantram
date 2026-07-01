@@ -117,6 +117,9 @@ const DEFAULT_CREDIT_COSTS = {
     qAdsDirector:  1,              // Q-Ads Stage 2 legacy — kept for backward compat
     qAdsGenerate:  50,             // ↑↑ CRITICAL FIX from 8 — Q-Ads Seedance 2.0 video (5s ≈ ₹46); 50cr × ₹5 = ₹250 → 81% margin
     avatarGenerate: 6,             // ↑ from 4 — Avatar Studio: 3 variants via LaoZhang NanoBanana 2
+    storyboardCreate: 8,           // Storyboard Director (Claude) + Gemini frame gen for all shots
+    storyboardAnimate: 'dynamic',  // DYNAMIC — Seedance 2.0 I2V per shot
+    storyboardAnimateLongForm: 'dynamic',
 };
 
 // Cache for credit costs (refresh every 5 minutes)
@@ -183,13 +186,54 @@ export const requireCredits = (actionOrCost = 1) => {
                 const rawCost = costs[actionOrCost];
 
                 // Dynamic video credits — calculated per request
-                if (rawCost === 'dynamic' && actionOrCost === 'videoGenerate') {
-                    const { model = 'kling-3.0', duration = 5,
-                        resolution = '1080p', qualityMode = 'fast' } = req.body;
+                if (rawCost === 'dynamic' && (actionOrCost === 'videoGenerate' || actionOrCost === 'storyboardAnimate')) {
+                    const { model = 'seedance-2.0-fast', duration = 5,
+                        resolution = '720p', qualityMode = 'fast' } = req.body;
                     const estimate = estimateCost(model, duration, resolution, qualityMode);
                     // ceil(USD × 70) ensures ~75% margin at ₹5/credit floor
                     cost = Math.max(Math.ceil(estimate.usd * 70), 5);
-                    console.log(`🎬 Dynamic video credits: ${model} ${duration}s ${resolution} ${qualityMode} → $${estimate.usd} → ${cost} credits`);
+                    console.log(`🎬 Dynamic video credits for ${actionOrCost}: ${model} ${duration}s ${resolution} ${qualityMode} → ${cost} credits`);
+                } else if (rawCost === 'dynamic' && actionOrCost === 'storyboardAnimateLongForm') {
+                    // Long-form! Calculate cost based on duration, model, and subtract skipped segments if projectId is provided!
+                    const { model = 'seedance-2.0-fast', duration = 30,
+                        resolution = '720p', qualityMode = 'fast', projectId } = req.body;
+                    
+                    const OPTIMAL_SEG = model === 'gemini-flash' ? 6 : (['veo-3.1', 'veo-3.1-fast', 'hunyuan'].includes(model) ? 8 : 10);
+                    const segCount = Math.ceil(duration / OPTIMAL_SEG);
+                    const segEstimate = estimateCost(model, Math.min(OPTIMAL_SEG, duration), resolution, qualityMode);
+                    const perSegCost = segEstimate.credits;
+                    let activeSegCount = segCount;
+                    
+                    if (projectId && mongoose.models.VideoProject) {
+                        try {
+                            const VideoProject = mongoose.models.VideoProject;
+                            const project = await VideoProject.findById(projectId).lean();
+                            const existingUrls = project?.storyboard?.segmentUrls || {};
+                            let skippedCount = 0;
+                            const regenerateIndices = new Set(
+                                Array.isArray(req.body.regenerateSegments)
+                                    ? req.body.regenerateSegments.map(Number)
+                                    : []
+                            );
+                            
+                            if (req.body.forceRegenerate !== true && req.body.forceRegenerate !== 'true') {
+                                const mapKeys = existingUrls instanceof Map ? Array.from(existingUrls.keys()) : Object.keys(existingUrls);
+                                for (const key of mapKeys) {
+                                    const idx = Number(key);
+                                    const url = existingUrls instanceof Map ? existingUrls.get(key) : existingUrls[key];
+                                    if (url && url.startsWith('http') && !regenerateIndices.has(idx)) {
+                                        skippedCount++;
+                                    }
+                                }
+                            }
+                            activeSegCount = Math.max(0, segCount - skippedCount);
+                            console.log(`🎬 [Credits Middleware] Longform resume: skipped ${skippedCount}/${segCount} segments. Charging for ${activeSegCount} segments.`);
+                        } catch (e) {
+                            console.warn(`[Credits Middleware] Failed to count skipped segments: ${e.message}`);
+                        }
+                    }
+                    cost = perSegCost * activeSegCount;
+                    console.log(`🎬 Dynamic longform video credits: ${model} ${duration}s ${resolution} ${qualityMode} → ${cost} credits (charging for ${activeSegCount} segments)`);
                 } else {
                     cost = (typeof rawCost === 'number' ? rawCost : null) || 1;
                 }

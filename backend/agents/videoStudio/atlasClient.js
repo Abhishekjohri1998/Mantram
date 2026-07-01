@@ -668,10 +668,7 @@ export async function submitAtlasCloudVideoGeneration({
         customCharacterNames,
     };
 
-    const isSeedanceOrVeo = model.includes('seedance') || model.includes('veo');
-    if (!isSeedanceOrVeo) {
-        taskInput.resolution = resolution === '4k' ? '4k' : (resolution === '1080p' ? '1080p' : (resolution === '480p' ? '480p' : '720p'));
-    }
+    taskInput.resolution = resolution === '4k' ? '4k' : (resolution === '1080p' ? '1080p' : (resolution === '480p' ? '480p' : '720p'));
 
     if (refAudio) {
         taskInput.audio_url = refAudio;
