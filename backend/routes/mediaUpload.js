@@ -251,7 +251,10 @@ router.post('/image-reference', protect, refUpload.single('file'), async (req, r
         const s3Url = await uploadToS3(buffer, s3Key, mimetype);
         console.log(`✅ [image-reference] Uploaded: ${s3Url}`);
 
-        res.json({ success: true, url: s3Url });
+        const { getSignedUrlIfNeeded } = await import('../utils/s3.js');
+        const signedUrl = await getSignedUrlIfNeeded(s3Url);
+
+        res.json({ success: true, url: signedUrl, rawUrl: s3Url });
     } catch (error) {
         console.error('image-reference upload error:', error);
         res.status(500).json({ success: false, error: `Upload failed: ${error.message}` });

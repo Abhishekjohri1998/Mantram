@@ -353,9 +353,16 @@ router.post('/mood-board', protect, async (req, res) => {
         const result = await generateMoodBoardImages(productDNA, brandContext, customMoodDirections, imageModel);
         await deductCredits(req.user._id, MOOD_CREDITS, 'pulse-mood-board');
 
+        const signedMoods = await Promise.all(
+            result.moods.map(async (m) => {
+                if (m.imageUrl) m.imageUrl = await getSignedUrlIfNeeded(m.imageUrl);
+                return m;
+            })
+        );
+
         res.json({
             success: true,
-            moods: result.moods,
+            moods: signedMoods,
             moodDirections: customMoodDirections,
         });
     } catch (err) {
@@ -2249,6 +2256,14 @@ router.post('/aplus/analyze-product', protect, async (req, res) => {
             }
         }
 
+        const { getSignedUrlIfNeeded } = await import('../utils/s3.js');
+        if (product.images) {
+            product.images = await Promise.all(product.images.map(img => getSignedUrlIfNeeded(img)));
+        }
+        if (product.persistedImages) {
+            product.persistedImages = await Promise.all(product.persistedImages.map(img => getSignedUrlIfNeeded(img)));
+        }
+
         res.json({ success: true, product });
     } catch (err) {
         console.error('❌ A+ analyze-product:', err.message);
@@ -2494,7 +2509,14 @@ router.get('/product-context', protect, async (req, res) => {
             // Only return fields needed for the gallery — not the full DNA blob
             .select('productName productCategory productBrand productUrl palette selectedMoodId thumbnail usedIn tags createdAt updatedAt');
 
-        res.json({ success: true, contexts });
+        const { getSignedUrlIfNeeded } = await import('../utils/s3.js');
+        const signedContexts = await Promise.all(contexts.map(async (c) => {
+            const doc = c.toObject();
+            if (doc.thumbnail) doc.thumbnail = await getSignedUrlIfNeeded(doc.thumbnail);
+            return doc;
+        }));
+
+        res.json({ success: true, contexts: signedContexts });
     } catch (err) {
         console.error('❌ [ProductContext list]:', err.message);
         res.status(500).json({ success: false, error: err.message });
@@ -2506,7 +2528,30 @@ router.get('/product-context/:id', protect, async (req, res) => {
     try {
         const ctx = await ProductContext.findById(req.params.id);
         if (!ctx) return res.status(404).json({ success: false, error: 'Context not found' });
-        res.json({ success: true, context: ctx });
+        
+        const { getSignedUrlIfNeeded } = await import('../utils/s3.js');
+        const doc = ctx.toObject();
+        
+        if (doc.productImages?.length) {
+            doc.productImages = await Promise.all(doc.productImages.map(url => getSignedUrlIfNeeded(url)));
+        }
+        if (doc.moodImages) {
+            for (const key of Object.keys(doc.moodImages)) {
+                if (doc.moodImages[key]) {
+                    doc.moodImages[key] = await getSignedUrlIfNeeded(doc.moodImages[key]);
+                }
+            }
+        }
+        if (doc.productDNA) {
+            if (doc.productDNA.heroImageUrl) {
+                doc.productDNA.heroImageUrl = await getSignedUrlIfNeeded(doc.productDNA.heroImageUrl);
+            }
+            if (doc.productDNA.productRefImages?.length) {
+                doc.productDNA.productRefImages = await Promise.all(doc.productDNA.productRefImages.map(url => getSignedUrlIfNeeded(url)));
+            }
+        }
+
+        res.json({ success: true, context: doc });
     } catch (err) {
         console.error('❌ [ProductContext get]:', err.message);
         res.status(500).json({ success: false, error: err.message });
