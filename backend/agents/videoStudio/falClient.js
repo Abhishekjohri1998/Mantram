@@ -27,7 +27,7 @@ const MODEL_ENDPOINTS = {
 
 export const MODEL_AVAILABLE = {
     'kling-3.0-o': true, 'kling-3.0': true, 'veo-3.1': true, 'veo-3.1-fast': true,
-    'seedance-1.0': true, 'seedance-2.0': true, 'grok-imagine': true,
+    'seedance-1.0': true, 'seedance-2.0': true, 'seedance-2.0-mini': true, 'grok-imagine': true,
     'hunyuan': true, 'sora-2': true, 'happyhorse-1.0': true,
 };
 
@@ -42,6 +42,7 @@ export const COST_PER_SECOND = {
     'veo-3.1-fast': { fast: 0.06, quality: 0.10 },
     'seedance-1.0': { fast: 0.05, quality: 0.08 },
     'seedance-2.0': { fast: 0.05, quality: 0.10 },
+    'seedance-2.0-mini': { fast: 0.03, quality: 0.06 },
     'grok-imagine': { fast: 0.08, quality: 0.08 },
     'hunyuan': { fast: 0.03, quality: 0.05 },
     'sora-2': { fast: 0.10, quality: 0.15 },
@@ -54,6 +55,7 @@ const DURATION_LIMITS = {
     'veo-3.1-fast': { min: 5, max: 8 },
     'seedance-1.0': { min: 5, max: 10 },
     'seedance-2.0': { min: 5, max: 15 },
+    'seedance-2.0-mini': { min: 4, max: 15 },
     'grok-imagine': { min: 1, max: 15 },
     'hunyuan': { min: 3, max: 10 },
     'sora-2': { min: 5, max: 15 },
@@ -99,6 +101,16 @@ export const MODEL_CAPABILITIES = {
         features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: true, multiShot: true, nativeAudio: true, voiceIds: false, cameraControl: true },
         maxReferenceImages: 3, costPerSecond: COST_PER_SECOND['seedance-2.0'], recommended: false,
         maxPromptLength: 200000, // HARD LIMIT from MuAPI/Seedance
+    },
+    'seedance-2.0-mini': {
+        id: 'seedance-2.0-mini', name: 'Seedance 2.0 Mini', icon: '🎞️', provider: 'atlascloud',
+        description: 'Lightweight cinematic video, optimized for speed and cost',
+        bestFor: 'High-volume social reels, rapid testing, quick previews',
+        duration: { min: 4, max: 15, native: 15, step: 1 },
+        resolutions: ['480p', '720p', '1080p'], aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
+        features: { firstFrame: true, lastFrame: false, referenceImages: true, extendVideo: true, multiShot: true, nativeAudio: true, voiceIds: false, cameraControl: true },
+        maxReferenceImages: 3, costPerSecond: COST_PER_SECOND['seedance-2.0-mini'], recommended: false,
+        maxPromptLength: 10000,
     },
     'grok-imagine': {
         id: 'grok-imagine', name: 'Grok Imagine', icon: '🤖', provider: 'grok',
