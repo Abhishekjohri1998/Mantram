@@ -199,8 +199,8 @@ export class OpenAIProvider extends BaseProvider {
 
         const lzKeyAvailable = !!this.lzApiKey;
         const atlasKeyAvailable = !!process.env.ATLASCLOUD_API_KEY;
-        // Default to Atlas Cloud for image generation (LaoZhang has no balance)
-        const useLaoZhang = process.env.OPENAI_USE_LZ === 'true';
+        // Default to Atlas Cloud for image generation (User explicitly requested bypassing LaoZhang)
+        const useLaoZhang = false; // process.env.OPENAI_USE_LZ === 'true';
         const useAtlas = !useLaoZhang && isGptImageModel && atlasKeyAvailable;
 
         let apiKey = useLaoZhang
