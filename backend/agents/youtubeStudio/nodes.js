@@ -1142,8 +1142,17 @@ Return ONLY a JSON object, no markdown:
             }, { provider: 'gemini' });
         } catch (geminiErr) {
             console.warn(`⚠️ Gemini image generation failed (${geminiErr.message}). Falling back to OpenAI without reference images to avoid edits endpoint...`);
+            
+            // Build a safe, generic fallback prompt to avoid strict OpenAI/DALL-E 3 safety filters on celebrity names
+            const safeFallbackPrompt = `A high-quality 16:9 YouTube thumbnail. 
+Graphic design style: ${template?.name || 'modern broadcast'}.
+Text overlays: "${overlayText}". 
+Concept: ${thumbnailDirection?.concept || 'An expressive, cinematic scene'}. 
+Focus on dramatic lighting, vibrant colors, and expressive characters. 
+(Visual representation only: represent the emotion and concept, do not attempt to draw real celebrities).`;
+
             result = await router.generateImage({
-                prompt: finalPrompt,
+                prompt: safeFallbackPrompt,
                 aspectRatio: '16:9',
                 model: 'gpt-image-2'
             }, { provider: 'openai' });
@@ -1260,8 +1269,12 @@ export async function characterPortraitNode({ analysis, video, brandContext, kno
                         }, { provider: 'gemini' });
                     } catch (geminiErr) {
                         console.warn(`   ⚠️ Gemini failed for ${char.label} (${geminiErr.message}). Falling back to gpt-image-2...`);
+                        
+                        // Sanitize prompt for fallback to avoid strict OpenAI safety filters
+                        const safeFallbackPortraitPrompt = `A clean, professional close-up studio portrait photo of a person. Visual details: ${char.visualDescription || 'expressive face'}. Focus strictly on the face/portrait, neutral solid background, cinematic studio lighting, photorealistic, clear features.`;
+                        
                         result = await router.generateImage({
-                            prompt: portraitPrompt,
+                            prompt: safeFallbackPortraitPrompt,
                             aspectRatio: '1:1',
                             model: 'gpt-image-2'
                         }, { provider: 'openai' });
