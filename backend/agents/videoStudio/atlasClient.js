@@ -671,7 +671,14 @@ export async function submitAtlasCloudVideoGeneration({
         customCharacterNames,
     };
 
-    taskInput.resolution = resolution === '4k' ? '4k' : (resolution === '1080p' ? '1080p' : (resolution === '480p' ? '480p' : '720p'));
+    // Normalize resolution: only models that natively support 480p should receive 480p. Otherwise fallback to 720p.
+    let targetRes = resolution;
+    if (resolution === '480p') {
+        if (model !== 'seedance-2.0-mini' && model !== 'veo-3.1-lite' && model !== 'gemini-flash' && model !== 'gemini-omni-flash' && model !== 'grok-imagine') {
+            targetRes = '720p';
+        }
+    }
+    taskInput.resolution = targetRes === '4k' ? '4k' : (targetRes === '1080p' ? '1080p' : (targetRes === '480p' ? '480p' : '720p'));
 
     if (refAudio) {
         taskInput.audio_url = refAudio;
@@ -967,7 +974,7 @@ export async function submitGeminiFlashVideoGeneration({
     const finalRatio = aspectRatio === '9:16' ? '9:16' : '16:9';
 
     // Normalize resolution
-    const finalRes = resolution === '4k' ? '4k' : resolution === '1080p' ? '1080p' : '720p';
+    const finalRes = resolution === '4k' ? '4k' : resolution === '1080p' ? '1080p' : (resolution === '480p' ? '480p' : '720p');
 
     console.log(`🎯 [Gemini Flash] model=${modelName} | dur=${finalDur}s | ratio=${finalRatio} | res=${finalRes} | images=${cdnImageUrls.length}`);
     console.log(`📝 [Gemini Flash] Prompt (first 200): ${finalPrompt.substring(0, 200)}`);
