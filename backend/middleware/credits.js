@@ -15,6 +15,8 @@ import mongoose from 'mongoose';
 import User from '../models/User.js';
 import SystemSettings, { getSetting, setSetting } from '../models/SystemSettings.js';
 import CreditUsage from '../models/CreditUsage.js';
+import CreditTransaction from '../models/CreditTransaction.js';
+import { CREDITS_PER_SECOND, COST_PER_SECOND_INR } from '../constants/credits.js';
 import { estimateCost } from '../agents/videoStudio/falClient.js';
 
 // Human-readable labels for actions
@@ -187,14 +189,11 @@ export const requireCredits = (actionOrCost = 1) => {
 
                 // Dynamic video credits — calculated per request
                 if (rawCost === 'dynamic' && actionOrCost === 'videoGenerate') {
-                    const { model = 'seedance-2.0-fast', duration = 5,
-                        resolution = '720p', qualityMode = 'fast' } = req.body;
-                    const estimate = estimateCost(model, duration, resolution, qualityMode);
-                    // ceil(USD × 70) ensures ~75% margin at ₹5/credit floor
-                    cost = Math.max(Math.ceil(estimate.usd * 70), 5);
-                    console.log(`🎬 Dynamic video credits: ${model} ${duration}s ${resolution} ${qualityMode} → ${cost} credits`);
+                    const duration = parseInt(req.body.duration) || 5;
+                    cost = Math.ceil(duration * CREDITS_PER_SECOND);
+                    console.log(`🎬 Dynamic video credits: ${duration}s → ${cost} credits`);
                 } else if (rawCost === 'dynamic' && actionOrCost === 'storyboardAnimate') {
-                    const { model = 'seedance-2.0-fast', resolution = '720p', qualityMode = 'fast', projectId, segmentIndex } = req.body;
+                    const { projectId, segmentIndex } = req.body;
                     let duration = parseInt(req.body.duration) || 5;
                     if (projectId && segmentIndex !== undefined) {
                         try {
@@ -209,18 +208,17 @@ export const requireCredits = (actionOrCost = 1) => {
                             console.warn(`[Credits Middleware] Failed to get segment duration: ${e.message}`);
                         }
                     }
-                    const estimate = estimateCost(model, duration, resolution, qualityMode);
-                    cost = Math.max(Math.ceil(estimate.usd * 70), 5);
-                    console.log(`🎬 Dynamic storyboardAnimate credits: ${model} ${duration}s ${resolution} ${qualityMode} → ${cost} credits`);
+                    cost = Math.ceil(duration * CREDITS_PER_SECOND);
+                    console.log(`🎬 Dynamic storyboardAnimate credits: ${duration}s → ${cost} credits`);
                 } else if (rawCost === 'dynamic' && actionOrCost === 'storyboardAnimateLongForm') {
                     // Long-form! Calculate cost based on duration, model, and subtract skipped segments if projectId is provided!
-                    const { model = 'seedance-2.0-fast', duration = 30,
-                        resolution = '720p', qualityMode = 'fast', projectId } = req.body;
+                    const { model = 'seedance-2.0-fast', projectId } = req.body;
+                    let duration = parseInt(req.body.duration) || 30;
                     
                     const OPTIMAL_SEG = model === 'gemini-flash' ? 6 : (['veo-3.1', 'veo-3.1-fast', 'hunyuan'].includes(model) ? 8 : 10);
                     const segCount = Math.ceil(duration / OPTIMAL_SEG);
-                    const segEstimate = estimateCost(model, Math.min(OPTIMAL_SEG, duration), resolution, qualityMode);
-                    const perSegCost = segEstimate.credits;
+                    const perSegDuration = Math.min(OPTIMAL_SEG, duration);
+                    const perSegCost = Math.ceil(perSegDuration * CREDITS_PER_SECOND);
                     let activeSegCount = segCount;
                     
                     if (projectId) {
@@ -252,7 +250,7 @@ export const requireCredits = (actionOrCost = 1) => {
                         }
                     }
                     cost = perSegCost * activeSegCount;
-                    console.log(`🎬 Dynamic longform video credits: ${model} ${duration}s ${resolution} ${qualityMode} → ${cost} credits (charging for ${activeSegCount} segments)`);
+                    console.log(`🎬 Dynamic longform video credits: ${duration}s → ${cost} credits (charging for ${activeSegCount} segments)`);
                 } else {
                     cost = (typeof rawCost === 'number' ? rawCost : null) || 1;
                 }
@@ -343,6 +341,22 @@ export const requireCredits = (actionOrCost = 1) => {
                 },
             }).catch(err => console.warn('Credit usage log failed:', err.message));
 
+            // Determine if it was a video generate action to calculate the margin tracking
+            let costInrAtDebit = null;
+            if (rawCost === 'dynamic' && (actionName === 'videoGenerate' || actionName === 'storyboardAnimate' || actionName === 'storyboardAnimateLongForm')) {
+                 const duration = parseInt(req.body.duration) || 5;
+                 costInrAtDebit = Math.ceil(duration * COST_PER_SECOND_INR);
+            }
+
+            CreditTransaction.create({
+                userId: user._id,
+                type: 'debit',
+                amount: -cost,
+                costInrAtDebit,
+                balanceAfter: Math.max(0, balanceAfter),
+                relatedJobId: req.body?.idempotencyKey || null,
+            }).catch(err => console.warn('Credit transaction log failed:', err.message));
+
             // Store reference for downstream token usage logging
             req.creditAction = actionName;
             req.creditStudio = studio;
@@ -402,6 +416,13 @@ export const deductCredits = async (userId, actionOrCost, amount = 1, brandId = 
             studio: (typeof actionOrCost === 'string' && actionOrCost.startsWith('seo')) ? 'seo' : 'unknown',
             metadata: { brandId },
         }).catch(err => console.warn('Manual credit usage log failed:', err.message));
+
+        CreditTransaction.create({
+            userId: userId,
+            type: 'debit',
+            amount: -cost,
+            balanceAfter: Math.max(0, balanceAfter),
+        }).catch(err => console.warn('Manual credit transaction log failed:', err.message));
 
         console.log(`💰 Manually deducted ${cost} credits from user ${userId} for ${actionOrCost}`);
         return updated;
@@ -578,6 +599,14 @@ export const refundCredits = async (userId, amount, actionName, description, stu
                 ...metadata,
                 isRefund: true
             },
+        });
+        
+        await CreditTransaction.create({
+            userId: userId,
+            type: 'refund',
+            amount: amount, // Positive for refund
+            balanceAfter: Math.max(0, balanceAfter),
+            relatedJobId: metadata?.idempotencyKey || null,
         });
         console.log(`💰 Refunded ${amount} credits to user ${userId} for ${actionName}`);
     } catch (err) {

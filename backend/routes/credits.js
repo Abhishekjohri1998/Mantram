@@ -1,5 +1,5 @@
 import express from 'express';
-import { protect, admin } from '../middleware/auth.js';
+import { protect, superadmin } from '../middleware/auth.js';
 import User from '../models/User.js';
 import CreditTransaction from '../models/CreditTransaction.js';
 import crypto from 'crypto';
@@ -143,7 +143,7 @@ router.post('/webhook/razorpay', express.raw({ type: 'application/json' }), asyn
  * @route   POST /api/credits/bonus
  * @access  Superadmin
  */
-router.post('/bonus', protect, admin, async (req, res) => {
+router.post('/bonus', protect, superadmin, async (req, res) => {
     try {
         const { targetUserId, amount, reason } = req.body;
         if (!targetUserId || !amount) {

@@ -6,6 +6,7 @@ const creditTransactionSchema = new mongoose.Schema({
     amount: { type: Number, required: true }, // positive for purchase/refund/bonus, negative for debit
     inrAmount: { type: Number, default: null }, // for purchases
     relatedJobId: { type: String, default: null }, // for video generation debits/refunds
+    costInrAtDebit: { type: Number, default: null }, // snapshot of COGS at time of debit
     balanceAfter: { type: Number, required: true },
     referenceId: { type: String, default: null }, // for idempotency (e.g. Razorpay order ID / txn ID)
 }, { timestamps: true });
