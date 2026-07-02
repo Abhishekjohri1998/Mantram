@@ -243,9 +243,11 @@ export function estimateCost(model = 'kling-3.0', durationSeconds = 5, resolutio
     
     const usd = Number((costPerSec * durationSeconds * resMult).toFixed(2));
     const inr = Number((usd * 93.21).toFixed(0));
-    // ⚡ Updated May 2026: ceil(USD × 170) → ~89% gross margin at ₹5/credit floor
-    // e.g. Kling 3.0, 5s 1080p fast: $0.35 → 60cr = ₹300; API cost ₹32.6 → 89% margin
-    const credits = Math.max(Math.ceil(usd * 170), 15);
+    
+    // Flat credit rate per second (from CREDITS_PER_SECOND = 17)
+    // 15 seconds = 255 credits
+    const credits = Math.ceil(durationSeconds * 17); // CREDITS_PER_SECOND
+    
     return { usd, inr, credits, model, resolution, mode, durationSeconds, maxDuration: DURATION_LIMITS[model]?.max || 15 };
 }
 

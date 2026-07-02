@@ -225,44 +225,9 @@ export default function Storyboard({
     const projectIdRef = useRef(null);
 
     const getStoryboardCredits = (m, d, r) => {
-        const estimateCostLocal = (modelId, durationSeconds, res, mode = 'fast') => {
-            let costPerSec = 0.23;
-            if (modelId === 'seedance-2.0-fast') costPerSec = 0.1536;
-            else if (modelId === 'seedance-2.0-mini') costPerSec = 0.08;
-            else if (modelId === 'seedance-1.0') costPerSec = 0.08;
-            else if (modelId === 'happyhorse-1.0' || modelId === 'happyhorse-1.1') costPerSec = 0.15;
-            else if (modelId === 'gemini-flash' || modelId === 'gemini-omni-flash') costPerSec = 0.15;
-            else if (modelId === 'kling-3.0') costPerSec = 0.07;
-            else if (modelId === 'veo-3.1') costPerSec = 0.10;
-            else if (modelId === 'veo-3.1-lite') costPerSec = 0.05;
-            else if (modelId === 'grok-imagine') costPerSec = 0.08;
-            
-            let resMult = 1.0;
-            const ATLAS_MODELS = ['seedance-2.0', 'seedance-2.0-fast', 'seedance-2.0-mini', 'happyhorse-1.0', 'happyhorse-1.1', 'gemini-flash', 'gemini-omni-flash', 'veo-3.1-lite'];
-            if (ATLAS_MODELS.includes(modelId)) {
-                if (res === '480p') resMult = 0.5;
-                else if (res === '720p') resMult = 0.6;
-                else if (res === '1080p') resMult = 1.0;
-                else if (res === '4k') resMult = 2.0;
-            } else {
-                if (res === '480p') resMult = 0.5;
-                else if (res === '720p') resMult = 0.7;
-                else if (res === '4k') resMult = 2.0;
-            }
-            const usd = costPerSec * durationSeconds * resMult;
-            return Math.max(Math.ceil(usd * 20), 5);
-        };
-
-        if (d > 15) {
-            const OPTIMAL_SEG  = m === 'gemini-flash' ? 6 : (['veo-3.1', 'veo-3.1-fast', 'hunyuan'].includes(m) ? 8 : 10);
-            const segCount     = Math.ceil(d / OPTIMAL_SEG);
-            const segQuality   = m.includes('quality') || m === 'seedance-2.0' ? 'quality' : 'fast';
-            const perSeg       = estimateCostLocal(m, Math.min(OPTIMAL_SEG, d), r, segQuality);
-            return perSeg * segCount;
-        } else {
-            const sbQuality    = m === 'seedance-2.0' ? 'quality' : 'fast';
-            return estimateCostLocal(m, Math.min(d, 15), r, sbQuality);
-        }
+        // Flat rate based on CREDITS_PER_SECOND
+        // e.g. 15 seconds = 255 credits -> 17 credits / second
+        return Math.ceil(d * 17);
     };
 
     const hasAttemptedReconnect = useRef(false);

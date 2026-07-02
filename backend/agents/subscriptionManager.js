@@ -68,7 +68,7 @@ export async function processRenewals() {
                 let carryOverCredits = 0;
                 if (pkg.credits?.rollover) {
                     // Carry over unused credits, capped at 2x monthly limit (common industry standard)
-                    const unused = Math.max(0, sub.credits.total - sub.credits.used);
+                    const unused = Math.max(0, sub.credits);
                     carryOverCredits = Math.min(unused, pkg.credits.monthly);
                 }
 
@@ -91,17 +91,13 @@ export async function processRenewals() {
                 // Update Subscription doc
                 sub.renewalDate = newRenewalDate;
                 sub.endDate = newRenewalDate; // Assuming single cycle for now
-                sub.credits = {
-                    total: newTotalCredits,
-                    used: 0
-                };
+                sub.credits = newTotalCredits;
                 // sub.status = 'active'; // stay active
                 await sub.save();
 
                 // Update User doc (source of truth for real-time deductions)
                 await User.findByIdAndUpdate(user._id, {
-                    'credits.total': newTotalCredits,
-                    'credits.used': 0,
+                    credits: newTotalCredits,
                     'credits.resetDate': newRenewalDate
                 });
 
@@ -129,7 +125,7 @@ async function assignFreePlan(user) {
             user: user._id,
             plan: 'free',
             billingCycle: 'monthly',
-            credits: { total: monthlyCredits, used: 0 },
+            credits: monthlyCredits,
             price: 0,
             startDate: new Date(),
             endDate,
@@ -141,8 +137,7 @@ async function assignFreePlan(user) {
         await User.findByIdAndUpdate(user._id, {
             plan: 'free',
             activeSubscription: newSub._id,
-            'credits.total': monthlyCredits,
-            'credits.used': 0,
+            credits: monthlyCredits,
             'credits.resetDate': endDate
         });
 

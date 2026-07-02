@@ -58,14 +58,7 @@ const userSchema = new mongoose.Schema({
     brandAccess: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Brand' }],
 
     // Credits
-    credits: {
-        total: { type: Number, default: 100 },
-        used: { type: Number, default: 0 },
-        bonus: { type: Number, default: 0 }, // extra credits from coupons/admin
-        resetDate: { type: Date }, // next monthly reset date
-        topUp: { type: Number, default: 0 }, // purchased top-up credits
-        topUpExpiry: { type: Date }, // 90-day expiry for purchased credits
-    },
+    credits: { type: Number, default: 0 },
 
     // Gamification — daily login streak
     streak: { type: Number, default: 0 },
@@ -150,14 +143,6 @@ const userSchema = new mongoose.Schema({
     isFacebookUser: { type: Boolean, default: false },
 }, { timestamps: true });
 
-// Virtual: remaining credits (includes non-expired top-up)
-userSchema.virtual('creditsRemaining').get(function () {
-    if (this.role === 'superadmin' || this.plan === 'enterprise') return Infinity;
-    const topUp = (this.credits.topUp > 0 && this.credits.topUpExpiry && new Date(this.credits.topUpExpiry) > new Date())
-        ? this.credits.topUp : 0;
-    return Math.max(0, (this.credits.total + this.credits.bonus + topUp) - this.credits.used);
-});
-
 userSchema.set('toJSON', {
     virtuals: true,
     transform: (_doc, ret) => {
@@ -181,19 +166,6 @@ userSchema.set('toJSON', {
         delete ret.isFacebookUser;
         delete ret.lastActive;
         delete ret.__v;
-        // Sanitize credits — only expose what the user needs to see
-        if (ret.credits) {
-            const total = ret.credits.total || 0;
-            const used = ret.credits.used || 0;
-            const bonus = ret.credits.bonus || 0;
-            const topUp = (ret.credits.topUp > 0 && ret.credits.topUpExpiry && new Date(ret.credits.topUpExpiry) > new Date())
-                ? ret.credits.topUp : 0;
-            ret.credits = {
-                total,
-                used,
-                remaining: Math.max(0, (total + bonus + topUp) - used),
-            };
-        }
         return ret;
     }
 });

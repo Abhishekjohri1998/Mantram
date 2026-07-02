@@ -1832,7 +1832,7 @@ router.get('/notifications', protect, async (req, res) => {
 
         // Credit warning
         const user = req.user;
-        const creditsRemaining = Math.max(0, (user.credits?.total || 50) + (user.credits?.bonus || 0) - (user.credits?.used || 0));
+        const creditsRemaining = user.credits || 0;
         if (creditsRemaining <= 5) {
             notifications.push({
                 type: 'low_credits', severity: 'warning',

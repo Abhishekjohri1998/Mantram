@@ -290,38 +290,38 @@ export const requireCredits = (actionOrCost = 1) => {
                 return next();
             }
 
-            // Include topUp credits if not expired
-            const topUp = (user.credits?.topUp > 0 && user.credits?.topUpExpiry && new Date(user.credits.topUpExpiry) > new Date())
-                ? user.credits.topUp : 0;
-            const remaining = (user.credits?.total || 0) + (user.credits?.bonus || 0) + topUp - (user.credits?.used || 0);
+            const remaining = user.credits || 0;
 
             if (remaining < cost) {
                 console.warn(`❌ [CREDITS] ${user.email} (Remaining: ${remaining}) has insufficient credits for "${actionName}" (Cost: ${cost} | Mult: ${providerMultiplier}x)`);
-                return res.status(403).json({
+                return res.status(402).json({
                     success: false,
                     error: 'Insufficient credits',
                     creditsRequired: cost,
-                    creditsRemaining: Math.max(0, remaining),
+                    creditsRemaining: remaining,
                     upgradeRequired: true,
                 });
             }
 
-            // Deduct credits immediately
-            const updateOps = [
-                User.findByIdAndUpdate(user._id, { $inc: { 'credits.used': cost } }, { returnDocument: 'after' })
-            ];
+            // Deduct credits immediately with atomic guard
+            const updated = await User.findOneAndUpdate(
+                { _id: user._id, credits: { $gte: cost } },
+                { $inc: { credits: -cost } },
+                { returnDocument: 'after' }
+            );
 
-            // If user has an active subscription, sync deduction there too
-            if (user.activeSubscription) {
-                const Subscription = (await import('../models/Subscription.js')).default;
-                updateOps.push(Subscription.findByIdAndUpdate(user.activeSubscription, { $inc: { 'credits.used': cost } }));
+            if (!updated) {
+                 return res.status(402).json({
+                    success: false,
+                    error: 'Insufficient credits',
+                    creditsRequired: cost,
+                    creditsRemaining: remaining,
+                    upgradeRequired: true,
+                });
             }
 
-            const [updated] = await Promise.all(updateOps);
-
             // Log usage (fire-and-forget)
-            const updTopUp = (updated.credits?.topUp > 0 && updated.credits?.topUpExpiry && new Date(updated.credits.topUpExpiry) > new Date()) ? updated.credits.topUp : 0;
-            const balanceAfter = (updated.credits?.total || 0) + (updated.credits?.bonus || 0) + updTopUp - (updated.credits?.used || 0);
+            const balanceAfter = updated.credits;
             // Detect studio from action name
             const studioMap = { content: 'content', contentRefine: 'content', creative: 'creative', photoshoot: 'creative', brainstorm: 'brainstorm', brainstormRefine: 'brainstorm', brainstormChat: 'brainstorm', brainstormScreenplay: 'brainstorm', trendRefresh: 'brainstorm', research: 'research', videoBrainstorm: 'video', videoGenerate: 'video', videoEdit: 'video', socialMedia: 'social', socialMediaCalendar: 'social', socialMediaAudit: 'social', socialMediaCompetitor: 'social', socialMediaScore: 'social', canvasGenerate: 'creative', canvasBgRemove: 'creative', canvasExtend: 'creative', fidatoCanvas: 'creative', fidatoCanvasClaude: 'creative', creativeCampaign: 'creative', creativeCritique: 'creative', adCreative: 'performance', voiceClone: 'voice', voiceTranscribe: 'voice', promptEnhance: 'creative', imageEnhance: 'video', monthlyStrategy: 'brainstorm', monthlyBrief: 'brainstorm', qAdsPrompt: 'video', qAdsEnhance: 'video', qAdsDirector: 'video', qAdsGenerate: 'video', ugcProGenerate: 'video', ugcProAnalyze: 'video', avatarGenerate: 'creative' };
             const studio = studioMap[actionName] || (actionName?.startsWith('seo') ? 'seo' : 'unknown');
@@ -380,21 +380,18 @@ export const deductCredits = async (userId, actionOrCost, amount = 1, brandId = 
             cost = costs[actionOrCost] || amount;
         }
 
-        const updateOps = [
-            User.findByIdAndUpdate(userId, { $inc: { 'credits.used': cost } }, { returnDocument: 'after' })
-        ];
-
-        // If user has an active subscription, sync deduction there too
-        if (user.activeSubscription) {
-            const Subscription = (await import('../models/Subscription.js')).default;
-            updateOps.push(Subscription.findByIdAndUpdate(user.activeSubscription, { $inc: { 'credits.used': cost } }));
+        const updated = await User.findOneAndUpdate(
+            { _id: userId, credits: { $gte: cost } },
+            { $inc: { credits: -cost } },
+            { returnDocument: 'after' }
+        );
+        if (!updated) {
+            console.warn(`💰 Manual deduction failed: insufficient credits for ${userId}`);
+            return null;
         }
 
-        const [updated] = await Promise.all(updateOps);
-
         // Log usage
-        const updTopUp = (updated.credits?.topUp > 0 && updated.credits?.topUpExpiry && new Date(updated.credits.topUpExpiry) > new Date()) ? updated.credits.topUp : 0;
-        const balanceAfter = (updated.credits?.total || 0) + (updated.credits?.bonus || 0) + updTopUp - (updated.credits?.used || 0);
+        const balanceAfter = updated.credits;
 
         CreditUsage.create({
             user: userId,
@@ -418,34 +415,23 @@ export const deductCredits = async (userId, actionOrCost, amount = 1, brandId = 
  */
 export const getCreditBalance = (user) => {
     // Superadmin and Enterprise plans have unlimited credits
-    if (user.role === 'superadmin' || user.plan === 'enterprise' || (user.credits?.total >= 999999)) {
+    if (user.role === 'superadmin' || user.plan === 'enterprise') {
         return {
             total: Infinity,
-            used: user.credits?.used || 0,
+            used: 0,
             remaining: Infinity,
             unlimited: true,
-            bonus: user.credits?.bonus || 0,
-            topUp: user.credits?.topUp || 0,
             plan: user.plan || 'enterprise'
         };
     }
 
-    const total = user.credits?.total || 0;
-    const bonus = user.credits?.bonus || 0;
-    const used = user.credits?.used || 0;
-    // Include topUp only if not expired
-    const topUp = (user.credits?.topUp > 0 && user.credits?.topUpExpiry && new Date(user.credits.topUpExpiry) > new Date())
-        ? user.credits.topUp : 0;
-    const remaining = Math.max(0, (total + bonus + topUp) - used);
+    const remaining = user.credits || 0;
 
     return {
-        total,
-        used,
+        total: remaining,
+        used: 0,
         remaining,
         unlimited: false,
-        bonus,
-        topUp,
-        topUpExpiry: user.credits?.topUpExpiry || null,
         plan: user.plan || 'starter'
     };
 };
@@ -575,22 +561,11 @@ export { MODEL_COSTS };
 export const refundCredits = async (userId, amount, actionName, description, studio = 'unknown', metadata = {}) => {
     if (!userId || !amount || amount <= 0) return;
     try {
-        const updateOps = [
-            User.findByIdAndUpdate(userId, { $inc: { 'credits.used': -amount } }, { returnDocument: 'after' })
-        ];
-
-        // We need the user to check activeSubscription
-        const user = await User.findById(userId).select('activeSubscription credits');
-        if (user?.activeSubscription) {
-            const Subscription = (await import('../models/Subscription.js')).default;
-            updateOps.push(Subscription.findByIdAndUpdate(user.activeSubscription, { $inc: { 'credits.used': -amount } }));
-        }
-
-        const [updated] = await Promise.all(updateOps);
+        const updated = await User.findByIdAndUpdate(userId, { $inc: { credits: amount } }, { returnDocument: 'after' });
+        if (!updated) return;
 
         // Log the refund
-        const updTopUp = (updated?.credits?.topUp > 0 && updated?.credits?.topUpExpiry && new Date(updated.credits.topUpExpiry) > new Date()) ? updated.credits.topUp : 0;
-        const balanceAfter = (updated?.credits?.total || 0) + (updated?.credits?.bonus || 0) + updTopUp - (updated?.credits?.used || 0);
+        const balanceAfter = updated.credits;
 
         await CreditUsage.create({
             user: userId,

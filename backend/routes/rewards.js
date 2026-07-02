@@ -124,7 +124,7 @@ async function claimMilestoneHandler(req, res) {
             success: true,
             message: `${reward.label} — +${reward.credits} bonus credits!`,
             creditsAwarded: reward.credits,
-            newBalance: updatedUser.creditsRemaining,
+            newBalance: updatedUser.credits,
         });
     } catch (error) {
         console.error('❌ Claim Milestone Error:', error);
@@ -212,8 +212,8 @@ router.post('/video-cost-preview', protect, async (req, res) => {
             apiCostUSD: estimate.usd,
             apiCostINR: estimate.inr,
             credits,
-            userBalance: req.user.creditsRemaining,
-            canAfford: req.user.creditsRemaining >= credits,
+            userBalance: req.user.credits,
+            canAfford: req.user.credits >= credits,
         });
     } catch (error) {
         console.error('❌ Video Cost Preview Error:', error);

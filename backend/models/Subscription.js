@@ -6,10 +6,7 @@ const subscriptionSchema = new mongoose.Schema({
     billingCycle: { type: String, enum: ['monthly', 'quarterly', 'yearly', 'lifetime'], default: 'monthly' },
 
     // Credits
-    credits: {
-        total: { type: Number, default: 50 },
-        used: { type: Number, default: 0 },
-    },
+    credits: { type: Number, default: 0 },
 
     // Pricing
     price: { type: Number, default: 0 }, // amount paid
@@ -54,11 +51,7 @@ const subscriptionSchema = new mongoose.Schema({
     notes: { type: String, default: '' },
 }, { timestamps: true });
 
-// Virtual: remaining credits
-subscriptionSchema.virtual('creditsRemaining').get(function () {
-    if (this.plan === 'enterprise') return Infinity;
-    return Math.max(0, this.credits.total - this.credits.used);
-});
+
 
 // Virtual: is active
 subscriptionSchema.virtual('isActive').get(function () {

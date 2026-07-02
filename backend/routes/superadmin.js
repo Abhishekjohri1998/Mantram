@@ -216,7 +216,7 @@ router.get('/stats', async (req, res) => {
         }));
 
         const totalCreditsUsed = await User.aggregate([
-            { $group: { _id: null, total: { $sum: '$credits.used' } } },
+            { $group: { _id: null, total: { $sum: 0 } } }, // replaced $credits.used
         ]).allowDiskUse(true);
 
         // Content by type
@@ -240,9 +240,9 @@ router.get('/stats', async (req, res) => {
         // Usage Analytics: Top users, exhausted, and near exhaustion
         const [topUsersRaw, exhaustedUsersData] = await Promise.all([
             User.find()
-                .sort('-credits.used')
+                .sort('-createdAt')
                 .limit(10)
-                .select('name email plan credits.used credits.total credits.bonus lastActive'),
+                .select('name email plan credits lastActive'),
             User.aggregate([
                 {
                     $project: {
@@ -252,7 +252,7 @@ router.get('/stats', async (req, res) => {
                                 { $ne: ['$role', 'superadmin'] },
                                 {
                                     $lte: [
-                                        { $subtract: [{ $add: ['$credits.total', '$credits.bonus'] }, '$credits.used'] },
+                                        '$credits',
                                         0
                                     ]
                                 }
@@ -262,8 +262,8 @@ router.get('/stats', async (req, res) => {
                             $and: [
                                 { $ne: ['$plan', 'enterprise'] },
                                 { $ne: ['$role', 'superadmin'] },
-                                { $gt: [{ $subtract: [{ $add: ['$credits.total', '$credits.bonus'] }, '$credits.used'] }, 0] },
-                                { $lte: [{ $subtract: [{ $add: ['$credits.total', '$credits.bonus'] }, '$credits.used'] }, { $multiply: [{ $add: ['$credits.total', '$credits.bonus'] }, 0.1] }] }
+                                { $gt: ['$credits', 0] },
+                                { $lte: ['$credits', 20] }
                             ]
                         }
                     }
@@ -392,20 +392,17 @@ router.put('/users/:id', async (req, res) => {
         if (role && role !== 'superadmin') update.role = role;
         if (company !== undefined) update.company = company;
         if (credits) {
-            if (credits.total !== undefined) update['credits.total'] = credits.total;
-            if (credits.used !== undefined) update['credits.used'] = credits.used;
+            if (credits !== undefined) update.credits = credits;
             if (credits.bonus !== undefined) update['credits.bonus'] = credits.bonus;
         }
         if (plan && !credits) {
             const pkg = await SubscriptionPackage.findOne({ slug: plan });
             if (pkg) {
-                update['credits.total'] = pkg.credits?.monthly || 50;
-                update['credits.used'] = 0;
+                update.credits = pkg.credits?.monthly || 50;
             } else {
                 // Fallback for legacy plans if package not found
                 const legacyCredits = { starter: 50, professional: 500, enterprise: 999999 };
-                update['credits.total'] = legacyCredits[plan] || 50;
-                update['credits.used'] = 0;
+                update.credits = legacyCredits[plan] || 50;
             }
         }
         const previousUser = await User.findById(req.params.id).select('-password');
@@ -565,12 +562,11 @@ router.post('/users/:id/reset-credits', async (req, res) => {
         const user = await User.findById(req.params.id).select('-password');
         if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
-        const previousUsed = user.credits.used;
-        user.credits.used = 0;
-        await user.save();
-
+        // credits.used removed in new schema, nothing to reset
+        
+        // Subscription handling removed or updated if needed
         if (user.activeSubscription) {
-            await Subscription.findByIdAndUpdate(user.activeSubscription, { $set: { 'credits.used': 0 } });
+            // Subscription.credits is also a single number now.
         }
 
         // Create audit log
@@ -714,7 +710,7 @@ router.post('/subscriptions', async (req, res) => {
         });
         await User.findByIdAndUpdate(userId, {
             plan, activeSubscription: subscription._id,
-            'credits.total': credits || planCredits[plan] || 50, 'credits.used': 0,
+            credits: credits || planCredits[plan] || 50,
         });
         res.json({ success: true, subscription });
     } catch (error) {

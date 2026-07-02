@@ -365,10 +365,7 @@ router.post('/verify', protect, async (req, res) => {
             user: req.user._id,
             plan: pkg.slug,
             billingCycle,
-            credits: {
-                total: (pkg.credits.monthly || 0) + (pkg.credits.bonusOnSignup || 0),
-                used: 0,
-            },
+            credits: (pkg.credits.monthly || 0) + (pkg.credits.bonusOnSignup || 0),
             price: (pkg.pricing[billingCycle] || pkg.pricing.monthly),
             currency: pkg.pricing.currency,
             startDate: new Date(),
@@ -396,10 +393,13 @@ router.post('/verify', protect, async (req, res) => {
 
         // Update user
         await User.findByIdAndUpdate(req.user._id, {
-            plan: pkg.slug,
-            activeSubscription: subscription._id,
-            'credits.total': (pkg.credits.monthly || 0) + (pkg.credits.bonusOnSignup || 0),
-            'credits.used': 0,
+            $set: {
+                plan: pkg.slug,
+                activeSubscription: subscription._id,
+            },
+            $inc: {
+                credits: (pkg.credits.monthly || 0) + (pkg.credits.bonusOnSignup || 0),
+            }
         });
 
         res.json({
@@ -656,7 +656,7 @@ router.post('/verify-topup', protect, async (req, res) => {
         res.json({
             success: true,
             message: `Successfully added ${credits} credits to your account!`,
-            newBalance: user.creditsRemaining,
+            newBalance: user.credits,
             creditsAdded: credits,
             expiresAt: expiry,
         });
@@ -1061,10 +1061,7 @@ router.get('/shopify/callback', async (req, res) => {
             user: userId,
             plan: pkg.slug,
             billingCycle,
-            credits: {
-                total: (pkg.credits.monthly || 0) + (pkg.credits.bonusOnSignup || 0),
-                used: 0,
-            },
+            credits: (pkg.credits.monthly || 0) + (pkg.credits.bonusOnSignup || 0),
             price: parseFloat(shopifySub.lineItems[0].plan.price.amount),
             currency: 'USD',
             startDate: new Date(),
@@ -1078,10 +1075,13 @@ router.get('/shopify/callback', async (req, res) => {
 
         // Update user
         await User.findByIdAndUpdate(userId, {
-            plan: pkg.slug,
-            activeSubscription: subscription._id,
-            'credits.total': (pkg.credits.monthly || 0) + (pkg.credits.bonusOnSignup || 0),
-            'credits.used': 0,
+            $set: {
+                plan: pkg.slug,
+                activeSubscription: subscription._id,
+            },
+            $inc: {
+                credits: (pkg.credits.monthly || 0) + (pkg.credits.bonusOnSignup || 0),
+            }
         });
 
         console.log(`✅ Shopify subscription activated for ${shop} (user: ${userId}), plan: ${pkg.slug}`);

@@ -84,7 +84,7 @@ async function assignDefaultSubscription(user) {
             user: user._id,
             plan: 'free',
             billingCycle: 'monthly',
-            credits: { total: freePackage.credits?.monthly || 100, used: 0 },
+            credits: freePackage.credits?.monthly || 100,
             price: 0,
             startDate: new Date(),
             endDate,
@@ -96,7 +96,7 @@ async function assignDefaultSubscription(user) {
         await User.findByIdAndUpdate(user._id, {
             plan: 'free',
             activeSubscription: subscription._id,
-            'credits.total': freePackage.credits?.monthly || 100,
+            credits: freePackage.credits?.monthly || 100,
             'credits.resetDate': endDate,
         });
         
@@ -574,11 +574,7 @@ router.get('/me', protect, async (req, res) => {
                 userId: user.userId,
                 teamRole: user.teamRole || '',
                 organization: user.organization || null,
-                credits: {
-                    total: user.credits?.total || 0,
-                    used: user.credits?.used || 0,
-                    remaining: user.creditsRemaining ?? 0,
-                },
+                credits: user.credits || 0,
                 streak: user.streak || 0,
                 preferences: user.preferences || {},
                 milestones: user.milestones || {},
