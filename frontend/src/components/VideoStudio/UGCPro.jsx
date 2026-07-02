@@ -515,7 +515,9 @@ export default function UGCPro({ activeBrand, projects = [], projectsLoaded = fa
                         setGridVideos(prev => [{ _id: jobId, generation: { videoUrl: status.videoUrl }, input: { productData } }, ...prev])
                     } else if (status.status === 'FAILED') {
                         clearInterval(pollRefs.current[jobId]); delete pollRefs.current[jobId]
-                        setJobs(prev => prev.map(j => j.id === jobId ? { ...j, status: 'failed', error: status.error || 'Failed' } : j))
+                        const isTimeout = status.error && (status.error.includes('Network request timed out') || status.error.includes('504'));
+                        const errorMsg = isTimeout ? 'Video generation modal servers are overloaded or experiencing downtime please try after sometime' : (status.error || 'Failed');
+                        setJobs(prev => prev.map(j => j.id === jobId ? { ...j, status: 'failed', error: errorMsg } : j))
                     }
                 } catch { /* keep polling */ }
             }, 5000)

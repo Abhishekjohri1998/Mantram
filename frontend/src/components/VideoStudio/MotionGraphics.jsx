@@ -336,7 +336,8 @@ export default function MotionGraphics({ activeBrand, canCreateVideo = true, onU
                     setStage('done')
                 } else if (d.status === 'FAILED') {
                     clearInterval(pollRef.current)
-                    setError(d.error || 'Generation failed. Try a different style or prompt.')
+                    const isTimeout = d.error && (d.error.includes('Network request timed out') || d.error.includes('504'));
+                    setError(isTimeout ? 'Video generation modal servers are overloaded or experiencing downtime please try after sometime' : (d.error || 'Generation failed. Try a different style or prompt.'))
                     setStage('error')
                 }
             } catch { /* keep polling */ }

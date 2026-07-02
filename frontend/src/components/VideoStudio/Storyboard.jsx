@@ -596,7 +596,8 @@ export default function Storyboard({
             }
         } catch (e) {
             console.error('Regen poster error:', e);
-            setError('Failed to regenerate poster');
+            const isTimeout = e.message && (e.message.includes('Network request timed out') || e.message.includes('504'));
+            setError(isTimeout ? 'Video generation modal servers are overloaded or experiencing downtime please try after sometime' : 'Failed to regenerate poster');
         } finally {
             setRegenLoading(false);
         }
@@ -793,7 +794,8 @@ export default function Storyboard({
             // Start polling — long-form uses 10s interval, single-shot uses 4s
             startPolling(!!data.longForm);
         } catch (e) {
-            setError(e.message);
+            const isTimeout = e.message && (e.message.includes('Network request timed out') || e.message.includes('504'));
+            setError(isTimeout ? 'Video generation modal servers are overloaded or experiencing downtime please try after sometime' : e.message);
             setPhase('review');
         }
     };
@@ -849,7 +851,8 @@ export default function Storyboard({
                     });
                 } else if (data.status === 'FAILED') {
                     clearInterval(pollRef.current);
-                    setError('Animation generation failed.');
+                    const isTimeout = data.error && (data.error.includes('Network request timed out') || data.error.includes('504'));
+                    setError(isTimeout ? 'Video generation modal servers are overloaded or experiencing downtime please try after sometime' : (data.error || 'Animation generation failed.'));
                     setPhase('review');
                 }
             } catch (e) {

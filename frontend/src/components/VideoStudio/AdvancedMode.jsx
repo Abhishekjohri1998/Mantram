@@ -472,7 +472,9 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                     setTimeout(() => setJobs(prev => prev.filter(j => j.id !== jobId)), 3000)
                 } else if (gen?.status === 'FAILED' || d.project.status === 'failed') {
                     clearInterval(pollRefs.current[jobId]); delete pollRefs.current[jobId]
-                    updateJob(jobId, { status: 'failed', error: gen?.error || 'Generation failed' })
+                    const errMsg = gen?.error || 'Generation failed';
+                    const isTimeout = errMsg.includes('Network request timed out') || errMsg.includes('504');
+                    updateJob(jobId, { status: 'failed', error: isTimeout ? 'Video generation modal servers are overloaded or experiencing downtime please try after sometime' : errMsg })
                 }
 
                 // High traffic check (5 minutes = 300000ms) with closure-safe state access
@@ -508,7 +510,9 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                         setTimeout(() => setJobs(prev => prev.filter(j => j.id !== jobId)), 3000)
                     } else if (s.status === 'FAILED') {
                         clearInterval(pollRefs.current[jobId]); delete pollRefs.current[jobId]
-                        updateJob(jobId, { status: 'failed', error: s.error || 'Long-form generation failed' })
+                        const errMsg = s.error || 'Long-form generation failed';
+                        const isTimeout = errMsg.includes('Network request timed out') || errMsg.includes('504');
+                        updateJob(jobId, { status: 'failed', error: isTimeout ? 'Video generation modal servers are overloaded or experiencing downtime please try after sometime' : errMsg })
                     } else {
                         updateJob(jobId, {
                             progress: s.progress || 10,

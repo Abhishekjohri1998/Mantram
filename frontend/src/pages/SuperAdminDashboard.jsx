@@ -337,7 +337,8 @@ export default function SuperAdminDashboard() {
                         }
                     } else if (data.status === 'FAILED') {
                         clearInterval(pollInterval);
-                        showToast('Video studio generation failed.', 'error');
+                        const isTimeout = data.error && (data.error.includes('Network request timed out') || data.error.includes('504'));
+                        showToast(isTimeout ? 'Video generation modal servers are overloaded or experiencing downtime please try after sometime' : (data.error || 'Video studio generation failed.'), 'error');
                     } else if (data.status === 'IN_PROGRESS') {
                         setGrowthVideoProgress(data.overallProgress || 0);
                         setGrowthVideoPhase(data.phaseLabel || 'Generating...');

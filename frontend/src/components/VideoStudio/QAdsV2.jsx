@@ -1101,7 +1101,7 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
                                     status,
                                     progress: d.progress || prev[vid]?.progress,
                                     videoUrl: d.videoUrl || prev[vid]?.videoUrl,
-                                    error: d.error,
+                                    error: (d.error && (d.error.includes('Network request timed out') || d.error.includes('504'))) ? 'Video generation modal servers are overloaded or experiencing downtime please try after sometime' : d.error,
                                     phaseLabel: d.phaseLabel || prev[vid]?.phaseLabel,
                                     detail: d.detail || '',
                                     scenes: d.scenes || prev[vid]?.scenes,
@@ -1149,7 +1149,7 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
                                     status,
                                     progress: d.progress || prev[vid]?.progress,
                                     videoUrl: d.videoUrl || prev[vid]?.videoUrl,
-                                    error: d.error
+                                    error: (d.error && (d.error.includes('Network request timed out') || d.error.includes('504'))) ? 'Video generation modal servers are overloaded or experiencing downtime please try after sometime' : d.error
                                 }
                             }))
                             if (status === 'done' || status === 'failed') {
@@ -1181,7 +1181,9 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
                 }, 5000)
             }
         } catch (e) {
-            setVideoJobs(prev => ({ ...prev, [vid]: { status: 'failed', error: e.message } }))
+            const isTimeout = e.message && (e.message.includes('Network request timed out') || e.message.includes('504'));
+            const errorMsg = isTimeout ? 'Video generation modal servers are overloaded or experiencing downtime please try after sometime' : e.message;
+            setVideoJobs(prev => ({ ...prev, [vid]: { status: 'failed', error: errorMsg } }))
         }
     }, [selP, productImgs, avatarUrl, duration, format, resolution, selectedModel, hookShot, activeBrand, language, productData, canCreateVideo, onUpgradeRequired, onVideoComplete])
 
