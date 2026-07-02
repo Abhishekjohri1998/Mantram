@@ -10070,7 +10070,7 @@ Format: ${format} | Style: ${style === '3d' ? 'Pixar/Unreal Engine 3D animated' 
             studioMode: 'storyboard',
             status: 'storyboard-ready',
             refAudio: briefAudioUrl || '',
-            title: `Storyboard — ${productName || brief?.substring(0, 40) || 'Ad Film'}`,
+            title: req.body.title || 'Untitled',
             input: {
                 brief,
                 productName: productName || '',
@@ -11334,6 +11334,48 @@ router.get('/storyboard/status/:projectId', protect, async (req, res) => {
     } catch (err) {
         console.error('[Storyboard Status] Error:', err.message);
         res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+// ── PATCH /api/video-studio/storyboard/:projectId ────────────────────────────
+// Saves changes to the storyboard project (draft saves, title changes, configurations)
+router.patch('/storyboard/:projectId', protect, async (req, res) => {
+    try {
+        const { title, scenes, dialogueLanguage, format, audioSync, includeBranding, model, resolution, overallProgress, segmentUrls, finalVideoUrl, status } = req.body;
+        
+        const updateFields = {};
+        if (title !== undefined) updateFields.title = title;
+        if (dialogueLanguage !== undefined) updateFields['storyboard.dialogueLanguage'] = dialogueLanguage;
+        if (format !== undefined) updateFields['storyboard.format'] = format;
+        if (audioSync !== undefined) updateFields['storyboard.audioSync'] = audioSync;
+        if (includeBranding !== undefined) updateFields['storyboard.includeBranding'] = includeBranding;
+        if (model !== undefined) updateFields['routing.selectedModel'] = model;
+        if (resolution !== undefined) updateFields['routing.resolution'] = resolution;
+        if (overallProgress !== undefined) updateFields['storyboard.progress'] = overallProgress;
+        if (segmentUrls !== undefined) updateFields['storyboard.segmentUrls'] = segmentUrls;
+        if (finalVideoUrl !== undefined) updateFields.finalVideoUrl = finalVideoUrl;
+        if (status !== undefined) updateFields.status = status;
+
+        if (scenes !== undefined && Array.isArray(scenes)) {
+            updateFields['storyboard.scenes'] = scenes;
+            // Also sync segmentPrompts map for long-form pipeline compatibility
+            const segmentPrompts = {};
+            scenes.forEach((scene, idx) => {
+                segmentPrompts[String(idx)] = scene.visualPrompt;
+            });
+            updateFields['storyboard.segmentPrompts'] = segmentPrompts;
+        }
+
+        const project = await VideoProject.findOneAndUpdate(
+            { _id: req.params.projectId, user: req.user._id },
+            { $set: updateFields },
+            { new: true }
+        );
+
+        if (!project) return res.status(404).json({ success: false, error: 'Project not found' });
+        res.json({ success: true, project });
+    } catch (error) {
+        res.status(500).json({ success: false, error: safeErrorMessage(error) });
     }
 });
 
