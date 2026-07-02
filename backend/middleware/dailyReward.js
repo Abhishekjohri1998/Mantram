@@ -58,30 +58,10 @@ export async function trackDailyLogin(req, res, next) {
 
         const totalReward = dailyReward + streakBonus;
 
-        // ── Defensive guard: ensure credits is a valid subdocument ────────────
-        // If a legacy user doc has `credits` stored as a NaN/number/null (from
-        // old migrations), MongoDB throws "Cannot create field 'bonus' in element
-        // {credits: nan.0}". We repair it inline before the $inc.
-        const creditsIsObject = typeof user.credits === 'object' && user.credits !== null
-            && !Array.isArray(user.credits)
-            && !Number.isNaN(user.credits); // NaN has typeof 'number' not 'object'
-
-        if (!creditsIsObject) {
-            console.warn(`⚠️ [dailyReward] User ${user._id} has corrupted credits field (${JSON.stringify(user.credits)}) — repairing…`);
-            await User.findByIdAndUpdate(user._id, {
-                $set: {
-                    'credits.total': 100,
-                    'credits.used':  0,
-                    'credits.bonus': 0,
-                    'credits.topUp': 0,
-                },
-            });
-        }
-
         // Update user
         await User.findByIdAndUpdate(user._id, {
             $set: { lastLoginDate: today, streak: newStreak },
-            $inc: { 'credits.bonus': totalReward },
+            $inc: { credits: totalReward },
         });
 
 

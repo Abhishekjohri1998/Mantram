@@ -24,45 +24,47 @@ const fixCredits = async () => {
     const db = mongoose.connection.db;
     const usersCollection = db.collection('users');
 
-    // Find users where credits is not an object
-    const corruptedUsers = await usersCollection.find({ credits: { $type: "double" } }).toArray();
+    // Find users where credits is an object (corrupted by legacy daily reward middleware)
+    const corruptedUsers = await usersCollection.find({ credits: { $type: "object" } }).toArray();
     
-    console.log(`Found ${corruptedUsers.length} users with corrupted credits (type double/NaN).`);
+    console.log(`Found ${corruptedUsers.length} users with corrupted credits (type object).`);
 
     for (const user of corruptedUsers) {
-        console.log(`Fixing user: ${user.email}`);
+        console.log(`Fixing user: ${user.email} (current credits: ${JSON.stringify(user.credits)})`);
+        
+        // Safely extract a number from the corrupted object
+        let newCreditAmount = 0;
+        if (user.credits) {
+            newCreditAmount = (user.credits.total || 0) + (user.credits.bonus || 0) + (user.credits.topUp || 0) - (user.credits.used || 0);
+            if (newCreditAmount < 0) newCreditAmount = 0;
+        }
+
         await usersCollection.updateOne(
             { _id: user._id },
             { 
-                $set: { 
-                    credits: {
-                        total: 100,
-                        used: 0,
-                        bonus: 0,
-                        topUp: 0
-                    }
-                } 
+                $set: { credits: newCreditAmount } 
             }
         );
-        console.log(`Fixed user: ${user.email}`);
+        console.log(`Fixed user: ${user.email} -> Set credits to ${newCreditAmount}`);
     }
 
-    // Also check for null credits or any other non-object types
-    const nullCreditsUsers = await usersCollection.find({ credits: null }).toArray();
-    console.log(`Found ${nullCreditsUsers.length} users with null credits.`);
-    for (const user of nullCreditsUsers) {
+    // Also check for null or NaN credits
+    const nullCreditsUsers = await usersCollection.find({ 
+        $or: [
+            { credits: null },
+            { credits: { $type: "double" }, $expr: { $eq: [{ $type: "$credits" }, "double"] } } // Simple check just to ensure it's not actually NaN but fixing null is easier.
+        ]
+    }).toArray();
+    
+    const actualNulls = nullCreditsUsers.filter(u => u.credits === null || Number.isNaN(u.credits));
+    
+    console.log(`Found ${actualNulls.length} users with null or NaN credits.`);
+    for (const user of actualNulls) {
          console.log(`Fixing user: ${user.email}`);
         await usersCollection.updateOne(
             { _id: user._id },
             { 
-                $set: { 
-                    credits: {
-                        total: 100,
-                        used: 0,
-                        bonus: 0,
-                        topUp: 0
-                    }
-                } 
+                $set: { credits: 0 } 
             }
         );
         console.log(`Fixed user: ${user.email}`);
