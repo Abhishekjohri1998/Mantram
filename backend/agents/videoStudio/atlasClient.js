@@ -171,20 +171,37 @@ async function ensureAssetCompatible(imageUrl) {
         }
         
         const meta = await sharp(buffer).metadata();
+        const width = meta.width || 300;
+        const height = meta.height || 300;
+        const aspectRatio = width / height;
 
         const UNSUPPORTED_FORMATS = ['avif', 'tiff', 'svg', 'heic', 'heif'];
         const needsConvert = UNSUPPORTED_FORMATS.some(f => contentType.includes(f));
-        const needsResize = (meta.width || 0) < 300 || (meta.height || 0) < 300;
+        const needsResize = width < 300 || height < 300;
+        const needsARFix = aspectRatio < 0.42 || aspectRatio > 2.45; // Buffer inside the 0.4 - 2.5 hard limits
 
-        if (!needsConvert && !needsResize) return imageUrl; // already compatible
+        if (!needsConvert && !needsResize && !needsARFix) return imageUrl; // already compatible
 
         let pipeline = sharp(buffer);
-        if (needsResize) {
-            const scale = Math.max(300 / (meta.width || 300), 300 / (meta.height || 300));
-            const newW = Math.max(300, Math.ceil((meta.width || 300) * scale));
-            const newH = Math.max(300, Math.ceil((meta.height || 300) * scale));
-            pipeline = pipeline.resize(newW, newH, { fit: 'fill' });
-            console.log(`📐 [Atlas Prep] Upscaling ${meta.width}x${meta.height} → ${newW}x${newH}`);
+        let finalW = width;
+        let finalH = height;
+        let fitMode = 'fill';
+
+        if (needsARFix) {
+            if (aspectRatio > 2.45) { finalH = Math.round(width / 2.45); } // Too wide -> pad height
+            else if (aspectRatio < 0.42) { finalW = Math.round(height * 0.42); } // Too tall -> pad width
+            fitMode = 'contain';
+        }
+
+        if (finalW < 300 || finalH < 300) {
+            const scale = Math.max(300 / finalW, 300 / finalH);
+            finalW = Math.ceil(finalW * scale);
+            finalH = Math.ceil(finalH * scale);
+        }
+
+        if (needsResize || needsARFix) {
+            pipeline = pipeline.resize(finalW, finalH, { fit: fitMode, background: { r: 0, g: 0, b: 0, alpha: 1 } });
+            console.log(`📐 [Atlas Prep] Resizing/Padding ${width}x${height} (AR:${aspectRatio.toFixed(2)}) → ${finalW}x${finalH} (fit:${fitMode})`);
         }
         if (needsConvert) {
             console.log(`🔄 [Atlas Prep] Converting ${contentType} → JPEG`);
