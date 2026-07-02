@@ -4903,6 +4903,7 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), aiGe
                 generateAudio: true,
                 referenceImages: allRefImages,
                 customCharacterNames,
+                resolution,
             });
             usedProvider = 'atlascloud';
 

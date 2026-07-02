@@ -323,7 +323,7 @@ function buildPayload(model, { prompt, imageUrl, duration, resolution, mode, sho
 /**
  * Robust cascading poll for seedance-2.0
  */
-async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, generateAudio, mode, referenceImages, refAudio, refVideo }) {
+async function trySeedanceCascade({ prompt, imageUrl, duration, resolution, aspectRatio, generateAudio, mode, referenceImages, refAudio, refVideo }) {
     if (isLaozhangAvailable()) {
         try {
             const r = await submitLaozhangVideoGeneration({
@@ -348,6 +348,8 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, aspectRatio, gen
             aspectRatio: aspectRatio || '16:9',
             generateAudio, referenceImages: referenceImages || [], qualityMode: mode || 'fast',
             refAudio, refVideo,
+            resolution,
+            model: 'seedance-2.0'
         });
         if (atlasResult?.taskId) {
             console.log('✅ [Cascade] Step 2 done: Atlas Cloud (seedance)');
@@ -442,7 +444,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
     } catch (e) {
         console.warn('⚠️ Could not read video_provider from cache:', e.message);
     }
-    if (model === 'seedance-2.0') {
+    if (model === 'seedance-2.0' || model === 'seedance-2.0-fast' || model === 'seedance-2.0-mini') {
         const hasRealFaceRefs = s3ReferenceImages.filter(Boolean).length > 0;
         
         // 👤 REAL FACE REFERENCE-TO-VIDEO: Bypass MuAPI/LaoZhang entirely
@@ -455,6 +457,8 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                     aspectRatio: aspectRatio || '16:9', generateAudio,
                     referenceImages: s3ReferenceImages.filter(Boolean), qualityMode: mode || 'fast',
                     refAudio: s3RefAudio, refVideo: s3RefVideo,
+                    resolution,
+                    model,
                 });
                 return {
                     requestId: result.taskId, endpoint: 'atlascloud-r2v',
@@ -477,6 +481,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                     aspectRatio: aspectRatio || '16:9', qualityMode: mode || 'fast',
                     generateAudio, referenceImages: s3ReferenceImages,
                     refAudio: s3RefAudio, refVideo: s3RefVideo,
+                    resolution,
                 });
                 return {
                     requestId: result.taskId, endpoint: 'muapi-seedance-2.0',
@@ -489,6 +494,8 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                     aspectRatio: aspectRatio || '16:9', generateAudio,
                     referenceImages: s3ReferenceImages, qualityMode: mode || 'fast',
                     refAudio: s3RefAudio, refVideo: s3RefVideo,
+                    resolution,
+                    model,
                 });
                 return {
                     requestId: result.taskId, endpoint: 'atlascloud-seedance-2.0',
@@ -518,6 +525,7 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                 aspectRatio: aspectRatio || '16:9', generateAudio, mode,
                 referenceImages: s3ReferenceImages, 
                 refAudio: s3RefAudio, refVideo: s3RefVideo,
+                resolution,
             });
             return {
                 requestId: cascade.taskId || `lz-${Date.now()}`,
