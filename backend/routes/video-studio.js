@@ -11341,7 +11341,7 @@ router.get('/storyboard/status/:projectId', protect, async (req, res) => {
 // Saves changes to the storyboard project (draft saves, title changes, configurations)
 router.patch('/storyboard/:projectId', protect, async (req, res) => {
     try {
-        const { title, scenes, dialogueLanguage, format, audioSync, includeBranding, model, resolution, overallProgress } = req.body;
+        const { title, scenes, dialogueLanguage, format, audioSync, includeBranding, model, resolution, overallProgress, segmentUrls, finalVideoUrl, status } = req.body;
         
         const updateFields = {};
         if (title !== undefined) updateFields.title = title;
@@ -11352,6 +11352,9 @@ router.patch('/storyboard/:projectId', protect, async (req, res) => {
         if (model !== undefined) updateFields['routing.selectedModel'] = model;
         if (resolution !== undefined) updateFields['routing.resolution'] = resolution;
         if (overallProgress !== undefined) updateFields['storyboard.progress'] = overallProgress;
+        if (segmentUrls !== undefined) updateFields['storyboard.segmentUrls'] = segmentUrls;
+        if (finalVideoUrl !== undefined) updateFields.finalVideoUrl = finalVideoUrl;
+        if (status !== undefined) updateFields.status = status;
 
         if (scenes !== undefined && Array.isArray(scenes)) {
             updateFields['storyboard.scenes'] = scenes;

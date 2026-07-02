@@ -209,6 +209,8 @@ export default function Storyboard({
     // Manual mode — per-segment items for the gallery
     const [segmentItems, setSegmentItems] = useState([]); // [{index, status, videoUrl, prompt, duration, error}]
     const [regenSegIdx, setRegenSegIdx] = useState(null); // which segment is being regen'd
+    const [showRegenOptionModal, setShowRegenOptionModal] = useState(false);
+    const [targetRegenIdx, setTargetRegenIdx] = useState(null);
     const [editedPrompts, setEditedPrompts] = useState({}); // {segIdx: editedPrompt}
     const [editedVoiceovers, setEditedVoiceovers] = useState({}); // {segIdx: editedVoiceover}
     const [characterRefSheetUrl, setCharacterRefSheetUrl] = useState('');
@@ -1117,6 +1119,100 @@ export default function Storyboard({
             setRegenSegIdx(null);
         }
     }, [projectIdRef, segmentItems, editedPrompts]);
+
+    const handleRegenSequenceFrom = useCallback(async (segIdx) => {
+        if (!projectIdRef.current) return;
+        
+        // 1. Build updated segmentUrls map where index >= segIdx are cleared (set to null)
+        const newSegmentUrls = {};
+        segmentItems.forEach((seg, idx) => {
+            if (idx < segIdx) {
+                newSegmentUrls[String(idx)] = seg.videoUrl;
+            } else {
+                newSegmentUrls[String(idx)] = null;
+            }
+        });
+
+        // Optimistically update segmentItems state in the UI
+        setSegmentItems(prev => prev.map((item, idx) => {
+            if (idx >= segIdx) {
+                return { ...item, status: 'pending', videoUrl: null, progress: 0 };
+            }
+            return item;
+        }));
+
+        setPhase('animating');
+        setError('');
+        
+        try {
+            // 2. PATCH the DB to clear these segment URLs and reset finalVideoUrl
+            const patchRes = await fetch(`${API}/storyboard/${projectIdRef.current}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('mantram_token')}`
+                },
+                body: JSON.stringify({
+                    segmentUrls: newSegmentUrls,
+                    finalVideoUrl: null,
+                    status: 'animating'
+                })
+            });
+            const patchData = await safeJson(patchRes);
+            if (!patchData.success) throw new Error(patchData.error || 'Failed to update project sequence in DB');
+
+            // 3. Trigger /storyboard/animate to start the long form generator
+            const res = await fetch(`${API}/storyboard/animate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('mantram_token')}` },
+                body: JSON.stringify({
+                    projectId: projectIdRef.current,
+                    imageUrl,
+                    duration,
+                    format,
+                    resolution,
+                    productImageUrls: productImages
+                        .map(pi => typeof pi.file === 'string' ? pi.file : null)
+                        .filter(Boolean),
+                    avatarUrls: avatarImages
+                        .filter(ai => typeof ai.file === 'string')
+                        .map(ai => ai.file),
+                    avatarUrl: (avatarImages[0] && typeof avatarImages[0].file === 'string')
+                        ? avatarImages[0].file
+                        : undefined,
+                    model,
+                    brandId: activeBrand?._id,
+                    generateMode,
+                    audioSync,
+                    voiceoverScript: plan?.voiceoverScript || '',
+                    editedPrompts,
+                    editedVoiceovers,
+                }),
+            });
+
+            const data = await safeJson(res);
+            if (!data.success) throw new Error(data.error || 'Animation failed to start');
+
+            if (data.videoPrompt) setGeneratedVideoPrompt(data.videoPrompt);
+
+            if (data.longForm) {
+                setIsLongForm(true);
+                longFormJobIdRef.current = data.jobId || null;
+                setPhaseLabel('Planning segments...');
+                setPhaseDetail(`${data.segments || Math.ceil(duration / 10)} segments will be generated`);
+            } else {
+                setIsLongForm(false);
+                setPhaseLabel('Animating film...');
+                setPhaseDetail('');
+            }
+
+            // Start polling (long form)
+            startPolling(true);
+        } catch (e) {
+            setError(e.message);
+            setPhase('review');
+        }
+    }, [projectIdRef, segmentItems, imageUrl, duration, format, resolution, productImages, avatarImages, model, activeBrand?._id, generateMode, audioSync, plan?.voiceoverScript, editedPrompts, editedVoiceovers, startPolling]);
 
     // ── Manual mode: Generate/Regenerate all incomplete segments in parallel ──
     const handleGenerateAllSegments = useCallback(async () => {
@@ -2336,7 +2432,10 @@ export default function Storyboard({
                                                      )}
                                                     <button
                                                         className="sb-seg-regen-btn"
-                                                        onClick={() => handleRegenSegment(i)}
+                                                        onClick={() => {
+                                                            setTargetRegenIdx(i);
+                                                            setShowRegenOptionModal(true);
+                                                        }}
                                                         disabled={isRegen || isCompiling}
                                                         title="Regenerate this segment"
                                                     >
@@ -2465,6 +2564,49 @@ export default function Storyboard({
                                 <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
                             </button>
                         </div>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* Storyboard Option Modal for Segment/Sequence Regeneration */}
+        {showRegenOptionModal && (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 10001, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                <div style={{ background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: '28px', maxWidth: '420px', width: '100%', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
+                    <h3 style={{ margin: '0 0 12px', fontSize: 18, fontWeight: 700, color: '#fff' }}>Regenerate Options</h3>
+                    <p style={{ margin: '0 0 24px', fontSize: 13, lineHeight: '1.5', color: 'rgba(255,255,255,0.6)' }}>
+                        Choose whether to regenerate only this clip, or start generating the entire remaining sequence from this clip onward.
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        <button
+                            onClick={() => {
+                                setShowRegenOptionModal(false);
+                                handleRegenSegment(targetRegenIdx);
+                            }}
+                            className="sb-btn-primary"
+                            style={{ justifyContent: 'center', width: '100%', gap: 8 }}
+                        >
+                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>filter_1</span>
+                            Regenerate only this clip
+                        </button>
+                        <button
+                            onClick={() => {
+                                setShowRegenOptionModal(false);
+                                handleRegenSequenceFrom(targetRegenIdx);
+                            }}
+                            className="sb-btn-primary"
+                            style={{ justifyContent: 'center', width: '100%', gap: 8, background: 'linear-gradient(135deg, #A855F7 0%, #7C3AED 100%)' }}
+                        >
+                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>fast_forward</span>
+                            Regenerate sequence from here
+                        </button>
+                        <button
+                            onClick={() => setShowRegenOptionModal(false)}
+                            className="sb-btn-ghost"
+                            style={{ justifyContent: 'center', width: '100%', border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: '#fff', cursor: 'pointer' }}
+                        >
+                            Cancel
+                        </button>
                     </div>
                 </div>
             </div>
