@@ -656,7 +656,7 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
         else if (resolution === '4k') resMult = 2.0
     }
     
-    const credits = Math.max(Math.ceil(m.cost * (quality === 'quality' ? 2 : 1) * duration * 70 * resMult), 5)
+    const credits = Math.max(Math.ceil(duration * 17), 5)
     const activeJobCount = jobs.filter(j => j.status === 'generating').length
     const canGenerate = activeJobCount < MAX_CONCURRENT
 
