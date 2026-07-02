@@ -192,6 +192,7 @@ export default function Storyboard({
     const [generatedVideoPrompt, setGeneratedVideoPrompt] = useState(''); // set after animate starts
     
     const [projectId, setProjectId] = useState(null);
+    const [projectTitle, setProjectTitle] = useState('Untitled');
     const [error, setError] = useState('');
     const [finalVideoUrl, setFinalVideoUrl] = useState(null);
     const [previewVideo, setPreviewVideo] = useState(null);
@@ -677,6 +678,7 @@ export default function Storyboard({
 
             setProjectId(data.projectId);
             projectIdRef.current = data.projectId;
+            setProjectTitle('Untitled');
             if (onProjectIdCreated) {
                 onProjectIdCreated(data.projectId);
             }
@@ -862,6 +864,7 @@ export default function Storyboard({
         console.log('🔄 Reconnecting to active storyboard project:', id);
         setProjectId(id);
         projectIdRef.current = id;
+        setProjectTitle(proj.title || 'Untitled');
         
         // Restore plan & basic info
         const sb = proj.storyboard || {};
@@ -967,6 +970,74 @@ export default function Storyboard({
             startPolling(isLf);
         }
     }, [onVideoComplete, startPolling]);
+
+    const handleUpdateTitle = async (newTitle) => {
+        setProjectTitle(newTitle);
+        if (!projectId) return;
+        try {
+            const res = await fetch(`${API}/storyboard/${projectId}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('mantram_token')}`
+                },
+                body: JSON.stringify({ title: newTitle }),
+            });
+            const data = await safeJson(res);
+            if (data.success) {
+                onVideoComplete?.();
+            }
+        } catch (e) {
+            console.warn('Failed to update title:', e.message);
+        }
+    };
+
+    const handleSaveStoryboardDraft = useCallback(async () => {
+        if (!projectId) return;
+        
+        // Build updated scenes list from local states
+        const activeScenes = scenes.map((scene, i) => {
+            const visualPrompt = editedPrompts[i] !== undefined ? editedPrompts[i] : (scene.visualPrompt || '');
+            const voiceoverVal = editedVoiceovers[i] !== undefined ? editedVoiceovers[i] : (scene.dialogue?.[0]?.text || scene.voiceoverText || '');
+            
+            return {
+                ...scene,
+                visualPrompt,
+                voiceoverText: voiceoverVal,
+                dialogue: [{ text: voiceoverVal, emotion: 'natural' }]
+            };
+        });
+
+        try {
+            await fetch(`${API}/storyboard/${projectId}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('mantram_token')}`
+                },
+                body: JSON.stringify({
+                    scenes: activeScenes,
+                    format,
+                    dialogueLanguage,
+                    audioSync,
+                    includeBranding,
+                    model,
+                    resolution
+                })
+            });
+        } catch (err) {
+            console.warn('Failed to save storyboard draft:', err.message);
+        }
+    }, [projectId, scenes, editedPrompts, editedVoiceovers, format, dialogueLanguage, audioSync, includeBranding, model, resolution]);
+
+    // Auto-save debounced effect
+    useEffect(() => {
+        if (!projectId) return;
+        const timer = setTimeout(() => {
+            handleSaveStoryboardDraft();
+        }, 1000);
+        return () => clearTimeout(timer);
+    }, [format, dialogueLanguage, audioSync, includeBranding, model, resolution, editedPrompts, editedVoiceovers, projectId]);
 
     // Reset reconnect trigger if brand changes
     useEffect(() => {
@@ -1157,8 +1228,33 @@ export default function Storyboard({
                 <div className="sb-header-left">
                     <span className="material-symbols-outlined sb-header-icon">movie</span>
                     <div>
-                        <h2 className="sb-title">Storyboard Director</h2>
-                        <p className="sb-subtitle">Claude writes your shot plan · Gemini generates frames · Seedance animates</p>
+                        {projectId ? (
+                            <>
+                                <DebouncedInput
+                                    value={projectTitle}
+                                    onChange={handleUpdateTitle}
+                                    className="sb-editable-title-input"
+                                    placeholder="Untitled"
+                                    style={{
+                                        fontSize: 20,
+                                        fontWeight: 'bold',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        borderBottom: '1px dashed rgba(255,255,255,0.3)',
+                                        color: '#fff',
+                                        outline: 'none',
+                                        padding: '2px 6px',
+                                        width: '320px'
+                                    }}
+                                />
+                                <p className="sb-subtitle" style={{ marginTop: 4 }}>Rename project · Claude writes your shot plan · Gemini generates frames</p>
+                            </>
+                        ) : (
+                            <>
+                                <h2 className="sb-title">Storyboard Director</h2>
+                                <p className="sb-subtitle">Claude writes your shot plan · Gemini generates frames · Seedance animates</p>
+                            </>
+                        )}
                     </div>
                 </div>
                 {plan && (
@@ -2290,7 +2386,7 @@ export default function Storyboard({
                                     )}
                                     <button className="sb-btn-ghost" onClick={() => {
                                         setPhase('input'); setPlan(null); setImageUrl(''); setImagePrompt(''); setGeneratedVideoPrompt(''); setStructuredPlan(null);
-                                        setProjectId(null); setFinalVideoUrl(null);
+                                        setProjectId(null); setFinalVideoUrl(null); setProjectTitle('Untitled');
                                         // Clear any lingering brief-media state so next job starts clean
                                         if (briefSourceFile?.preview?.startsWith('blob:')) URL.revokeObjectURL(briefSourceFile.preview);
                                         setBriefSourceFile(null); setBriefAnalysisResult(null);

@@ -200,6 +200,8 @@ export default function VideoStudio() {
     const [critique, setCritique] = useState(null)
     const [pipeline, setPipeline] = useState(null)
 
+    const [storyboardProjectId, setStoryboardProjectId] = useState(null)
+
     // History
     const [projects, setProjects] = useState([])
     const [projectsLoaded, setProjectsLoaded] = useState(false)
@@ -381,6 +383,27 @@ export default function VideoStudio() {
             setGeneration(null)
         }
         setShowHistory(false)
+    }
+
+    function handleOpenProject(p) {
+        if (p.studioMode === 'storyboard') {
+            setStudioMode('storyboard');
+            setStoryboardProjectId(p._id);
+            setShowHistory(false);
+        } else {
+            loadProject(p._id);
+            setShowHistory(false);
+        }
+    }
+
+    async function handleDeleteProject(id, title) {
+        if (!window.confirm(`Are you sure you want to delete "${title || 'Untitled'}"?`)) return;
+        try {
+            await api(`/video-studio/${id}`, { method: 'DELETE' });
+            fetchHistory(50);
+        } catch (err) {
+            alert(`Failed to delete project: ${err.message}`);
+        }
     }
 
     // ── Fetch history with brand filter ──
@@ -1099,6 +1122,18 @@ export default function VideoStudio() {
 
                                             {/* Actions */}
                                             <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={(e) => { e.stopPropagation(); handleOpenProject(p) }}
+                                                     className={`p-1.5 rounded-lg transition-all cursor-pointer ${(!isDone && !isGenerating && !isFailed) ? 'text-primary bg-[var(--sys-primary-dim)] hover:bg-[#FF4D00]/20' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}
+                                                     title={(!isDone && !isGenerating && !isFailed) ? 'Resume Draft' : 'Open project'}>
+                                                     <span className="material-symbols-outlined text-base">
+                                                         {(!isDone && !isGenerating && !isFailed) ? 'edit_document' : 'open_in_new'}
+                                                     </span>
+                                                 </button>
+                                                 <button onClick={(e) => { e.stopPropagation(); handleDeleteProject(p._id, p.title) }}
+                                                     className="p-1.5 rounded-lg text-[var(--sys-text-muted)] hover:text-[#ef4444] hover:bg-[rgba(239,68,68,0.1)] transition-all cursor-pointer"
+                                                     title="Delete project">
+                                                     <span className="material-symbols-outlined text-base">delete</span>
+                                                 </button>
                                                 {videoUrl && (
                                                     <>
                                                         <button onClick={(e) => { e.stopPropagation(); setPlayingVideo(videoUrl) }}
@@ -1125,13 +1160,7 @@ export default function VideoStudio() {
                                                     title="Refill inputs & regenerate">
                                                     <span className="material-symbols-outlined text-base">replay</span>
                                                 </button>
-                                                <button onClick={(e) => { e.stopPropagation(); loadProject(p._id); setShowHistory(false) }}
-                                                    className={`p-1.5 rounded-lg transition-all cursor-pointer ${(!isDone && !isGenerating && !isFailed) ? 'text-primary bg-[var(--sys-primary-dim)] hover:bg-[#FF4D00]/20' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}
-                                                    title={(!isDone && !isGenerating && !isFailed) ? 'Resume Draft' : 'Open project'}>
-                                                    <span className="material-symbols-outlined text-base">
-                                                        {(!isDone && !isGenerating && !isFailed) ? 'edit_document' : 'open_in_new'}
-                                                    </span>
-                                                </button>
+
                                                 {/* Virality fire button — only for completed videos */}
                                                 {isDone && videoUrl && (
                                                     <button
@@ -1187,7 +1216,7 @@ export default function VideoStudio() {
                                         <div key={p._id} className="rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] hover:border-[var(--sys-border)] transition-all group overflow-hidden">
                                             {/* Video thumbnail */}
                                             <div className="relative aspect-video bg-[var(--sys-surface)] cursor-pointer"
-                                                onClick={() => { if (videoUrl) setPlayingVideo(videoUrl); else loadProject(p._id) }}>
+                                                onClick={() => { if (videoUrl) setPlayingVideo(videoUrl); else handleOpenProject(p) }}>
                                                 {videoUrl ? (
                                                     <LazyVideoThumbnail src={videoUrl} poster={p.generation?.thumbnailUrl || p.thumbUrl || p.advancedConfig?.firstImageUrl || ''} />
                                                 ) : (
@@ -1241,12 +1270,17 @@ export default function VideoStudio() {
                                                         className="p-1 rounded text-[var(--sys-text-muted)] hover:text-primary hover:bg-[var(--sys-primary-dim)] transition-all cursor-pointer" title="Refill">
                                                         <span className="material-symbols-outlined text-sm">replay</span>
                                                     </button>
-                                                     <button onClick={() => { loadProject(p._id); setShowHistory(false) }}
+                                                     <button onClick={() => handleOpenProject(p)}
                                                         className={`p-1 rounded transition-all cursor-pointer ${(!isDone && !isGenerating && !isFailed) ? 'text-primary bg-[var(--sys-primary-dim)] hover:bg-[#FF4D00]/20' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] hover:bg-[var(--sys-surface)]'}`}
                                                         title={(!isDone && !isGenerating && !isFailed) ? 'Resume Draft' : 'Open'}>
                                                         <span className="material-symbols-outlined text-sm">
                                                             {(!isDone && !isGenerating && !isFailed) ? 'edit_document' : 'open_in_new'}
                                                         </span>
+                                                    </button>
+                                                    <button onClick={() => handleDeleteProject(p._id, p.title)}
+                                                        className="p-1 rounded text-[var(--sys-text-muted)] hover:text-[#ef4444] hover:bg-[rgba(239,68,68,0.1)] transition-all cursor-pointer"
+                                                        title="Delete project">
+                                                        <span className="material-symbols-outlined text-sm">delete</span>
                                                     </button>
                                                     {/* Virality fire button — grid view, only for completed videos */}
                                                     {isDone && videoUrl && (
@@ -1414,6 +1448,8 @@ export default function VideoStudio() {
                                 canCreateVideo={canCreateVideo}
                                 onUpgradeRequired={() => setShowUpgradeModal(true)}
                                 user={user}
+                                initialProjectId={storyboardProjectId}
+                                onProjectIdCreated={setStoryboardProjectId}
                             />
                         </Suspense>
                     </div>
