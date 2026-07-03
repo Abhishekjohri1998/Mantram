@@ -383,7 +383,7 @@ export default function Storyboard({
     };
 
     const handleAddAvatar = () => {
-        if (avatarImages.length >= 4) return;
+        if (avatarImages.length >= 9) return;
         setAvatarPickerTargetIdx(null);
         setShowAvatarPicker(true);
     };
@@ -406,7 +406,7 @@ export default function Storyboard({
         // Reset input so the same file can be re-selected
         if (directAvatarInputRef.current) directAvatarInputRef.current.value = '';
         setAvatarImages(prev => {
-            const remaining = 4 - prev.length;
+            const remaining = 9 - prev.length;
             if (remaining <= 0) return prev;
             return [
                 ...prev,
@@ -423,7 +423,7 @@ export default function Storyboard({
     const handleRefImages = (e) => {
         const files = Array.from(e.target.files || []);
         setRefImages(prev => {
-            const remaining = 3 - prev.length;
+            const remaining = 9 - prev.length;
             const toAdd = files.slice(0, remaining).map(f => ({ file: f, preview: URL.createObjectURL(f), label: '' }));
             return [...prev, ...toAdd];
         });
@@ -1612,7 +1612,7 @@ export default function Storyboard({
                                                 <button className="scott-thumb-remove" onClick={() => handleRemoveAvatar(idx)}>✕</button>
                                             </div>
                                         ))}
-                                        {avatarImages.length > 0 && avatarImages.length < 4 && (
+                                        {avatarImages.length > 0 && avatarImages.length < 9 && (
                                             <button className="scott-media-add-btn" onClick={() => { setAvatarPickerTargetIdx(null); setShowAvatarPicker(true); }} title="Add another character">
                                                 <span className="material-symbols-outlined">add</span>
                                             </button>
@@ -1624,7 +1624,7 @@ export default function Storyboard({
                                 <div className="scott-media-group">
                                     <div className="scott-media-label-row">
                                         <span className="scott-media-type">Location</span>
-                                        {refImages.length < 3 && (
+                                        {refImages.length < 9 && (
                                             <button className="scott-media-add-btn" onClick={() => refInputRef.current?.click()} title="Upload location reference">
                                                 <span className="material-symbols-outlined">add_location_alt</span>
                                             </button>

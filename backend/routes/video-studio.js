@@ -9576,9 +9576,9 @@ const storyboardUpload = multer({ storage: multer.memoryStorage(), limits: { fil
 // Returns full storyboard JSON with frameUrls
 router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), storyboardUpload.fields([
     { name: 'productImages', maxCount: 20 },
-    { name: 'avatarImages', maxCount: 4 },    // multi-character support (replaces avatarImage)
+    { name: 'avatarImages', maxCount: 9 },    // multi-character support (up to 9)
     { name: 'avatarImage',  maxCount: 1 },    // legacy single-avatar compat
-    { name: 'refImages',    maxCount: 3 },    // location/element/mood reference images
+    { name: 'refImages',    maxCount: 9 },    // location/scene reference images (up to 9)
 ]), async (req, res) => {
     // Set headers to application/json and set CORS headers immediately to prevent gateway timeout
     res.setHeader('Content-Type', 'application/json');
@@ -9741,7 +9741,7 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
             else if (typeof bodyRefImageUrls === 'string') {
                 try { parsed = JSON.parse(bodyRefImageUrls); } catch { parsed = [bodyRefImageUrls]; }
             }
-            refImageUrls.push(...parsed.filter(u => u?.startsWith('http') && !refImageUrls.includes(u)).slice(0, 3 - refImageUrls.length));
+            refImageUrls.push(...parsed.filter(u => u?.startsWith('http') && !refImageUrls.includes(u)).slice(0, 9 - refImageUrls.length));
         }
 
         console.log(`  📸 FINAL productImageUrls (${productImageUrls.length}): ${JSON.stringify(productImageUrls).substring(0, 200)}`);
@@ -10373,7 +10373,11 @@ async function generateAnimateVideoPrompt({
     productFeatures,
     storyboardPosterUrl,   // approved storyboard poster
     productImageUrls = [], // product images from DB
-    avatarUrl = null,
+    avatarUrl = null,      // legacy single avatar
+    avatarUrls = [],       // multi-avatar (new)
+    avatarNames = [],      // multi-avatar names (new)
+    refImageUrls = [],     // location/scene ref images (new)
+    characterRefSheetUrl = null, // character reference sheet (new)
     logoUrl = null,
     duration,
     format,
@@ -10392,28 +10396,43 @@ async function generateAnimateVideoPrompt({
         logoUrl = null;
     }
 
-    // Build the precise @imageN tag mapping so Claude can write them correctly.
-    // The video model sees: firstFrame then referenceImages in order.
-    // @image1 = the I2V first frame (product image OR avatar if no product images).
-    // @image2 = storyboard poster (always in slot 2 of combinedReferences).
+    // Build the precise @imageN tag mapping dynamically.
+    // Indexing follows the order in combinedReferences.
     const tagMap = [];
-
+    
     if (firstFrameIsAvatar) {
-        tagMap.push(`@image1 = Avatar / Presenter image (first frame / I2V anchor) — the presenter's face and body. The video OPENS with this person in frame.`);
+        tagMap.push(`@image1 = Presenter/Avatar 1 ("${avatarNames[0] || 'Character 1'}") — First frame anchor. Start the video showing this presenter.`);
     } else {
-        tagMap.push(`@image1 = Product image (first frame / I2V anchor) — "${productName || 'the product'}". This is the opening visual frame of the video.`);
+        tagMap.push(`@image1 = Product image (First frame anchor) — "${productName || 'the product'}". Start the video showing this product.`);
     }
-    tagMap.push(`@image2 = Storyboard poster (visual style reference) — Use this as the overall style guide for colour grading, mood, layout, and composition.`);
+    tagMap.push(`@image2 = Storyboard poster (Visual style reference) — Use this to extract colour grading, mood, lighting and composition.`);
 
     let nextTag = 3;
+
+    // Product images
     for (let i = 0; i < productImageUrls.length; i++) {
-        tagMap.push(`@image${nextTag++} = Product reference image ${i + 1} — "${productName || 'product'}" appearance reference.`);
+        tagMap.push(`@image${nextTag++} = Product reference image ${i + 1} — Additional angle/detail of "${productName || 'product'}".`);
     }
-    if (avatarUrl) {
-        tagMap.push(`@image${nextTag++} = Avatar / Presenter reference — the human presenter's exact face and identity.`);
+
+    // Location reference images
+    for (let i = 0; i < refImageUrls.length; i++) {
+        tagMap.push(`@image${nextTag++} = Location/Scene reference image ${i + 1} — Visual guide for the background environment, setting, or scenery.`);
     }
+
+    // Character/Avatar reference images
+    if (characterRefSheetUrl) {
+        tagMap.push(`@image${nextTag++} = CHARACTER REFERENCE SHEET — Stable reference sheet containing the facial/visual features for character(s) used in this project.`);
+    } else {
+        const avatarsToMap = avatarUrls.length > 0 ? avatarUrls : (avatarUrl ? [avatarUrl] : []);
+        for (let i = 0; i < avatarsToMap.length; i++) {
+            const name = avatarNames[i] || `Character ${i + 1}`;
+            tagMap.push(`@image${nextTag++} = Character/Presenter "${name}" reference image — locked face and physical features for this character.`);
+        }
+    }
+
+    // Brand logo
     if (logoUrl) {
-        tagMap.push(`@image${nextTag++} = Brand logo reference — show this exact logo during the closing shot or overlay.`);
+        tagMap.push(`@image${nextTag++} = Brand logo reference — overlay or show in the closing shot or overlay.`);
     }
 
     // ── Build a rich structured context block from the 4-section plan ──────────
@@ -10551,7 +10570,7 @@ PRODUCT: ${productName || 'See @image1'}
 KEY FEATURES: ${productFeatures || 'Highlight from product images'}
 VIDEO DURATION: ${duration}s | FORMAT: ${format} | STYLE: ${style}
 DIALOGUE LANGUAGE: ${dialogueLanguage}
-AVATAR PRESENT: ${avatarUrl ? `YES — presenter's face is in @image${nextTag - (logoUrl ? 2 : 1)}` : 'NO'}
+AVATAR PRESENT: ${avatarUrls.length > 0 ? `YES — ${avatarUrls.length} avatars: ${avatarNames.join(', ')}` : (avatarUrl ? 'YES' : 'NO')}
 BRAND LOGO: ${logoUrl ? `YES — logo appears in @image${nextTag - 1}` : 'NO'}
 BRANDING ENABLED: ${includeBranding ? 'YES — end with brand CTA in final seconds only' : 'NO — absolutely no brand logo, no CTA, no closing brand shot'}
 ${structuredContext}
@@ -10563,8 +10582,15 @@ Write the final video prompt now. Follow the cut plan timings exactly. Ensure ev
     for (const url of (productImageUrls || []).filter(u => u?.startsWith('http'))) {
         if (!visionImages.includes(url)) visionImages.push(url);
     }
-    if (avatarUrl?.startsWith('http') && !visionImages.includes(avatarUrl)) {
-        visionImages.push(avatarUrl);
+    for (const url of (refImageUrls || []).filter(u => u?.startsWith('http'))) {
+        if (!visionImages.includes(url)) visionImages.push(url);
+    }
+    const allAvatars = avatarUrls.length > 0 ? avatarUrls : (avatarUrl ? [avatarUrl] : []);
+    for (const url of allAvatars.filter(u => u?.startsWith('http'))) {
+        if (!visionImages.includes(url)) visionImages.push(url);
+    }
+    if (characterRefSheetUrl?.startsWith('http') && !visionImages.includes(characterRefSheetUrl)) {
+        visionImages.push(characterRefSheetUrl);
     }
     if (logoUrl?.startsWith('http') && !visionImages.includes(logoUrl)) {
         visionImages.push(logoUrl);
@@ -10858,6 +10884,7 @@ router.post('/storyboard/animate', protect, async (req, res) => {
         const combinedReferences = [
             { url: imageUrl, role: 'style_reference' },           // storyboard poster style guide
             ...dbProductImgs.map(url => ({ url, role: 'product' })),
+            ...dbRefImageUrls.map(url => ({ url, role: 'location' })), // scene/location reference images
             ...avatarRefs,                                         // char ref sheet OR individual avatars
             ...(dbLogoUrl ? [{ url: dbLogoUrl, role: 'logo' }] : []),
         ];
@@ -10865,6 +10892,7 @@ router.post('/storyboard/animate', protect, async (req, res) => {
         // For long-form segments — same but without poster (storyboardLongForm.js adds it per-segment)
         const longFormRefs = [
             ...dbProductImgs.map(url => ({ url, role: 'product' })),
+            ...dbRefImageUrls.map(url => ({ url, role: 'location' })), // scene/location reference images
             ...avatarRefs,
             ...(dbLogoUrl ? [{ url: dbLogoUrl, role: 'logo' }] : []),
         ];
@@ -10892,6 +10920,10 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                 storyboardPosterUrl: imageUrl,
                 productImageUrls: dbProductImgs,
                 avatarUrl: dbAvatar,
+                avatarUrls: dbAvatarUrls,
+                avatarNames: dbAvatarNames,
+                refImageUrls: dbRefImageUrls,
+                characterRefSheetUrl: dbCharRefSheetUrl,
                 logoUrl: dbLogoUrl,
                 duration: rawDuration,
                 format: dbFormat,
