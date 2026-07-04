@@ -573,7 +573,7 @@ async function _runPipeline(jobId, params) {
                                         duration: requestedDuration,
                                         aspectRatio: params.format,
                                         resolution: params.resolution,
-                                        referenceImages: segmentRefs.slice(0, 6),
+                                        referenceImages: segmentRefs.slice(0, 9),
                                         customCharacterNames: avatarNames,
                                     });
                                 } else {
@@ -584,7 +584,7 @@ async function _runPipeline(jobId, params) {
                                         duration: requestedDuration,
                                         aspectRatio: params.format,
                                         generateAudio: false,
-                                        referenceImages: segmentRefs.slice(0, 6),
+                                        referenceImages: segmentRefs.slice(0, 9),
                                         qualityMode,
                                         resolution: params.resolution,
                                         imageRole: 'mixed',
@@ -781,7 +781,7 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
                         duration: sceneDurations[i],
                         aspectRatio: params.format,
                         resolution: params.resolution,
-                        referenceImages: segmentRefs.slice(0, 6),
+                        referenceImages: segmentRefs.slice(0, 9),
                         customCharacterNames: avatarNames,
                     });
                 } else {
@@ -792,7 +792,7 @@ Wardrobe/costume is defined per-cut in the prompt text — follow it exactly.
                         duration: sceneDurations[i],
                         aspectRatio: params.format,
                         generateAudio: false,
-                        referenceImages: segmentRefs.slice(0, 6),
+                        referenceImages: segmentRefs.slice(0, 9),
                         qualityMode,
                         resolution: params.resolution,
                         imageRole: 'mixed',
