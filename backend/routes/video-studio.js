@@ -12494,13 +12494,21 @@ Rewrite the user's text into this rich format, choosing a matching style (e.g. c
             systemPrompt,
         });
 
-        if (result && typeof result === 'string') {
-            if (result.includes('```')) {
-                result = result.replace(/```[a-zA-Z]*\n?/g, '').replace(/```/g, '').trim();
+        let textOutput = '';
+        if (result) {
+            textOutput = result.text || result.content || (typeof result === 'string' ? result : '');
+        }
+
+        if (textOutput && typeof textOutput === 'string') {
+            textOutput = textOutput.replace(/<think>[\s\S]*?<\/think>/gi, '')
+                .replace(/<\/?think>/gi, '')
+                .trim();
+            if (textOutput.includes('```')) {
+                textOutput = textOutput.replace(/```[a-zA-Z]*\n?/g, '').replace(/```/g, '').trim();
             }
         }
 
-        res.json({ success: true, enhancedText: result });
+        res.json({ success: true, enhancedText: textOutput });
     } catch (err) {
         console.error('Seed Audio enhance error:', err);
         res.status(500).json({ success: false, error: safeErrorMessage(err) });
