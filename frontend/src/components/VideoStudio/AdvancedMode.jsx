@@ -841,12 +841,13 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
             // Poll for completion
             let attempts = 0
             const maxAttempts = 60 // 120 seconds max
-            const interval = setInterval(async () => {
+            pollRefs.current['audio_gen'] = setInterval(async () => {
                 attempts++
                 try {
                     const statusCheck = await api(`/video-studio/seed-audio/status/${taskId}`)
                     if (statusCheck.status === 'COMPLETED') {
-                        clearInterval(interval)
+                        clearInterval(pollRefs.current['audio_gen'])
+                        delete pollRefs.current['audio_gen']
                         setRefAudio({
                             url: statusCheck.audioUrl,
                             name: 'Seed Audio 1.0 (Generated)',
@@ -854,7 +855,8 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                         })
                         setGeneratingAudio(false)
                     } else if (statusCheck.status === 'FAILED') {
-                        clearInterval(interval)
+                        clearInterval(pollRefs.current['audio_gen'])
+                        delete pollRefs.current['audio_gen']
                         setAudioGenError(statusCheck.error || 'Audio generation failed')
                         setGeneratingAudio(false)
                     } else {
@@ -863,7 +865,8 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                 } catch (pollErr) {
                     console.error('Poll audio error:', pollErr)
                     if (attempts >= maxAttempts) {
-                        clearInterval(interval)
+                        clearInterval(pollRefs.current['audio_gen'])
+                        delete pollRefs.current['audio_gen']
                         setAudioGenError('Audio generation timed out')
                         setGeneratingAudio(false)
                     }

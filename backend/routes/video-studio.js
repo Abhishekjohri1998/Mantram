@@ -12489,10 +12489,16 @@ Your task is to take a simple audio voiceover script or brief, and rewrite it in
 
 Rewrite the user's text into this rich format, choosing a matching style (e.g. corporate, funny, emotional, energetic, podcast-like, conversational) based on the user's brief. Ensure you ONLY return the enhanced script. Do not add conversational intro/outro text.`;
 
-        const result = await ai.generateText({
+        let result = await ai.generateText({
             prompt: `Enhance the following audio brief/script:\n\n"${text.trim()}"`,
             systemPrompt,
         });
+
+        if (result && typeof result === 'string') {
+            if (result.includes('```')) {
+                result = result.replace(/```[a-zA-Z]*\n?/g, '').replace(/```/g, '').trim();
+            }
+        }
 
         res.json({ success: true, enhancedText: result });
     } catch (err) {

@@ -1132,7 +1132,7 @@ export async function submitAtlasCloudAudioGeneration({
 
     const payload = {
         model: "bytedance/seed-audio-1.0",
-        text: text || "Welcome to Seed Audio.",
+        text: text ? text.slice(0, 5000) : "Welcome to Seed Audio.",
         references,
         format: format || "mp3",
         sample_rate: sample_rate || 44100,

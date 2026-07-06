@@ -979,16 +979,18 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
 
             let attempts = 0
             const maxAttempts = 60
-            const interval = setInterval(async () => {
+            pollRefs.current['audio_gen'] = setInterval(async () => {
                 attempts++
                 try {
                     const statusCheck = await api(`/video-studio/seed-audio/status/${taskId}`)
                     if (statusCheck.status === 'COMPLETED') {
-                        clearInterval(interval)
+                        clearInterval(pollRefs.current['audio_gen'])
+                        delete pollRefs.current['audio_gen']
                         setSeedAudioUrl(statusCheck.audioUrl)
                         setGeneratingAudio(false)
                     } else if (statusCheck.status === 'FAILED') {
-                        clearInterval(interval)
+                        clearInterval(pollRefs.current['audio_gen'])
+                        delete pollRefs.current['audio_gen']
                         setError(statusCheck.error || 'Audio generation failed')
                         setGeneratingAudio(false)
                     } else {
@@ -996,7 +998,8 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
                     }
                 } catch (pollErr) {
                     if (attempts >= maxAttempts) {
-                        clearInterval(interval)
+                        clearInterval(pollRefs.current['audio_gen'])
+                        delete pollRefs.current['audio_gen']
                         setError('Audio generation timed out')
                         setGeneratingAudio(false)
                     }
