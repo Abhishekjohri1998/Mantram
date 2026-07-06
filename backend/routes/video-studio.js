@@ -55,7 +55,7 @@ import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded, ensureS3Url } from '..
 import { safeErrorMessage } from '../utils/safeError.js';
 import { loadBrandContext, callMultimodalAgent, callAgent } from '../agents/shared/agentUtils.js';
 import { buildEnhanceSystemPrompt, buildEnhanceUserPrompt, VISUAL_GROUNDING_SYSTEM } from '../agents/videoStudio/promptEnhancer.js';
-import { submitAtlasCloudVideoGeneration, getAtlasCloudGenerationStatus as pollAtlasCloudStatus, submitInfiniteTalkVideoGeneration, submitGeminiFlashVideoGeneration } from '../agents/videoStudio/atlasClient.js';
+import { submitAtlasCloudVideoGeneration, getAtlasCloudGenerationStatus as pollAtlasCloudStatus, submitInfiniteTalkVideoGeneration, submitGeminiFlashVideoGeneration, submitAtlasCloudAudioGeneration, getAtlasCloudAudioStatus } from '../agents/videoStudio/atlasClient.js';
 import { geminiImageGenerate } from '../agents/videoStudio/firstFrame.js';
 import { falGenerateImage } from '../agents/youtubeStudio/nodes.js';
 import { Q_ADS_CATEGORIES, getCategory, buildQAdPrompt, getQAdsCreditCost } from '../agents/videoStudio/qAdsCategories.js';
@@ -4900,10 +4900,11 @@ router.post('/ugc-pro/generate', protect, requireCredits('ugcProGenerate'), aiGe
                 duration,
                 aspectRatio,
                 qualityMode: quality,
-                generateAudio: true,
+                generateAudio: parsedSettings.refAudio ? false : true,
                 referenceImages: allRefImages,
                 customCharacterNames,
                 resolution,
+                refAudio: parsedSettings.refAudio || null,
             });
             usedProvider = 'atlascloud';
 
@@ -5285,10 +5286,12 @@ router.post('/ugc-pro/qads/generate', protect, requireCredits('qAdsGenerate'), a
             model: selectedModel,
             prompt,
             imageUrl: imageUrls[0] || null,
-            duration, aspectRatio, qualityMode: quality, generateAudio: true,
+            duration, aspectRatio, qualityMode: quality,
+            generateAudio: parsedSettings.refAudio ? false : true,
             referenceImages: [...avatarFaceRefs, ...imageUrls.slice(1)],
             imageRole: resolvedImageRole,
             customCharacterNames,
+            refAudio: parsedSettings.refAudio || null,
         });
 
         // Persist as VideoProject
@@ -6277,10 +6280,12 @@ router.post('/ugc-pro/qads/v2/generate-video', protect, requireCredits('qAdsGene
         // ── SYNC TTS GENERATION FOR AUDIO-DRIVEN VIDEO ──
         // Generate TTS audio *before* video generation so we can pass it to the video model
         const dialogueLines = extractDialogueLines(finalPrompt);
-        let audioUrl = null;
-        if (dialogueLines.length > 0) {
+        let audioUrl = parsedSettings.refAudio || null;
+        if (!audioUrl && dialogueLines.length > 0) {
             console.log(`🎤 [Q-Ads V2] Pre-generating TTS for audio-driven video...`);
             audioUrl = await generateQAdsTTS(dialogueLines, parsedSettings.language || 'English');
+        } else if (audioUrl) {
+            console.log(`🎤 [Q-Ads V2] Using pre-generated Seed Audio: ${audioUrl}`);
         }
 
         let genResult;
@@ -12456,5 +12461,89 @@ Based on the current canvas and catalog, what commands should I emit? Return the
     }
 });
 
+
+// ── Seed Audio 1.0 Routes ──────────────────────────────────────────────────────
+
+router.post('/seed-audio/enhance-prompt', protect, async (req, res) => {
+    try {
+        const { text } = req.body;
+        if (!text || !text.trim()) {
+            return res.status(400).json({ success: false, error: 'Text prompt is required' });
+        }
+
+        const ai = getAIRouter();
+        const systemPrompt = `You are an AI expert in ByteDance Seed Audio 1.0 prompt styling.
+Your task is to take a simple audio voiceover script or brief, and rewrite it into the rich, cinematic markdown-style prompt format required by Seed Audio 1.0.
+
+### Seed Audio 1.0 Prompt Format Rules:
+1. Soundscape Setup: Begin with a paragraph describing the background sounds, music, ambience, and texture in bold.
+   Example: "The music begins with a **soothing guitar pluck** playing the main melody, supported by a **synthesizer ambience** pad creating the harmonies, shaping a slightly melancholic and nostalgic atmosphere. In the background, the **faint hum of microphone static, the rustling of paper** persist until the very end."
+2. Speaker Dialogue Tags: Prepend dialogue lines with speaker identifiers like **Speaker A** @audio1 or **Speaker B** @audio2 to indicate different voices or speaker styles.
+   Example: "**Speaker A** @audio1 says, 'We fell in love in middle school.'"
+3. Vocal Cues & Expressions: Add brief parenthetical or descriptive vocal cues to guide the narrator's speed, pauses, laughter, or sighs.
+   Example: "After a soft chuckle, he says..." or "**Speaker A** @audio1 lets out a faint sigh and continues..."
+4. Environmental/Background Transitions: Include brief descriptions of sound effects or music transitions in bold between dialogue blocks.
+   Example: "At this point, the intro music fades out completely."
+5. Concluding Cue: End the prompt with a descriptive bold sentence detailing how the audio finishes.
+   Example: "The audio concludes with the **mechanical \"click\" of the podcast recording being stopped, followed by a long, lingering silence**."
+
+Rewrite the user's text into this rich format, choosing a matching style (e.g. corporate, funny, emotional, energetic, podcast-like, conversational) based on the user's brief. Ensure you ONLY return the enhanced script. Do not add conversational intro/outro text.`;
+
+        const result = await ai.generateText({
+            prompt: `Enhance the following audio brief/script:\n\n"${text.trim()}"`,
+            systemPrompt,
+        });
+
+        res.json({ success: true, enhancedText: result });
+    } catch (err) {
+        console.error('Seed Audio enhance error:', err);
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+router.post('/seed-audio/generate', protect, async (req, res) => {
+    try {
+        const { text, speaker, format, sample_rate, pitch_rate, speech_rate, loudness_rate, refAudioUrl } = req.body;
+        if (!text || !text.trim()) {
+            return res.status(400).json({ success: false, error: 'Text prompt is required' });
+        }
+
+        const taskId = await submitAtlasCloudAudioGeneration({
+            text, speaker, format, sample_rate, pitch_rate, speech_rate, loudness_rate, refAudioUrl
+        });
+
+        res.json({ success: true, taskId });
+    } catch (err) {
+        console.error('Seed Audio generate error:', err);
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
+
+router.get('/seed-audio/status/:taskId', protect, async (req, res) => {
+    try {
+        const { taskId } = req.params;
+        if (!taskId) {
+            return res.status(400).json({ success: false, error: 'Task ID is required' });
+        }
+
+        const result = await getAtlasCloudAudioStatus(taskId);
+        if (result.status === 'COMPLETED' && result.audioUrl) {
+            // Mirror to S3 to ensure stability and bypass CORS
+            try {
+                const s3AudioUrl = await ensureS3Url(result.audioUrl, `video-studio/seed-audio-${Date.now()}.mp3`);
+                if (s3AudioUrl) {
+                    result.audioUrl = s3AudioUrl;
+                }
+            } catch (mirrorErr) {
+                console.warn(`⚠️ [Seed Audio Status] S3 mirror failed: ${mirrorErr.message}`);
+            }
+        }
+
+        res.json({ success: true, ...result });
+    } catch (err) {
+        console.error('Seed Audio status error:', err);
+        res.status(500).json({ success: false, error: safeErrorMessage(err) });
+    }
+});
 
 export default router;
