@@ -12487,10 +12487,12 @@ Your task is to take a simple audio voiceover script or brief, and rewrite it in
 5. Concluding Cue: End the prompt with a descriptive bold sentence detailing how the audio finishes.
    Example: "The audio concludes with the **mechanical \"click\" of the podcast recording being stopped, followed by a long, lingering silence**."
 
-Rewrite the user's text into this rich format, choosing a matching style (e.g. corporate, funny, emotional, energetic, podcast-like, conversational) based on the user's brief. Ensure you ONLY return the enhanced script. Do not add conversational intro/outro text.`;
+### CRITICAL RULE:
+Do not introduce yourself, explain your reasoning, or write conversational filler (like "Sure!", "Here is your enhanced script", or "Understood! Please provide...").
+ONLY output the enhanced Seed Audio 1.0 prompt directly.`;
 
         let result = await ai.generateText({
-            prompt: `Enhance the following audio brief/script:\n\n"${text.trim()}"`,
+            userPrompt: `Enhance the following audio brief/script:\n\n"${text.trim()}"`,
             systemPrompt,
         });
 
