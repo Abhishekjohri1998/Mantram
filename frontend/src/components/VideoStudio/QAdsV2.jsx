@@ -1497,6 +1497,30 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
                             )}
                         </button>
                     )}
+                    {selectedModel.startsWith('seedance') && (
+                        <button
+                            type="button"
+                            onClick={() => setShowAudioGenerator(!showAudioGenerator)}
+                            style={{
+                                background: seedAudioUrl ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.06)',
+                                color: seedAudioUrl ? '#10b981' : '#fff',
+                                border: seedAudioUrl ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.08)',
+                                borderRadius: 10,
+                                padding: '8px 12px',
+                                fontSize: 12,
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                whiteSpace: 'nowrap',
+                                marginLeft: 8
+                            }}
+                        >
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>music_note</span>
+                            <span>{seedAudioUrl ? 'Seed Audio Ready' : 'Seed Audio'}</span>
+                        </button>
+                    )}
                 </div>
 
                 {/* Row 2: Config + blocks + generate */}
@@ -1543,15 +1567,7 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
 
                     <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.08)' }} />
                     <CfgMenu value={language} onChange={setLanguage} options={LANGUAGES} icon="translate" />
-                    {selectedModel.startsWith('seedance') && (
-                        <>
-                            <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.08)' }} />
-                            <button className="scott-btn-cfg" onClick={() => setShowAudioGenerator(!showAudioGenerator)} style={{ background: seedAudioUrl ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 12px', whiteSpace: 'nowrap', flex: '0 0 auto', border: seedAudioUrl ? '1px solid rgba(16,185,129,0.3)' : '1px solid transparent', color: seedAudioUrl ? '#10b981' : '#fff' }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>music_note</span>
-                                <span>{seedAudioUrl ? 'Seed Audio Ready' : 'Seed Audio'}</span>
-                            </button>
-                        </>
-                    )}
+
 
                     <div style={{ flex: 1 }} />
 
