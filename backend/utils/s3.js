@@ -6,6 +6,40 @@ import crypto from "crypto";
 import axios from "axios";
 import fs from "fs";
 import path from "path";
+import { execSync } from "child_process";
+import os from "os";
+
+const compressVideoBuffer = async (buffer) => {
+    try {
+        const ffmpegStatic = await import('ffmpeg-static');
+        const ffmpegPath = ffmpegStatic.default || ffmpegStatic;
+        if (!ffmpegPath) {
+            console.warn("⚠️ FFmpeg path not found, skipping compression");
+            return buffer;
+        }
+
+        const tmpIn = path.join(os.tmpdir(), `compress-in-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.mp4`);
+        const tmpOut = path.join(os.tmpdir(), `compress-out-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.mp4`);
+
+        fs.writeFileSync(tmpIn, buffer);
+        console.log(`📹 [Video Compressor] Compressing video of size ${(buffer.length / (1024*1024)).toFixed(2)} MB...`);
+
+        // Compress using CRF 30 (high compression, good quality) and superfast preset
+        const cmd = `"${ffmpegPath}" -y -i "${tmpIn}" -vcodec libx264 -crf 30 -preset superfast -acodec aac -b:a 128k "${tmpOut}"`;
+        execSync(cmd, { stdio: 'ignore', timeout: 90000 });
+
+        if (fs.existsSync(tmpOut) && fs.statSync(tmpOut).size > 0) {
+            const compressed = fs.readFileSync(tmpOut);
+            console.log(`📹 [Video Compressor] Compression success: ${(compressed.length / (1024*1024)).toFixed(2)} MB`);
+            try { fs.unlinkSync(tmpIn); fs.unlinkSync(tmpOut); } catch {}
+            return compressed;
+        }
+        try { fs.unlinkSync(tmpIn); fs.unlinkSync(tmpOut); } catch {}
+    } catch (e) {
+        console.warn(`📹 [Video Compressor] Compression failed: ${e.message}`);
+    }
+    return buffer;
+};
 
 const s3Client = new S3Client({
     region: config.aws.region,
@@ -19,7 +53,12 @@ const s3Client = new S3Client({
  * Helper to upload files to public anonymous image hosting when AWS S3 is down or not configured.
  * Tries tmpfile.link first, falls back to Catbox.moe.
  */
-const uploadToPublicFallback = async (buffer, mimeType = "image/png") => {
+const uploadToPublicFallback = async (fileBuffer, mimeType = "image/png") => {
+    let buffer = fileBuffer;
+    if (mimeType.includes("video") && buffer.length > 25 * 1024 * 1024) {
+        buffer = await compressVideoBuffer(buffer);
+    }
+
     const ext = mimeType.includes('wav') ? 'wav' : 
                 mimeType.includes('mpeg') || mimeType.includes('mp3') ? 'mp3' : 
                 mimeType.includes('aac') ? 'aac' : 
