@@ -651,6 +651,8 @@ export async function submitAtlasCloudVideoGeneration({
                 desc = `${tag} = CHARACTER REFERENCE SHEET — contains one or more named characters. LOCK: exact face shape, facial features, hair colour/style, skin tone, eye colour. DO NOT LOCK wardrobe or clothing — costume/attire is defined per scene in the prompt text and must be followed exactly as written, overriding anything worn in this reference image.`;
             } else if (role === 'logo') {
                 desc = `${tag} = brand logo — show in closing shot / overlay without distortion.`;
+            } else if (role === 'location_reference' || role === 'location') {
+                desc = `${tag} = Location/Scene reference image — Visual guide for the background environment, setting, or scenery.`;
             } else {
                 desc = `${tag} = product reference — maintain exact shape, colour & surface detail.`;
             }
@@ -695,7 +697,15 @@ export async function submitAtlasCloudVideoGeneration({
             targetRes = '720p';
         }
     }
-    taskInput.resolution = targetRes === '4k' ? '4k' : (targetRes === '1080p' ? '1080p' : (targetRes === '480p' ? '480p' : '720p'));
+    
+    // Seedance workflow reference-to-video (r2v) models do not support the resolution parameter.
+    const isWorkflowSeedance = modelName.includes('atlascloud/workflow');
+    const isR2V = modelName.includes('reference-to-video');
+    if (isWorkflowSeedance && isR2V) {
+        console.log(`📌 [Atlas] Omitting resolution parameter for workflow Seedance r2v model to prevent API rejection.`);
+    } else {
+        taskInput.resolution = targetRes === '4k' ? '4k' : (targetRes === '1080p' ? '1080p' : (targetRes === '480p' ? '480p' : '720p'));
+    }
 
     if (refAudio) {
         taskInput.audio_url = refAudio;
@@ -1102,99 +1112,3 @@ export async function getAtlasCloudGenerationStatus(taskId) {
     }
     return { status: 'IN_QUEUE', progress: 10 };
 }
-
-export async function submitAtlasCloudAudioGeneration({
-    text, speaker, format, sample_rate, pitch_rate, speech_rate, loudness_rate, refAudioUrl
-}) {
-    console.log(`🔊 [Atlas Audio] Submitting audio generation: textLength=${text?.length || 0} | speaker=${speaker}`);
-
-    const references = [];
-    if (speaker) {
-        references.push({
-            audio_data: "",
-            image_data: "",
-            speaker: speaker
-        });
-    } else {
-        references.push({
-            audio_data: "",
-            image_data: "",
-            speaker: "zh_male_taocheng_uranus_bigtts"
-        });
-    }
-    if (refAudioUrl) {
-        references.push({
-            audio_url: refAudioUrl,
-            audio_data: "",
-            image_data: ""
-        });
-    }
-
-    const payload = {
-        model: "bytedance/seed-audio-1.0",
-        text: text ? text.slice(0, 5000) : "Welcome to Seed Audio.",
-        references,
-        format: format || "mp3",
-        sample_rate: sample_rate || 44100,
-        pitch_rate: pitch_rate || 0,
-        speech_rate: speech_rate || 0,
-        loudness_rate: loudness_rate || 0
-    };
-
-    const url = `${ATLAS_INFERENCE_BASE}/model/generateAudio`;
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify(payload)
-    });
-
-    const rawText = await response.text();
-    console.log(`🔊 [Atlas Audio] Submit response: ${rawText}`);
-
-    let result;
-    try { result = JSON.parse(rawText); }
-    catch (e) { throw new Error(`Failed to parse Atlas response: ${rawText.substring(0, 200)}`); }
-
-    if (!response.ok || !result?.data?.id) {
-        throw new Error(result?.msg || result?.message || 'Audio generation submission failed');
-    }
-
-    return result.data.id;
-}
-
-export async function getAtlasCloudAudioStatus(taskId) {
-    const statusUrl = `${ATLAS_INFERENCE_BASE}/model/prediction/${taskId}`;
-    console.log(`📊 [Atlas Audio Status] Polling: ${statusUrl}`);
-
-    const response  = await fetch(statusUrl, fetchOptions({ headers: { 'Authorization': `Bearer ${getAtlasApiKey()}` } }));
-    const rawText   = await response.text();
-    console.log(`📊 [Atlas Audio] Status raw for ${taskId}: ${rawText.substring(0, 300)}`);
-
-    let result;
-    try { result = JSON.parse(rawText); }
-    catch { return { status: 'IN_PROGRESS', progress: 30 }; }
-
-    if (!result?.data) return { status: 'IN_PROGRESS', progress: 30 };
-
-    const taskStatus = (result.data.status || '').toLowerCase();
-    if (taskStatus === 'completed' || taskStatus === 'success' || taskStatus === 'succeeded') {
-        const outputs  = result.data.outputs || [];
-        let audioUrl = outputs[0] || '';
-        if (typeof audioUrl === 'object' && audioUrl !== null) {
-            audioUrl = audioUrl.url || audioUrl.download_url || audioUrl.file_url || '';
-        }
-        console.log(`✅ [Atlas Audio] complete: ${audioUrl}`);
-        return { status: 'COMPLETED', progress: 100, audioUrl };
-    }
-
-    if (taskStatus === 'failed' || taskStatus === 'error') {
-        const err = result.data?.error || result.data?.message || result?.message || 'Audio generation failed';
-        return { status: 'FAILED', progress: 0, error: err };
-    }
-
-    if (taskStatus === 'processing' || taskStatus === 'in_progress' || taskStatus === 'starting') {
-        return { status: 'IN_PROGRESS', progress: 50 };
-    }
-    return { status: 'IN_QUEUE', progress: 10 };
-}
-

@@ -620,14 +620,6 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
     const [generatingFrame, setGeneratingFrame] = useState(false)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
-    // Seed Audio 1.0 UI states
-    const [showAudioGenerator, setShowAudioGenerator] = useState(false)
-    const [audioScript, setAudioScript] = useState('')
-    const [selectedAudioSpeaker, setSelectedAudioSpeaker] = useState('zh_male_taocheng_uranus_bigtts')
-    const [enhancingAudio, setEnhancingAudio] = useState(false)
-    const [generatingAudio, setGeneratingAudio] = useState(false)
-    const [audioGenError, setAudioGenError] = useState('')
-    const [audioProgress, setAudioProgress] = useState(0)
     const [showLibrary, setShowLibrary] = useState(false)
     const [libraryFor, setLibraryFor] = useState(null)
     const [libraryImages, setLibraryImages] = useState([])
@@ -800,82 +792,6 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
             console.error('Failed to upload media file:', err)
             setError(`Failed to upload file: ${err.message}`)
             setter(null)
-        }
-    }
-
-    async function handleEnhanceAudioScript() {
-        if (!audioScript.trim()) return
-        setEnhancingAudio(true)
-        setAudioGenError('')
-        try {
-            const data = await api('/video-studio/seed-audio/enhance-prompt', {
-                method: 'POST',
-                body: JSON.stringify({ text: audioScript })
-            })
-            if (data.enhancedText) {
-                setAudioScript(data.enhancedText)
-            }
-        } catch (err) {
-            console.error('Enhance audio script error:', err)
-            setAudioGenError(`Failed to enhance script: ${err.message}`)
-        }
-        setEnhancingAudio(false)
-    }
-
-    async function handleGenerateAudio() {
-        if (!audioScript.trim()) return
-        setGeneratingAudio(true)
-        setAudioGenError('')
-        setAudioProgress(5)
-        try {
-            const submitData = await api('/video-studio/seed-audio/generate', {
-                method: 'POST',
-                body: JSON.stringify({
-                    text: audioScript,
-                    speaker: selectedAudioSpeaker,
-                })
-            })
-            const taskId = submitData.taskId
-            if (!taskId) throw new Error('Failed to get Task ID for audio generation')
-
-            // Poll for completion
-            let attempts = 0
-            const maxAttempts = 60 // 120 seconds max
-            pollRefs.current['audio_gen'] = setInterval(async () => {
-                attempts++
-                try {
-                    const statusCheck = await api(`/video-studio/seed-audio/status/${taskId}`)
-                    if (statusCheck.status === 'COMPLETED') {
-                        clearInterval(pollRefs.current['audio_gen'])
-                        delete pollRefs.current['audio_gen']
-                        setRefAudio({
-                            url: statusCheck.audioUrl,
-                            name: 'Seed Audio 1.0 (Generated)',
-                            uploading: false
-                        })
-                        setGeneratingAudio(false)
-                    } else if (statusCheck.status === 'FAILED') {
-                        clearInterval(pollRefs.current['audio_gen'])
-                        delete pollRefs.current['audio_gen']
-                        setAudioGenError(statusCheck.error || 'Audio generation failed')
-                        setGeneratingAudio(false)
-                    } else {
-                        setAudioProgress(Math.min(attempts * 8 + 5, 95))
-                    }
-                } catch (pollErr) {
-                    console.error('Poll audio error:', pollErr)
-                    if (attempts >= maxAttempts) {
-                        clearInterval(pollRefs.current['audio_gen'])
-                        delete pollRefs.current['audio_gen']
-                        setAudioGenError('Audio generation timed out')
-                        setGeneratingAudio(false)
-                    }
-                }
-            }, 2000)
-        } catch (err) {
-            console.error('Generate audio error:', err)
-            setAudioGenError(err.message)
-            setGeneratingAudio(false)
         }
     }
     function onI2VFile(e) {
@@ -1447,8 +1363,8 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                         )}
 
                         {m.has.refAudio && (
-                            <button className="vm-btn-icon-label" style={{ opacity: refAudio || showAudioGenerator ? 1 : 0.5, background: refAudio || showAudioGenerator ? 'var(--sys-primary-dim)' : 'transparent', color: refAudio || showAudioGenerator ? 'var(--sys-primary)' : 'inherit' }} onClick={() => setShowAudioGenerator(v => !v)}>
-                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{refAudio ? 'audio_file' : 'music_note'}</span> {refAudio ? 'Audio Attached' : 'Seed Audio'}
+                            <button className="vm-btn-icon-label" style={{ opacity: refAudio ? 1 : 0.5, background: refAudio ? 'var(--sys-primary-dim)' : 'transparent' }} onClick={() => refAudioRef.current?.click()}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{refAudio ? 'audio_file' : 'music_note'}</span> {refAudio ? 'Audio' : 'Audio'}
                             </button>
                         )}
                         {m.has.refVideo && (
@@ -1547,97 +1463,6 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                                     </div>
                                 )}
                             </div>
-                        </div>
-                    )}
-
-                    {/* ── Seed Audio 1.0 Collapsible Tray ── */}
-                    {m.has.refAudio && showAudioGenerator && (
-                        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 12, borderBottom: '1px solid var(--sys-border)', background: 'rgba(255,255,255,0.01)', animation: 'traySlideUp 0.15s ease-out' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--sys-primary)' }}>music_note</span>
-                                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--sys-text)' }}>Seed Audio 1.0 (ByteDance)</span>
-                                </div>
-                                <button className="vm-btn-icon-label" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => refAudioRef.current?.click()}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: 13 }}>upload</span> Upload Audio
-                                </button>
-                            </div>
-
-                            {refAudio ? (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', background: 'var(--sys-surface-raised)', borderRadius: 8, border: '1px solid var(--sys-border)' }}>
-                                    <span className="material-symbols-outlined" style={{ color: 'var(--sys-primary)', fontSize: 20 }}>{refAudio.uploading ? 'sync' : 'audio_file'}</span>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--sys-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{refAudio.name}</div>
-                                        {refAudio.uploading ? (
-                                            <div style={{ fontSize: 10, color: 'var(--sys-text-muted)', marginTop: 2 }}>Uploading...</div>
-                                        ) : (
-                                            <audio src={refAudio.url} controls style={{ height: 24, marginTop: 4, width: '100%', maxWidth: 300 }} />
-                                        )}
-                                    </div>
-                                    <button onClick={() => setRefAudio(null)} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>Remove</button>
-                                </div>
-                            ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--sys-text-muted)' }}>Select Speaker Voice:</span>
-                                        <select
-                                            value={selectedAudioSpeaker}
-                                            onChange={e => setSelectedAudioSpeaker(e.target.value)}
-                                            style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--sys-border)', background: 'var(--sys-surface)', color: 'var(--sys-text)', fontSize: 11, outline: 'none' }}
-                                        >
-                                            <option value="zh_male_taocheng_uranus_bigtts">Uranus Male (Default)</option>
-                                            <option value="zh_female_xiaoxiao">Xiaoxiao Female</option>
-                                            <option value="zh_female_yunjie">Yunjie Female</option>
-                                        </select>
-                                    </div>
-
-                                    <div style={{ position: 'relative' }}>
-                                        <textarea
-                                            value={audioScript}
-                                            onChange={e => setAudioScript(e.target.value)}
-                                            placeholder="Write script for the voiceover/audio, e.g. A podcast introduction about design, then click AI Enhance..."
-                                            style={{ width: '100%', height: 72, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--sys-border)', background: 'var(--sys-surface)', color: 'var(--sys-text)', fontSize: 12, lineHeight: 1.4, resize: 'none', outline: 'none' }}
-                                        />
-                                        <button
-                                            onClick={handleEnhanceAudioScript}
-                                            disabled={enhancingAudio || !audioScript.trim()}
-                                            style={{ position: 'absolute', bottom: 8, right: 8, background: 'var(--sys-surface-raised)', border: '1px solid var(--sys-border)', color: 'var(--sys-primary)', fontSize: 10, padding: '4px 8px', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                                        >
-                                            {enhancingAudio ? (
-                                                <span className="material-symbols-outlined qa-spin" style={{ fontSize: 12 }}>progress_activity</span>
-                                            ) : (
-                                                <span className="material-symbols-outlined" style={{ fontSize: 12 }}>auto_awesome</span>
-                                            )}
-                                            {enhancingAudio ? 'Enhancing...' : 'AI Enhance'}
-                                        </button>
-                                    </div>
-
-                                    {audioGenError && (
-                                        <div style={{ color: '#f87171', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>error</span>
-                                            {audioGenError}
-                                        </div>
-                                    )}
-
-                                    <button
-                                        onClick={handleGenerateAudio}
-                                        disabled={generatingAudio || !audioScript.trim()}
-                                        style={{ width: '100%', padding: '8px', background: 'var(--sys-primary)', border: 'none', color: '#111', fontWeight: 700, borderRadius: 6, cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-                                    >
-                                        {generatingAudio ? (
-                                            <>
-                                                <span className="material-symbols-outlined qa-spin" style={{ fontSize: 14 }}>progress_activity</span>
-                                                Generating Audio ({audioProgress}%)
-                                            </>
-                                        ) : (
-                                            <>
-                                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>music_note</span>
-                                                Generate Custom Audio
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-                            )}
                         </div>
                     )}
 

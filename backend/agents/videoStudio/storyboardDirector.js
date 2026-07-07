@@ -146,7 +146,24 @@ function buildStoryboardDirectorPrompt({
     brief = '',
     productName = '',
     productFeatures = '',
+    audioTranscript = '',
+    preSeededCuts = [],
 }) {
+    const preSeededSection = (preSeededCuts && preSeededCuts.length > 0) ? `
+
+═══════════════════════════════════════════════════════
+MANDATORY PRE-SEEDED CUTS & TIMECODES (BLUEPRINT)
+═══════════════════════════════════════════════════════
+The audio brief has already been transcribed and split into segments. You MUST use these exact cuts, durations, and dialogues in your cuts[] array verbatim. Do NOT add, remove, or change their order or timing. Your job is to rewrite and enhance each cut's framePrompt and scene visual description to be highly cinematic, detailed, and visually matching the devotional/narrative style of the story (do NOT use corporate/studio templates if the story is spiritual/historical).
+
+Pre-seeded blueprint:
+${JSON.stringify(preSeededCuts.map((c, i) => ({
+    id: c.id || i + 1,
+    scene: c.scene || c.framePrompt || `Cut ${i + 1}`,
+    duration: c.duration || 3,
+    dialogue: c.dialogue || c.voiceover || '',
+})), null, 2)}` : '';
+
     const logoTagInstruction = (includeBranding && logoUrl)
         ? `\n- <<<image_logo>>> = brand logo — describe it as: "${logoDescription || 'brand logo'}".`
         : '';
@@ -252,7 +269,24 @@ This environment NEVER changes across cuts. The camera moves through it.`;
         cutSpecificRules += templeGuide;
     }
 
+    const audioSyncGuide = audioTranscript ? `
+═══════════════════════════════════════════════════════
+MANDATORY AUDIO-VISUAL TRANSCRIPT & TIMECODE SYNC
+═══════════════════════════════════════════════════════
+The video is audio-driven. You MUST understand the transcript and timecode markers.
+1. Split the transcript into scenes matching the timecode markers (e.g. "[0.0s - 4.5s]"). Each timecoded segment MUST become exactly one cut in the cuts[] array. Do not invent your own timings or distribute durations equally.
+2. The duration of each cut MUST be calculated directly from its timecode marker (endTime - startTime). Round to the nearest integer second. The durations of the cuts must sum exactly to the total duration of ${duration} seconds.
+3. The cut's voiceover field must contain the exact dialogue text of that segment, verbatim, omitting the brackets and timecodes (e.g. "Hello, welcome to Mantram AI").
+4. Each cut's scene and framePrompt must DIRECTLY ILLUSTRATE what is being spoken in that segment. Do not write generic or abstract visual prompts.
+5. Create a dynamic, multi-shot commercial narrative. Avoid standard repetitive "1 pan closeup and bshot" shots. For each cut/scene, use a variety of highly cinematic shot types (WIDE, CLOSE-UP, MEDIUM, INSERT, MACRO, TWO-SHOT, POV, LOW-ANGLE, HIGH-ANGLE, DUTCH-TILT), lens configurations (40mm anamorphic, 100mm macro, 85mm prime, 24mm wide-angle, 85mm portrait), and camera movements (STEADICAM, DOLLY-IN, DOLLY-OUT, RACK-FOCUS, ARC, PUSH-IN, WHIP-PAN, ORBIT).
+6. NO two consecutive cuts may use the same shot type.
+` : '';
+
     return `You are an award-winning Ad Film Director and Cinematographer building a professional pre-production storyboard package. Your output is a structured JSON document — NOT a description of a grid image.
+
+${preSeededSection}
+
+${audioSyncGuide}
 
 The storyboard package has 4 sections, exactly like a real agency pre-production document:
 
@@ -411,6 +445,7 @@ function buildUserPrompt({
     // Brochure pipeline
     brochureExtractedText = '',
     isBrochure = false,
+    audioTranscript = '',
 }) {
     const logoDetails = (includeBranding && logoUrl)
         ? `\nBRAND LOGO DETAILS: description="${logoDescription}"`
@@ -473,6 +508,16 @@ CRITICAL RULES for document-sourced storyboards:
 - Do NOT invent specs or prices — only use what is in the document above
 ` : '';
 
+    const audioTranscriptText = audioTranscript ? `
+
+═══════════════════════════════════════════════════════
+AUDIO TRANSCRIPT & TIMECODES (MANDATORY SYNC SOURCE)
+═══════════════════════════════════════════════════════
+The user uploaded an audio narration/dialogue track. Below is the transcript:
+${audioTranscript}
+
+Follow the timing and script verbatim. Each segment is a separate cut. Output scene durations matching the timecode segment durations exactly. Write the exact dialogue text in the voiceover field of each cut.` : '';
+
     return `CREATIVE BRIEF: "${brief || 'Create an incredibly creative, high-energy ad for this product.'}"
 ${imageMappingText}
 
@@ -483,7 +528,7 @@ FORMAT: ${format}
 VISUAL STYLE: ${style}
 DIALOGUE LANGUAGE: ${dialogueLanguage}
 AVATAR/PRESENTER(S): ${avatarInstruction}${refImageInstruction}
-BRAND NAME: ${brandName}${logoDetails}${documentSection}
+BRAND NAME: ${brandName}${logoDetails}${documentSection}${audioTranscriptText}
 
 Now act as the VISIONARY award-winning storyboard director. Deeply analyse every reference image, the brief, and the brand DNA.
 Write the complete 4-section structured storyboard JSON. Channel the energy of the world's best ad directors:
@@ -499,15 +544,102 @@ Write the complete 4-section structured storyboard JSON. Channel the energy of t
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// OUTPUT PARSER + VALIDATOR
+// OUTPUT PARSER + VALIDATOR WITH TRUNCATION REPAIR
 // ─────────────────────────────────────────────────────────────────────────────
 
+function repairTruncatedJson(jsonStr) {
+    let str = jsonStr.trim();
+    try {
+        JSON.parse(str);
+        return str;
+    } catch (e) {
+        // Proceed with repair
+    }
+
+    const stack = [];
+    let inString = false;
+    let escaped = false;
+    let cleanStr = '';
+
+    for (let i = 0; i < str.length; i++) {
+        const char = str[i];
+        if (inString) {
+            if (escaped) {
+                escaped = false;
+            } else if (char === '\\') {
+                escaped = true;
+            } else if (char === '"') {
+                inString = false;
+            }
+            cleanStr += char;
+        } else {
+            if (char === '"') {
+                inString = true;
+                cleanStr += char;
+            } else if (char === '{' || char === '[') {
+                stack.push(char);
+                cleanStr += char;
+            } else if (char === '}') {
+                if (stack[stack.length - 1] === '{') {
+                    stack.pop();
+                    cleanStr += char;
+                }
+            } else if (char === ']') {
+                if (stack[stack.length - 1] === '[') {
+                    stack.pop();
+                    cleanStr += char;
+                }
+            } else {
+                cleanStr += char;
+            }
+        }
+    }
+
+    if (inString) {
+        cleanStr += '"';
+    }
+
+    while (stack.length > 0) {
+        const last = stack.pop();
+        cleanStr = cleanStr.trim().replace(/,$/, '');
+        if (last === '{') {
+            cleanStr += '}';
+        } else if (last === '[') {
+            cleanStr += ']';
+        }
+    }
+
+    return cleanStr;
+}
+
 function parseStoryboardOutput(rawText, targetDuration) {
+    let cleaned = rawText.trim();
+
+    // Strip markdown reasoning block if present
+    cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
     // Strip markdown code fences if Claude added them
-    let cleaned = rawText.trim()
-        .replace(/^```(?:json)?\s*/i, '')
-        .replace(/\s*```\s*$/i, '')
-        .trim();
+    cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+
+    // Strip single-line comments (ignoring http:// or https://)
+    cleaned = cleaned.replace(/(?:^|[^:])\/\/.*$/gm, (match) => {
+        if (match.startsWith(':')) return ':';
+        return '';
+    });
+
+    // Strip multi-line comments
+    cleaned = cleaned.replace(/\/\*[\s\S]*?\*\//g, '');
+
+    // Fix missing commas between objects: } { -> }, {
+    cleaned = cleaned.replace(/\}\s*\{/g, '},\n{');
+    cleaned = cleaned.replace(/\]\s*\[/g, '],\n[');
+
+    // Strip trailing commas before closing braces/brackets
+    cleaned = cleaned.replace(/,\s*\}/g, '}');
+    cleaned = cleaned.replace(/,\s*\]/g, ']');
+
+    // Repair truncated JSON if needed
+    cleaned = repairTruncatedJson(cleaned);
 
     let plan;
     try {
@@ -515,14 +647,18 @@ function parseStoryboardOutput(rawText, targetDuration) {
     } catch (e) {
         const jsonMatch = cleaned.match(/\{[\s\S]+\}/);
         if (jsonMatch) {
-            plan = JSON.parse(jsonMatch[0]);
+            try {
+                plan = JSON.parse(jsonMatch[0]);
+            } catch (innerErr) {
+                throw new Error(`Failed to parse repaired storyboard JSON match: ${innerErr.message}`);
+            }
         } else {
-            throw new Error(`Failed to parse storyboard JSON: ${e.message}`);
+            throw new Error(`Failed to parse repaired storyboard JSON: ${e.message}\nRaw Output: ${rawText.substring(0, 100)}...`);
         }
     }
 
     if (!plan.imagePrompt) {
-        throw new Error('Storyboard JSON missing imagePrompt field');
+        plan.imagePrompt = `Create a high-end cinematic storyboard poster for a product advertisement.`;
     }
 
     // Validate and fix cuts[] if present
@@ -619,13 +755,15 @@ export async function runStoryboardDirector({
     isBrochure = false,
     // Legacy single-avatar compat
     avatarUrl = null,
+    audioTranscript = '',
+    preSeededCuts = [],
 }) {
     // Back-compat: if old single avatarUrl is passed, wrap it
     const resolvedAvatarUrls = (avatarUrls && avatarUrls.length > 0)
         ? avatarUrls
         : (avatarUrl ? [avatarUrl] : []);
 
-    console.log(`[Storyboard Director] Starting — ${duration}s, style=${style}, format=${format}, avatars=${resolvedAvatarUrls.length}, refs=${refImageUrls.length}, branding=${includeBranding}`);
+    console.log(`[Storyboard Director] Starting — ${duration}s, style=${style}, format=${format}, avatars=${resolvedAvatarUrls.length}, refs=${refImageUrls.length}, branding=${includeBranding}, audioTranscript=${!!audioTranscript}, preSeededCuts=${preSeededCuts.length}`);
     console.log(`[Storyboard Director] isBrochure=${isBrochure} brochureExtractedText.length=${(brochureExtractedText || '').length}`);
     if (brochureExtractedText) {
         console.log(`[Storyboard Director] brochureExtractedText preview: "${brochureExtractedText.substring(0, 300)}"`);
@@ -644,14 +782,18 @@ export async function runStoryboardDirector({
     const brandName = brand?.name || 'the brand';
 
     // 2. Build a preliminary cuts array for the imagePrompt panel builder.
-    //    We run a two-pass approach: first generate the plan (no imagePrompt yet)
-    //    then rebuild the imagePrompt with the actual cuts. But since the LLM
-    //    generates cuts AND imagePrompt in one call, we seed the system prompt
-    //    with the expected panel count based on duration heuristic.
-    //    The actual panel block in the final imagePrompt will be built by the LLM
-    //    using its own cuts[] output. We provide a heuristic panel count seed here.
-    const expectedCutCount = Math.max(5, Math.round(duration / 5));
-    const heuristicCuts = Array.from({ length: Math.min(expectedCutCount, 8) }, (_, i) => ({
+    const resolvedCuts = (preSeededCuts && preSeededCuts.length > 0)
+        ? preSeededCuts.map((c, i) => ({
+            id: c.id || i + 1,
+            scene: c.scene || c.framePrompt || `Cut ${i + 1}`,
+            framePrompt: c.framePrompt || '',
+            duration: c.duration || 3,
+            voiceover: c.dialogue || c.voiceover || '',
+          }))
+        : null;
+
+    const expectedCutCount = resolvedCuts ? resolvedCuts.length : Math.max(5, Math.round(duration / 5));
+    const heuristicCuts = resolvedCuts || Array.from({ length: Math.min(expectedCutCount, 8) }, (_, i) => ({
         id: i + 1,
         scene: `Cut ${i + 1} — narrative beat`,
         framePrompt: '',
@@ -674,6 +816,8 @@ export async function runStoryboardDirector({
         brief,
         productName,
         productFeatures,
+        audioTranscript,
+        preSeededCuts,
     });
 
     const userPrompt = buildUserPrompt({
@@ -690,6 +834,7 @@ export async function runStoryboardDirector({
         // Brochure pipeline
         brochureExtractedText,
         isBrochure,
+        audioTranscript,
     });
 
     // 4. Build image URLs for multimodal agent — ALL product images + avatars + ref images

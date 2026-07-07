@@ -68,6 +68,12 @@ export function safeErrorMessage(error, fallback = 'AI models are currently busy
         console.error('⚠️ [safeErrorMessage] Raw technical error:', error.message || error);
     }
     
+    // In development mode (but not during unit tests), return the real error message so developers can debug.
+    if (nodeEnv === 'development' && process.env.NODE_ENV !== 'test') {
+        const rawMsg = error ? (error.message || String(error)) : String(fallback);
+        return `[Dev Error] ${rawMsg}`;
+    }
+    
     return getFriendlyErrorMessage(error || fallback);
 }
 

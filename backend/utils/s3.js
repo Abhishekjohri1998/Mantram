@@ -17,7 +17,7 @@ const s3Client = new S3Client({
 
 /**
  * Helper to upload files to public anonymous image hosting when AWS S3 is down or not configured.
- * Tries Catbox.moe first, falls back to tmpfiles.org.
+ * Tries tmpfile.link first, falls back to Catbox.moe.
  */
 const uploadToPublicFallback = async (buffer, mimeType = "image/png") => {
     const ext = mimeType.includes('wav') ? 'wav' : 
@@ -27,49 +27,47 @@ const uploadToPublicFallback = async (buffer, mimeType = "image/png") => {
                 mimeType.split('/')[1] || 'png';
 
     try {
-        console.log(`📤 AWS S3 is down/unconfigured. Uploading to public fallback host (Catbox)...`);
-        
+        console.log(`📤 AWS S3 is down/unconfigured. Uploading to public fallback host (tmpfile.link)...`);
         const formData = new globalThis.FormData();
         const fileBlob = new globalThis.Blob([buffer], { type: mimeType });
-        formData.append("reqtype", "fileupload");
-        formData.append("fileToUpload", fileBlob, `upload-${Date.now()}.${ext}`);
-
-        const response = await globalThis.fetch("https://catbox.moe/user/api.php", {
+        formData.append("file", fileBlob, `upload-${Date.now()}.${ext}`);
+        
+        const response = await globalThis.fetch("https://tmpfile.link/api/upload", {
             method: "POST",
             body: formData
         });
 
-        const text = await response.text();
-        if (response.ok && text && text.startsWith("http")) {
-            const publicUrl = text.trim();
-            console.log(`✅ Catbox upload success: ${publicUrl}`);
-            return publicUrl;
-        } else {
-            throw new Error(`Unexpected Catbox response: ${text}`);
+        const responseData = await response.json();
+        if (response.ok && responseData.downloadLink) {
+            const directUrl = responseData.downloadLink;
+            console.log(`✅ tmpfile.link upload success: ${directUrl}`);
+            return directUrl;
         }
+        throw new Error(`Unexpected tmpfile.link response: ${JSON.stringify(responseData)}`);
     } catch (err) {
-        console.warn("⚠️ Catbox upload failed, trying tmpfiles.org...", err.message);
+        console.warn("⚠️ tmpfile.link upload failed, trying Catbox.moe...", err.message);
         try {
             const formData = new globalThis.FormData();
             const fileBlob = new globalThis.Blob([buffer], { type: mimeType });
-            formData.append("file", fileBlob, `upload-${Date.now()}.${ext}`);
-            
-            const response = await globalThis.fetch("https://tmpfiles.org/api/v1/upload", {
+            formData.append("reqtype", "fileupload");
+            formData.append("fileToUpload", fileBlob, `upload-${Date.now()}.${ext}`);
+
+            const response = await globalThis.fetch("https://catbox.moe/user/api.php", {
                 method: "POST",
                 body: formData
             });
 
-            const responseData = await response.json();
-            if (response.ok && responseData.status === "success" && responseData.data?.url) {
-                const viewerUrl = responseData.data.url;
-                const directUrl = viewerUrl.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/");
-                console.log(`✅ tmpfiles upload success: ${directUrl}`);
-                return directUrl;
+            const text = await response.text();
+            if (response.ok && text && text.startsWith("http")) {
+                const publicUrl = text.trim();
+                console.log(`✅ Catbox upload success: ${publicUrl}`);
+                return publicUrl;
+            } else {
+                throw new Error(`Unexpected Catbox response: ${text}`);
             }
-            throw new Error(`Unexpected tmpfiles response: ${JSON.stringify(responseData)}`);
-        } catch (tmpErr) {
-            console.error("❌ Both fallback hosts failed:", tmpErr.message);
-            throw new Error(`Public hosting fallback failed. Catbox error: ${err.message}. Tmpfiles error: ${tmpErr.message}`);
+        } catch (catErr) {
+            console.error("❌ Both fallback hosts failed:", catErr.message);
+            throw new Error(`Public hosting fallback failed. Tmpfile.link error: ${err.message}. Catbox error: ${catErr.message}`);
         }
     }
 };
@@ -310,8 +308,12 @@ export const getSignedUrlForPath = async (urlOrKey, expiresIn = 3600) => { // SE
     try {
         let key = urlOrKey;
         
-        // If it's a full URL, extract the key
+        // If it's a full URL, check if it's an S3 URL. If not, return as-is
         if (urlOrKey.startsWith('http')) {
+            const isS3 = urlOrKey.includes('.amazonaws.com') || urlOrKey.includes('mantram-assets');
+            if (!isS3) {
+                return urlOrKey;
+            }
             try {
                 const url = new URL(urlOrKey);
                 // For path-style URLs: /bucket-name/key/path

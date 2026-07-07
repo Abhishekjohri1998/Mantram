@@ -1052,27 +1052,29 @@ async function _stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', 
     const normPaths = [];
     for (let i = 0; i < segmentPaths.length; i++) {
         const normPath = path.join(tmpDir, `norm-${i}.mp4`);
+        const targetDur = prePlannedDurations[i] || 10;
+        console.log(`[SB LongForm ${jobId}] Normalizing segment ${i+1}/${segmentPaths.length} to target duration: ${targetDur}s`);
         await execFileAsync(ffmpegPath, [
-            '-y', '-i', segmentPaths[i],
-            '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo',
+            '-y',
+            '-i', segmentPaths[i],
+            '-f', 'lavfi', '-i', `anullsrc=r=48000:cl=stereo:d=${targetDur}`,
             '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p`,
             '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
             '-c:a', 'aac', '-b:a', '192k', '-ac', '2', '-ar', '48000',
             '-map', '0:v:0',
-            '-map', '0:a:0?',
+            '-map', '1:a:0',
+            '-t', String(targetDur),
             '-shortest',
             '-movflags', '+faststart',
             normPath,
-        ], { timeout: 120000 }).catch(async () => {
-            console.warn(`[SB LongForm ${jobId}] Segment ${i+1} has no audio — adding silent track`);
+        ], { timeout: 120000 }).catch(async (err) => {
+            console.warn(`[SB LongForm ${jobId}] Segment ${i+1} normalization failed (${err.message}) — falling back to untrimmed`);
             await execFileAsync(ffmpegPath, [
-                '-y', '-i', segmentPaths[i],
-                '-f', 'lavfi', '-i', `anullsrc=r=48000:cl=stereo:d=${prePlannedDurations[i] || 10}`,
+                '-y',
+                '-i', segmentPaths[i],
                 '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p`,
                 '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
-                '-c:a', 'aac', '-b:a', '192k', '-ac', '2', '-ar', '48000',
-                '-map', '0:v:0', '-map', '1:a:0',
-                '-shortest',
+                '-an',
                 '-movflags', '+faststart',
                 normPath,
             ], { timeout: 120000 });

@@ -190,15 +190,6 @@ export default function QAds({ activeBrand, projects = [] }) {
     const [cta, setCta] = useState('Shop now')
     const [customDialogue, setCustomDialogue] = useState('')
     const [selectedModel, setSelectedModel] = useState('seedance-2.0-fast')
-    // Seed Audio 1.0 UI states
-    const [seedAudioUrl, setSeedAudioUrl] = useState('')
-    const [showAudioGenerator, setShowAudioGenerator] = useState(false)
-    const [audioScript, setAudioScript] = useState('')
-    const [selectedAudioSpeaker, setSelectedAudioSpeaker] = useState('zh_male_taocheng_uranus_bigtts')
-    const [enhancingAudio, setEnhancingAudio] = useState(false)
-    const [generatingAudio, setGeneratingAudio] = useState(false)
-    const [audioGenError, setAudioGenError] = useState('')
-    const [audioProgress, setAudioProgress] = useState(0)
 
     // ── Prompt ──
     const [promptText, setPromptText] = useState('')
@@ -287,67 +278,6 @@ export default function QAds({ activeBrand, projects = [] }) {
         setAvatarGenerating(false)
     }, [activeBrand])
 
-    // ── Seed Audio handlers ──
-    const handleEnhanceAudioScript = useCallback(async () => {
-        if (!audioScript.trim()) return
-        setEnhancingAudio(true); setAudioGenError('')
-        try {
-            const data = await api('/video-studio/seed-audio/enhance-prompt', {
-                method: 'POST',
-                body: JSON.stringify({ text: audioScript })
-            })
-            if (data.enhancedText) setAudioScript(data.enhancedText)
-        } catch (err) {
-            setAudioGenError(`Failed to enhance script: ${err.message}`)
-        }
-        setEnhancingAudio(false)
-    }, [audioScript])
-
-    const handleGenerateAudio = useCallback(async () => {
-        if (!audioScript.trim()) return
-        setGeneratingAudio(true); setAudioGenError(''); setAudioProgress(5)
-        try {
-            const submitData = await api('/video-studio/seed-audio/generate', {
-                method: 'POST',
-                body: JSON.stringify({ text: audioScript, speaker: selectedAudioSpeaker })
-            })
-            const taskId = submitData.taskId
-            if (!taskId) throw new Error('Failed to get Task ID for audio generation')
-
-            let attempts = 0
-            const maxAttempts = 60
-            pollRefs.current['audio_gen'] = setInterval(async () => {
-                attempts++
-                try {
-                    const statusCheck = await api(`/video-studio/seed-audio/status/${taskId}`)
-                    if (statusCheck.status === 'COMPLETED') {
-                        clearInterval(pollRefs.current['audio_gen'])
-                        delete pollRefs.current['audio_gen']
-                        setSeedAudioUrl(statusCheck.audioUrl)
-                        setGeneratingAudio(false)
-                    } else if (statusCheck.status === 'FAILED') {
-                        clearInterval(pollRefs.current['audio_gen'])
-                        delete pollRefs.current['audio_gen']
-                        setAudioGenError(statusCheck.error || 'Audio generation failed')
-                        setGeneratingAudio(false)
-                    } else {
-                        setAudioProgress(Math.min(attempts * 8 + 5, 95))
-                    }
-                } catch (pollErr) {
-                    if (attempts >= maxAttempts) {
-                        clearInterval(pollRefs.current['audio_gen'])
-                        delete pollRefs.current['audio_gen']
-                        setAudioGenError('Audio generation timed out')
-                        setGeneratingAudio(false)
-                    }
-                }
-            }, 2000)
-        } catch (err) {
-            setAudioGenError(err.message)
-            setGeneratingAudio(false)
-        }
-    }, [audioScript, selectedAudioSpeaker])
-
     // ── Build Prompt ──
     const handleBuildPrompt = useCallback(async () => {
         if (!selectedCat) { setError('Select a Q-Ad category first'); return }
@@ -357,13 +287,13 @@ export default function QAds({ activeBrand, projects = [] }) {
         try {
             const data = await apiJson('/video-studio/ugc-pro/qads/build-prompt', {
                 brandId: activeBrand?._id, categoryId: selectedCat, productData, avatarUrl, productImageUrls,
-                settings: { duration, format, cta, customDialogue, model: selectedModel, refAudio: seedAudioUrl || null },
+                settings: { duration, format, cta, customDialogue, model: selectedModel },
             })
             setPromptText(data.prompt)
             setPromptReady(true)
         } catch (err) { setError(err.message) }
         setBuildingPrompt(false)
-    }, [selectedCat, productData, avatarUrl, productImageUrls, activeBrand, duration, format, cta, customDialogue, isNoAvatar, selectedModel, seedAudioUrl])
+    }, [selectedCat, productData, avatarUrl, productImageUrls, activeBrand, duration, format, cta, customDialogue, isNoAvatar, selectedModel])
 
     // ── Generate ──
     const handleGenerate = useCallback(async () => {
@@ -377,7 +307,7 @@ export default function QAds({ activeBrand, projects = [] }) {
             const data = await apiJson('/video-studio/ugc-pro/qads/generate', {
                 brandId: activeBrand?._id, categoryId: selectedCat, productData, avatarUrl, productImageUrls,
                 prebuiltPrompt: promptText,
-                settings: { duration, format, cta, customDialogue, quality: 'high', model: selectedModel, refAudio: seedAudioUrl || null },
+                settings: { duration, format, cta, customDialogue, quality: 'high', model: selectedModel },
             })
             setIsMinimized(true)
             setJobs(prev => prev.map(j => j.id === jobId ? { ...j, requestId: data.requestId, prompt: data.prompt } : j))
@@ -413,7 +343,7 @@ export default function QAds({ activeBrand, projects = [] }) {
             setJobs(prev => prev.filter(j => j.id !== jobId))
         }
         setLoading(false)
-    }, [activeBrand, selectedCat, productData, productImageUrls, avatarUrl, promptText, duration, format, cta, customDialogue, selectedModel, seedAudioUrl])
+    }, [activeBrand, selectedCat, productData, productImageUrls, avatarUrl, promptText, duration, format, cta, customDialogue, selectedModel])
 
     async function downloadVideo(url) {
         try {
@@ -664,94 +594,6 @@ export default function QAds({ activeBrand, projects = [] }) {
                         </div>
                     )}
 
-                    {/* ── Seed Audio 1.0 Collapsible Card ── */}
-                    {selectedModel.startsWith('seedance') && showAudioGenerator && (
-                        <div style={{ margin: '0 16px 12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: 12, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid var(--sys-border)', animation: 'traySlideUp 0.15s ease-out' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#a855f7' }}>music_note</span>
-                                    <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>Seed Audio 1.0 (ByteDance)</span>
-                                </div>
-                                {seedAudioUrl && (
-                                    <button onClick={() => setSeedAudioUrl('')} style={{ background: 'none', border: 'none', color: '#f87171', fontSize: 10, cursor: 'pointer', fontWeight: 600 }}>Clear</button>
-                                )}
-                            </div>
-
-                            {seedAudioUrl ? (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 10px', background: 'rgba(0,0,0,0.2)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.05)' }}>
-                                    <span className="material-symbols-outlined" style={{ color: '#a855f7', fontSize: 20 }}>audio_file</span>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ fontSize: 11, fontWeight: 600, color: '#fff' }}>Seed Audio Generated Successfully</div>
-                                        <audio src={seedAudioUrl} controls style={{ height: 24, marginTop: 4, width: '100%', maxWidth: 260 }} />
-                                    </div>
-                                </div>
-                            ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                        <span style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.6)' }}>Voice:</span>
-                                        <select
-                                            value={selectedAudioSpeaker}
-                                            onChange={e => setSelectedAudioSpeaker(e.target.value)}
-                                            style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 11, outline: 'none' }}
-                                        >
-                                            <option value="zh_male_taocheng_uranus_bigtts">Uranus Male</option>
-                                            <option value="zh_female_xiaoxiao">Xiaoxiao Female</option>
-                                            <option value="zh_female_yunjie">Yunjie Female</option>
-                                        </select>
-                                    </div>
-
-                                    <div style={{ position: 'relative' }}>
-                                        <textarea
-                                            value={audioScript}
-                                            onChange={e => setAudioScript(e.target.value)}
-                                            placeholder="Write dialogue script/prompt, then click AI Enhance..."
-                                            style={{ width: '100%', height: 60, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 11, lineHeight: 1.4, resize: 'none', outline: 'none' }}
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={handleEnhanceAudioScript}
-                                            disabled={enhancingAudio || !audioScript.trim()}
-                                            style={{ position: 'absolute', bottom: 6, right: 6, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#a855f7', fontSize: 9, padding: '3px 6px', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                                        >
-                                            {enhancingAudio ? (
-                                                <span className="material-symbols-outlined qa-spin" style={{ fontSize: 10 }}>progress_activity</span>
-                                            ) : (
-                                                <span className="material-symbols-outlined" style={{ fontSize: 10 }}>auto_awesome</span>
-                                            )}
-                                            {enhancingAudio ? 'Enhancing...' : 'Enhance'}
-                                        </button>
-                                    </div>
-
-                                    {audioGenError && (
-                                        <div style={{ color: '#f87171', fontSize: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: 12 }}>error</span>
-                                            {audioGenError}
-                                        </div>
-                                    )}
-
-                                    <button
-                                        type="button"
-                                        onClick={handleGenerateAudio}
-                                        disabled={generatingAudio || !audioScript.trim()}
-                                        style={{ width: '100%', padding: '6px', background: 'var(--sys-primary)', border: 'none', color: '#111', fontWeight: 700, borderRadius: 6, cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-                                    >
-                                        {generatingAudio ? (
-                                            <>
-                                                <span className="material-symbols-outlined qa-spin" style={{ fontSize: 12 }}>progress_activity</span>
-                                                Generating ({audioProgress}%)
-                                            </>
-                                        ) : (
-                                            <>
-                                                <span className="material-symbols-outlined" style={{ fontSize: 12 }}>music_note</span>
-                                                Generate Audio
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
                     {/* Bottom Bar */}
                     <div className="qa-bottom">
                         <div className="qa-bottom-left">
@@ -778,13 +620,6 @@ export default function QAds({ activeBrand, projects = [] }) {
                                 options={FORMATS} />
                             <CfgDropdown value={selectedModel} onChange={setSelectedModel}
                                 options={VIDEO_MODELS} />
-                            {selectedModel.startsWith('seedance') && (
-                                <button type="button" onClick={() => setShowAudioGenerator(!showAudioGenerator)}
-                                    style={{ background: seedAudioUrl ? 'rgba(168,85,247,0.1)' : 'rgba(255,255,255,0.06)', border: seedAudioUrl ? '1px solid rgba(168,85,247,0.3)' : '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '0 12px', height: '36px', display: 'flex', alignItems: 'center', gap: 6, color: seedAudioUrl ? '#c084fc' : '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: 15 }}>music_note</span>
-                                    <span>{seedAudioUrl ? 'Seed Audio Ready' : 'Seed Audio'}</span>
-                                </button>
-                            )}
                         </div>
                         {!promptReady ? (
                             <button className="qa-generate" disabled={!selectedCat || !hasProduct || !hasAvatar || buildingPrompt}

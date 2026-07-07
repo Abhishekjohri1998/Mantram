@@ -611,6 +611,7 @@ export default function Storyboard({
             });
             fd.append('directorModel', directorModel);
             fd.append('imageModel', imageModel);
+            fd.append('videoModel', model);
             fd.append('dialogueLanguage', dialogueLanguage);
             fd.append('audioSync', String(audioSync));
             // Brochure/document analysis data — send FULL content, no truncation
@@ -2160,6 +2161,107 @@ export default function Storyboard({
 
                          </div>
                      </div>
+
+                    {/* Settings Confirmation Panel */}
+                    {phase === 'review' && (
+                        <div className="sb-settings-confirm-panel" style={{
+                            margin: '24px auto 0',
+                            maxWidth: '1200px',
+                            width: '100%',
+                            background: 'rgba(255, 255, 255, 0.02)',
+                            backdropFilter: 'blur(16px)',
+                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            borderRadius: '16px',
+                            padding: '16px 24px',
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '20px',
+                        }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <div style={{ fontSize: '14px', fontWeight: 700, color: '#C084FC', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>settings</span>
+                                    Verify Production Settings
+                                </div>
+                                <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>
+                                    Confirm target AI model, output resolution, and sync parameters before initiating rendering
+                                </div>
+                            </div>
+                            
+                            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '16px' }}>
+                                {/* Model Selector */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <label style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>Generation Model</label>
+                                    <CfgMenu value={model} onChange={setModel} options={MODELS} icon="play_circle" />
+                                </div>
+
+                                {/* Resolution Selector */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <label style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>Resolution</label>
+                                    <CfgMenu value={resolution} onChange={setResolution} options={RESOLUTIONS} icon="aspect_ratio" />
+                                </div>
+
+                                {/* Audio Sync Toggle */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <label style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>Audio ASR Sync</label>
+                                    <button 
+                                        type="button"
+                                        onClick={() => setAudioSync(!audioSync)}
+                                        style={{
+                                            height: '38px',
+                                            padding: '0 16px',
+                                            borderRadius: '8px',
+                                            background: audioSync ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                                            border: audioSync ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(239, 68, 68, 0.3)',
+                                            color: audioSync ? '#34d399' : '#f87171',
+                                            fontSize: '13px',
+                                            fontWeight: 600,
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            transition: 'all 0.2s',
+                                        }}
+                                    >
+                                        <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
+                                            {audioSync ? 'sync' : 'sync_disabled'}
+                                        </span>
+                                        {audioSync ? 'Sync Enabled' : 'Sync Disabled'}
+                                    </button>
+                                </div>
+
+                                {/* Branding Toggle */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <label style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>Brand DNA Close</label>
+                                    <button 
+                                        type="button"
+                                        onClick={() => setIncludeBranding(!includeBranding)}
+                                        style={{
+                                            height: '38px',
+                                            padding: '0 16px',
+                                            borderRadius: '8px',
+                                            background: includeBranding ? 'rgba(139, 92, 246, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                                            border: includeBranding ? '1px solid rgba(139, 92, 246, 0.3)' : '1px solid rgba(255, 255, 255, 0.08)',
+                                            color: includeBranding ? '#A78BFA' : 'rgba(255,255,255,0.4)',
+                                            fontSize: '13px',
+                                            fontWeight: 600,
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            transition: 'all 0.2s',
+                                        }}
+                                    >
+                                        <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
+                                            {includeBranding ? 'verified' : 'circle'}
+                                        </span>
+                                        {includeBranding ? 'Branding ON' : 'Branding OFF'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Action bar */}
                     <div className="sb-action-bar">

@@ -258,7 +258,6 @@ const css = `
     text-transform: uppercase;
     position: relative;
     overflow: hidden;
-    flex-shrink: 0;
 }
 .scott-block-btn:hover {
     background: #333;
@@ -709,15 +708,6 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
     const [format, setFormat] = useState('9:16')
     const [resolution, setResolution] = useState('480p')
     const [selectedModel, setSelectedModel] = useState('seedance-2.0-fast')
-    // Seed Audio 1.0 UI states
-    const [seedAudioUrl, setSeedAudioUrl] = useState('')
-    const [showAudioGenerator, setShowAudioGenerator] = useState(false)
-    const [audioScript, setAudioScript] = useState('')
-    const [selectedAudioSpeaker, setSelectedAudioSpeaker] = useState('zh_male_taocheng_uranus_bigtts')
-    const [enhancingAudio, setEnhancingAudio] = useState(false)
-    const [generatingAudio, setGeneratingAudio] = useState(false)
-    const [audioGenError, setAudioGenError] = useState('')
-    const [audioProgress, setAudioProgress] = useState(0)
     const [userBrief, setUserBrief] = useState('')
     const [hookShot, setHookShot] = useState(false)
     const [language, setLanguage] = useState(() => {
@@ -951,67 +941,6 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
         setAvatarBusy(false)
     }, [avatarDesc, activeBrand])
 
-    // ── Seed Audio handlers ──
-    const handleEnhanceAudioScript = useCallback(async () => {
-        if (!audioScript.trim()) return
-        setEnhancingAudio(true); setError(null)
-        try {
-            const data = await api('/video-studio/seed-audio/enhance-prompt', {
-                method: 'POST',
-                body: JSON.stringify({ text: audioScript })
-            })
-            if (data.enhancedText) setAudioScript(data.enhancedText)
-        } catch (err) {
-            setError(`Failed to enhance script: ${err.message}`)
-        }
-        setEnhancingAudio(false)
-    }, [audioScript])
-
-    const handleGenerateAudio = useCallback(async () => {
-        if (!audioScript.trim()) return
-        setGeneratingAudio(true); setError(null); setAudioProgress(5)
-        try {
-            const submitData = await api('/video-studio/seed-audio/generate', {
-                method: 'POST',
-                body: JSON.stringify({ text: audioScript, speaker: selectedAudioSpeaker })
-            })
-            const taskId = submitData.taskId
-            if (!taskId) throw new Error('Failed to get Task ID for audio generation')
-
-            let attempts = 0
-            const maxAttempts = 60
-            pollRefs.current['audio_gen'] = setInterval(async () => {
-                attempts++
-                try {
-                    const statusCheck = await api(`/video-studio/seed-audio/status/${taskId}`)
-                    if (statusCheck.status === 'COMPLETED') {
-                        clearInterval(pollRefs.current['audio_gen'])
-                        delete pollRefs.current['audio_gen']
-                        setSeedAudioUrl(statusCheck.audioUrl)
-                        setGeneratingAudio(false)
-                    } else if (statusCheck.status === 'FAILED') {
-                        clearInterval(pollRefs.current['audio_gen'])
-                        delete pollRefs.current['audio_gen']
-                        setError(statusCheck.error || 'Audio generation failed')
-                        setGeneratingAudio(false)
-                    } else {
-                        setAudioProgress(Math.min(attempts * 8 + 5, 95))
-                    }
-                } catch (pollErr) {
-                    if (attempts >= maxAttempts) {
-                        clearInterval(pollRefs.current['audio_gen'])
-                        delete pollRefs.current['audio_gen']
-                        setError('Audio generation timed out')
-                        setGeneratingAudio(false)
-                    }
-                }
-            }, 2000)
-        } catch (err) {
-            setError(err.message)
-            setGeneratingAudio(false)
-        }
-    }, [audioScript, selectedAudioSpeaker])
-
     // Upload product image directly (no URL needed)
     const handleProductImageUpload = useCallback(async (file) => {
         setIsAnalyzing(true); setError(null)
@@ -1107,7 +1036,7 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
                     presetId: selP,
                     userBrief,
                     productData: pData,
-                    settings: { duration, format, resolution, model: selectedModel, hookShot, language, refAudio: seedAudioUrl || null },
+                    settings: { duration, format, resolution, model: selectedModel, hookShot, language },
                     avatarUrl: avatarUrl || null,
                     productImageUrls: pImgs
                 })
@@ -1121,7 +1050,7 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
             setIsGeneratingPrompts(false)
             setPromptStage('')
         }
-    }, [selP, userBrief, productData, productUrl, productImgs, duration, format, resolution, selectedModel, hookShot, language, avatarUrl, activeBrand, seedAudioUrl])
+    }, [selP, userBrief, productData, productUrl, productImgs, duration, format, resolution, selectedModel, hookShot, language, avatarUrl, activeBrand])
 
     // Step 2 — Generate video for one variant
     const generateVideo = useCallback(async (variant) => {
@@ -1198,7 +1127,7 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
                         legend: variant.legend || '',
                         productImageUrls: productImgs,
                         avatarUrl: avatarUrl || null,
-                        settings: { duration, format, resolution, model: selectedModel, hookShot, language, refAudio: seedAudioUrl || null }
+                        settings: { duration, format, resolution, model: selectedModel, hookShot, language }
                     })
                 })
 
@@ -1256,7 +1185,7 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
             const errorMsg = isTimeout ? 'Video generation modal servers are overloaded or experiencing downtime please try after sometime' : e.message;
             setVideoJobs(prev => ({ ...prev, [vid]: { status: 'failed', error: errorMsg } }))
         }
-    }, [selP, productImgs, avatarUrl, duration, format, resolution, selectedModel, hookShot, activeBrand, language, productData, canCreateVideo, onUpgradeRequired, onVideoComplete, seedAudioUrl])
+    }, [selP, productImgs, avatarUrl, duration, format, resolution, selectedModel, hookShot, activeBrand, language, productData, canCreateVideo, onUpgradeRequired, onVideoComplete])
 
     useEffect(() => {
         return () => Object.values(pollRefs.current).forEach(clearInterval)
@@ -1370,94 +1299,6 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
                 </div>
             )}
 
-            {/* ── Seed Audio 1.0 Collapsible Card ── */}
-            {selectedModel.startsWith('seedance') && showAudioGenerator && (
-                <div style={{ margin: '0 auto 12px', width: '100%', maxWidth: '1050px', padding: '16px', display: 'flex', flexDirection: 'column', gap: 12, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', animation: 'traySlideUp 0.15s ease-out', boxSizing: 'border-box' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#10b981' }}>music_note</span>
-                            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>Seed Audio 1.0 (ByteDance)</span>
-                        </div>
-                        {seedAudioUrl && (
-                            <button onClick={() => setSeedAudioUrl('')} style={{ background: 'none', border: 'none', color: '#f87171', fontSize: 10, cursor: 'pointer', fontWeight: 600 }}>Clear</button>
-                        )}
-                    </div>
-
-                    {seedAudioUrl ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 10px', background: 'rgba(0,0,0,0.2)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.05)' }}>
-                            <span className="material-symbols-outlined" style={{ color: '#10b981', fontSize: 20 }}>audio_file</span>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 11, fontWeight: 600, color: '#fff' }}>Seed Audio Generated Successfully</div>
-                                <audio src={seedAudioUrl} controls style={{ height: 24, marginTop: 4, width: '100%', maxWidth: 260 }} />
-                            </div>
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                <span style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.6)' }}>Voice:</span>
-                                <select
-                                    value={selectedAudioSpeaker}
-                                    onChange={e => setSelectedAudioSpeaker(e.target.value)}
-                                    style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 11, outline: 'none' }}
-                                >
-                                    <option value="zh_male_taocheng_uranus_bigtts">Uranus Male</option>
-                                    <option value="zh_female_xiaoxiao">Xiaoxiao Female</option>
-                                    <option value="zh_female_yunjie">Yunjie Female</option>
-                                </select>
-                            </div>
-
-                            <div style={{ position: 'relative' }}>
-                                <textarea
-                                    value={audioScript}
-                                    onChange={e => setAudioScript(e.target.value)}
-                                    placeholder="Write dialogue script/prompt, then click AI Enhance..."
-                                    style={{ width: '100%', height: 60, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 11, lineHeight: 1.4, resize: 'none', outline: 'none', boxSizing: 'border-box' }}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={handleEnhanceAudioScript}
-                                    disabled={enhancingAudio || !audioScript.trim()}
-                                    style={{ position: 'absolute', bottom: 6, right: 6, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#10b981', fontSize: 9, padding: '3px 6px', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                                >
-                                    {enhancingAudio ? (
-                                        <span className="material-symbols-outlined spin" style={{ fontSize: 10 }}>autorenew</span>
-                                    ) : (
-                                        <span className="material-symbols-outlined" style={{ fontSize: 10 }}>auto_awesome</span>
-                                    )}
-                                    {enhancingAudio ? 'Enhancing...' : 'Enhance'}
-                                </button>
-                            </div>
-
-                            {error && error.includes('enhance') && (
-                                <div style={{ color: '#f87171', fontSize: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: 12 }}>error</span>
-                                    {error}
-                                </div>
-                            )}
-
-                            <button
-                                type="button"
-                                onClick={handleGenerateAudio}
-                                disabled={generatingAudio || !audioScript.trim()}
-                                style={{ width: '100%', padding: '8px', background: '#10b981', border: 'none', color: '#111', fontWeight: 700, borderRadius: 6, cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-                            >
-                                {generatingAudio ? (
-                                    <>
-                                        <span className="material-symbols-outlined spin" style={{ fontSize: 12 }}>autorenew</span>
-                                        Generating ({audioProgress}%)
-                                    </>
-                                ) : (
-                                    <>
-                                        <span className="material-symbols-outlined" style={{ fontSize: 12 }}>music_note</span>
-                                        Generate Audio
-                                    </>
-                                )}
-                            </button>
-                        </div>
-                    )}
-                </div>
-            )}
-
             {/* Scott Panel — two row layout */}
             <div className="scott-panel" style={{ flexDirection: 'column', gap: 8, padding: '12px 16px', maxWidth: '1050px' }}>
 
@@ -1498,34 +1339,10 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
                             )}
                         </button>
                     )}
-                    {selectedModel.startsWith('seedance') && (
-                        <button
-                            type="button"
-                            onClick={() => setShowAudioGenerator(!showAudioGenerator)}
-                            style={{
-                                background: seedAudioUrl ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.06)',
-                                color: seedAudioUrl ? '#10b981' : '#fff',
-                                border: seedAudioUrl ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.08)',
-                                borderRadius: 10,
-                                padding: '8px 12px',
-                                fontSize: 12,
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 4,
-                                whiteSpace: 'nowrap',
-                                marginLeft: 8
-                            }}
-                        >
-                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>music_note</span>
-                            <span>{seedAudioUrl ? 'Seed Audio Ready' : 'Seed Audio'}</span>
-                        </button>
-                    )}
                 </div>
 
                 {/* Row 2: Config + blocks + generate */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', flexWrap: 'wrap', rowGap: 8 }}>
 
                     {/* Format picker */}
                     <button type="button" className="scott-btn-cfg" onClick={() => setShowCats(true)} style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 12px', whiteSpace: 'nowrap', flex: '0 0 auto' }}>
@@ -1569,10 +1386,9 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
                     <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.08)' }} />
                     <CfgMenu value={language} onChange={setLanguage} options={LANGUAGES} icon="translate" />
 
-
                     <div style={{ flex: 1 }} />
 
-                     {/* Product block — shows first image + count badge if multiple */}
+                    {/* Product block — shows first image + count badge if multiple */}
                     <button className={`scott-block-btn ${productData || productImgs.length ? 'active' : ''}`} onClick={() => setShowProduct(true)} style={{ width: 64, height: 56, position: 'relative', flexShrink: 0 }}>
                         {productImgs?.[0] ? (
                             <>
