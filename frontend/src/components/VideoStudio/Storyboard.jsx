@@ -54,9 +54,9 @@ const FORMATS = [
     { value: '4:3', label: '4:3 Classic' }
 ];
 
-// Duration slider: 5s to 120s in 5s steps
+// Duration slider: 5s to 600s (10 min)
 const MIN_DURATION = 5;
-const MAX_DURATION = 120;
+const MAX_DURATION = 600;
 const DURATION_STEP = 5;
 
 function getDurationLabel(d) {
@@ -1668,14 +1668,14 @@ export default function Storyboard({
                                         type="range"
                                         className="sb-dur-slider"
                                         min={model.startsWith('seedance') ? 4 : 5}
-                                        max={120}
+                                        max={MAX_DURATION}
                                         step={model.startsWith('seedance') ? 1 : 5}
                                         value={duration}
                                         onChange={e => { setDuration(Number(e.target.value)); setBriefAudioDuration(null); }}
                                         disabled={isLoading}
                                     />
                                     <div className="scott-duration-range">
-                                        <span>{model.startsWith('seedance') ? '4s' : '5s'}</span><span>120s</span>
+                                        <span>{model.startsWith('seedance') ? '4s' : '5s'}</span><span>10m (600s)</span>
                                     </div>
                                     {briefAudioDuration && preSeededCuts?.length && (
                                         <div className="sb-audio-dur-notice">
