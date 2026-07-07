@@ -1668,14 +1668,14 @@ export default function Storyboard({
                                         type="range"
                                         className="sb-dur-slider"
                                         min={model.startsWith('seedance') ? 4 : 5}
-                                        max={model === 'seedance-2.0-mini' ? 45 : 120}
+                                        max={120}
                                         step={model.startsWith('seedance') ? 1 : 5}
                                         value={duration}
                                         onChange={e => { setDuration(Number(e.target.value)); setBriefAudioDuration(null); }}
                                         disabled={isLoading}
                                     />
                                     <div className="scott-duration-range">
-                                        <span>{model.startsWith('seedance') ? '4s' : '5s'}</span><span>{model === 'seedance-2.0-mini' ? '45s' : '120s'}</span>
+                                        <span>{model.startsWith('seedance') ? '4s' : '5s'}</span><span>120s</span>
                                     </div>
                                     {briefAudioDuration && preSeededCuts?.length && (
                                         <div className="sb-audio-dur-notice">

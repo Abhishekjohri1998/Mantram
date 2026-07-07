@@ -14,6 +14,7 @@ import { callAgentText } from '../shared/agentUtils.js';
 const OPTIMAL_SEGMENT_DURATION = {
     'seedance-2.0': 15,
     'seedance-2.0-fast': 15,
+    'seedance-2.0-mini': 15,
     'kling-3.0': 12,
     'kling-3.0-o': 10,
     'veo-3.1': 8,
@@ -31,6 +32,7 @@ const OPTIMAL_SEGMENT_DURATION = {
 const MAX_SEGMENT_DURATION = {
     'seedance-2.0': 15,
     'seedance-2.0-fast': 15,
+    'seedance-2.0-mini': 15,
     'kling-3.0': 15,
     'kling-3.0-o': 15,
     'veo-3.1': 8,
