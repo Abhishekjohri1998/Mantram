@@ -9530,9 +9530,9 @@ Rules:
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         contents: [{ role: 'user', parts }],
-                        generationConfig: { temperature: 0.1, maxOutputTokens: 2000 },
+                        generationConfig: { temperature: 0.1, maxOutputTokens: 8000 },
                     }),
-                    signal: AbortSignal.timeout(45_000),
+                    signal: AbortSignal.timeout(60_000),
                 });
 
                 if (geminiResp.ok) {
@@ -9617,6 +9617,94 @@ Rules:
         console.warn(`[Audio Transcribe] Global transcription helper failed:`, err.message);
         return '';
     }
+}
+
+function mergeTranscriptSegments(transcript, targetDuration = 8) {
+    if (!transcript) return '';
+    const lines = transcript.split('\n').map(l => l.trim()).filter(Boolean);
+    const regex = /^\[(\d+(?:\.\d+)?)s\s*-\s*(\d+(?:\.\d+)?)s\]\s*(.*)$/;
+    
+    const parsed = [];
+    for (const line of lines) {
+        const match = line.match(regex);
+        if (match) {
+            parsed.push({
+                start: parseFloat(match[1]),
+                end: parseFloat(match[2]),
+                text: match[3].trim()
+            });
+        }
+    }
+    
+    if (parsed.length === 0) return transcript;
+    
+    const merged = [];
+    let current = null;
+    
+    for (const item of parsed) {
+        if (!current) {
+            current = { ...item };
+        } else {
+            const currentDur = current.end - current.start;
+            // If current segment duration is under targetDuration, merge the next item into it
+            if (currentDur < targetDuration) {
+                current.end = item.end;
+                current.text = (current.text + ' ' + item.text).trim();
+            } else {
+                merged.push(current);
+                current = { ...item };
+            }
+        }
+    }
+    if (current) merged.push(current);
+    
+    return merged.map(item => `[${item.start.toFixed(1)}s - ${item.end.toFixed(1)}s] ${item.text}`).join('\n');
+}
+
+function mergePreSeededCuts(cuts = [], targetDuration = 8) {
+    if (!cuts || cuts.length === 0) return [];
+    
+    const merged = [];
+    let current = null;
+    
+    for (const cut of cuts) {
+        const cutDur = Math.max(2, parseInt(cut.duration) || 3);
+        if (!current) {
+            current = {
+                ...cut,
+                duration: cutDur,
+                startTime: cut.startTime || 0,
+                endTime: cut.endTime || cutDur,
+                dialogue: cut.dialogue || cut.voiceover || ''
+            };
+        } else {
+            // If current segment duration is under targetDuration, merge this cut into it
+            if (current.duration < targetDuration) {
+                current.endTime = cut.endTime || (current.endTime + cutDur);
+                current.duration += cutDur;
+                current.scene = (current.scene + ' ' + (cut.scene || '')).trim();
+                current.framePrompt = (current.framePrompt + ' ' + (cut.framePrompt || '')).trim();
+                current.dialogue = (current.dialogue + ' ' + (cut.dialogue || cut.voiceover || '')).trim();
+            } else {
+                merged.push(current);
+                current = {
+                    ...cut,
+                    duration: cutDur,
+                    startTime: cut.startTime || current.endTime,
+                    endTime: cut.endTime || (current.endTime + cutDur),
+                    dialogue: cut.dialogue || cut.voiceover || ''
+                };
+            }
+        }
+    }
+    if (current) merged.push(current);
+    
+    // Re-index IDs and format fields
+    return merged.map((c, idx) => ({
+        ...c,
+        id: idx + 1,
+        voiceover: c.dialogue
+    }));
 }
 
 function getDurationFromTranscript(transcript) {
@@ -9722,6 +9810,7 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
             console.log(`[Storyboard Create] Transcribing brief audio url: ${briefAudioUrl}`);
             audioTranscript = await transcribeAudioFromUrl(briefAudioUrl, dialogueLanguage);
             if (audioTranscript) {
+                audioTranscript = mergeTranscriptSegments(audioTranscript, 8); // target ~8s per segment
                 const transcriptDur = getDurationFromTranscript(audioTranscript);
                 if (transcriptDur > 0) {
                     console.log(`[Storyboard Create] Calculated duration from audio transcript timecodes: ${transcriptDur}s`);
@@ -9833,6 +9922,10 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
                 parsedCuts = typeof req.body.preSeededCuts === 'string'
                     ? JSON.parse(req.body.preSeededCuts)
                     : req.body.preSeededCuts;
+                if (parsedCuts && parsedCuts.length > 0) {
+                    parsedCuts = mergePreSeededCuts(parsedCuts, 8); // merge to target ~8s segments
+                    console.log(`[Storyboard Create] 🎬 Merged pre-seeded cuts down to ${parsedCuts.length} segments`);
+                }
             } catch (e) {
                 console.warn('[Storyboard Create] Failed to parse preSeededCuts:', e.message);
             }
