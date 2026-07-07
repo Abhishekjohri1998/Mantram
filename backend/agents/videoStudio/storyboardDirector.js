@@ -401,6 +401,12 @@ The JSON must match this exact schema:
   "paletteNames": ["Name1", "Name2", "Name3"],
   "materialNotes": "string",
   "environmentFingerprint": "string",
+  "moodKeywords": ["word1", "word2"],
+  "cinematographyRules": "string",
+  "emotionalArc": "establish → approach → detail → emotion → resolve",
+  "narrativeArc": "string",
+  "hookStrategy": "string",
+  "imagePrompt": "Create a premium...",
   "cuts": [
     {
       "id": 1,
@@ -412,13 +418,7 @@ The JSON must match this exact schema:
       "framePrompt": "string",
       "voiceover": "string"
     }
-  ],
-  "moodKeywords": ["word1", "word2"],
-  "cinematographyRules": "string",
-  "emotionalArc": "establish → approach → detail → emotion → resolve",
-  "narrativeArc": "string",
-  "hookStrategy": "string",
-  "imagePrompt": "Create a premium..."
+  ]
 }`;
 }
 
