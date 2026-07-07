@@ -9141,7 +9141,6 @@ router.post('/storyboard/analyze-brief-media', protect, (req, res) => {
                         .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
                         .jpeg({ quality: 88 })
                         .toBuffer();
-                    const base64 = resized.toString('base64');
 
                     const { getRouter } = await import('../ai/router.js');
                     const router = getRouter();
@@ -9187,17 +9186,6 @@ CRITICAL RULES:
 - suggestedDuration MUST be one of: 15, 30, 60, 90
 - suggestedFormat MUST be one of: "9:16", "16:9", "1:1"`;
 
-                    // ═══════════════════════════════════════════════════════════════
-                    // VISION: Use router.nativeGemini directly — exact same pattern
-                    // as callMultimodalAgent() used in YouTube Studio, Creative Studio,
-                    // and all other studios. nativeGemini = real GeminiProvider (direct
-                    // Google API, NOT the Laozhang OpenAI-format proxy in providers.gemini).
-                    //
-                    // GeminiProvider.generateText accepts images[] as data: URIs or
-                    // http URLs — it fetches/decodes them into inlineData automatically.
-                    // ═══════════════════════════════════════════════════════════════
-                    console.log(`[analyze-brief-media] 🔍 Calling Gemini vision directly via fetch (base64 length=${base64.length})...`);
-
                     const geminiApiKey = process.env.GEMINI_API_KEY;
                     if (!geminiApiKey) {
                         return res.status(503).json({
@@ -9206,11 +9194,47 @@ CRITICAL RULES:
                         });
                     }
 
+                    // Upload to S3 if not already uploaded, and also upload to Gemini Files API
+                    console.log(`🚀 Uploading resized image buffer (${Math.round(resized.length / 1024)}KB) to Gemini Files API...`);
+                    const initRes = await fetch(
+                        `https://generativelanguage.googleapis.com/upload/v1beta/files?uploadType=resumable&key=${geminiApiKey}`,
+                        {
+                            method: 'POST',
+                            headers: {
+                                'X-Goog-Upload-Protocol': 'resumable',
+                                'X-Goog-Upload-Command': 'start',
+                                'X-Goog-Upload-Header-Content-Length': resized.length.toString(),
+                                'X-Goog-Upload-Header-Content-Type': 'image/jpeg',
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ file: { displayName: `image_brief_${Date.now()}` } })
+                        }
+                    );
+                    if (!initRes.ok) throw new Error(`Gemini Files API initialization failed: ${initRes.statusText}`);
+                    const uploadUrl = initRes.headers.get('x-goog-upload-url');
+                    if (!uploadUrl) throw new Error('No upload URL returned from Gemini');
+
+                    const uploadRes = await fetch(uploadUrl, {
+                        method: 'POST',
+                        headers: {
+                            'X-Goog-Upload-Protocol': 'resumable',
+                            'X-Goog-Upload-Command': 'upload, finalize',
+                            'X-Goog-Upload-Offset': '0',
+                            'Content-Length': resized.length.toString(),
+                        },
+                        body: resized
+                    });
+                    if (!uploadRes.ok) throw new Error(`Gemini Files API upload failed: ${uploadRes.statusText}`);
+                    const fileInfo = await uploadRes.json();
+                    const fileUri = fileInfo.file.uri;
+                    const fileName = fileInfo.file.name;
+                    console.log(`✅ Gemini Files API Upload Success: ${fileUri}`);
+
                     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
                     const parts = [
                         { text: systemPrompt },
                         { text: 'Read every word from this image. Extract ALL text verbatim and generate the advertising brief.' },
-                        { inlineData: { mimeType: mime || 'image/jpeg', data: base64 } }
+                        { fileData: { fileUri, mimeType: 'image/jpeg' } }
                     ];
 
                     const geminiResp = await fetch(geminiUrl, {
@@ -9222,6 +9246,11 @@ CRITICAL RULES:
                         }),
                         signal: AbortSignal.timeout(40_000),
                     });
+
+                    // Cleanup file from Gemini asynchronously
+                    fetch(`https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${geminiApiKey}`, {
+                        method: 'DELETE'
+                    }).catch(e => console.error('Failed to delete Gemini file:', e.message));
 
                     if (!geminiResp.ok) {
                         const errText = await geminiResp.text();
