@@ -11905,7 +11905,7 @@ router.post('/storyboard/compile', protect, async (req, res) => {
                 const audioResp = await fetch(signedRefAudio);
                 if (audioResp.ok) {
                     fs.writeFileSync(refAudioLocalPath, Buffer.from(await audioResp.arrayBuffer()));
-                    const { mixAudioAndMux } = await import('../../utils/ffmpegUtils.js');
+                    const { mixAudioAndMux } = await import('../utils/ffmpegUtils.js');
                     finalPath = await mixAudioAndMux(filePath, refAudioLocalPath, null, tmpDir);
                     console.log(`[SB Compile] Audio mixed: ${finalPath}`);
                 }
