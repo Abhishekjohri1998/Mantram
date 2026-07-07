@@ -9587,8 +9587,8 @@ async function transcribeAudioFromUrl(audioFileUrl, dialogueLanguage = 'English'
         const geminiApiKey = process.env.GEMINI_API_KEY;
         if (geminiApiKey) {
             try {
-                console.log('   🎧 Transcribing audio using Gemini 2.5 Flash...');
-                const base64 = audioBuffer.toString('base64');
+                console.log('   🎧 Transcribing audio using Gemini 2.5 Flash (via Files API)...');
+                
                 const systemPrompt = `You are a highly accurate audio transcription engine.
 Your job is to transcribe the audio verbatim and split it into segments with start and end times.
 Output the transcript in this exact format for each segment:
@@ -9602,14 +9602,66 @@ Rules:
 - Start and end times must be in seconds, followed by 's' (e.g., 0.0s, 4.5s).
 - Keep segments to around 3-10 seconds each.
 - Output ONLY the formatted transcription. No introduction, no markdown wrappers, no formatting other than the lines.`;
-
+                
+                // Upload buffer to Gemini Files API
+                const initRes = await fetch(
+                    `https://generativelanguage.googleapis.com/upload/v1beta/files?uploadType=resumable&key=${geminiApiKey}`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'X-Goog-Upload-Protocol': 'resumable',
+                            'X-Goog-Upload-Command': 'start',
+                            'X-Goog-Upload-Header-Content-Length': audioBuffer.length.toString(),
+                            'X-Goog-Upload-Header-Content-Type': audioMime,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ file: { displayName: `audio_transcribe_${Date.now()}` } })
+                    }
+                );
+                
+                if (!initRes.ok) throw new Error(`Gemini Files API init failed: ${initRes.statusText}`);
+                const uploadUrl = initRes.headers.get('x-goog-upload-url');
+                if (!uploadUrl) throw new Error('No upload URL returned from Gemini');
+                
+                const uploadRes = await fetch(uploadUrl, {
+                    method: 'POST',
+                    headers: {
+                        'X-Goog-Upload-Protocol': 'resumable',
+                        'X-Goog-Upload-Command': 'upload, finalize',
+                        'X-Goog-Upload-Offset': '0',
+                        'Content-Length': audioBuffer.length.toString(),
+                    },
+                    body: audioBuffer
+                });
+                
+                if (!uploadRes.ok) throw new Error(`Gemini Files API upload failed: ${uploadRes.statusText}`);
+                const fileInfo = await uploadRes.json();
+                const fileUri = fileInfo.file.uri;
+                const fileName = fileInfo.file.name;
+                console.log(`   ✅ Gemini Files API Upload Success: ${fileUri}`);
+                
+                // Poll until active
+                let state = 'PROCESSING';
+                let attempts = 0;
+                while (state === 'PROCESSING' && attempts < 30) {
+                    attempts++;
+                    await new Promise(r => setTimeout(r, 1000));
+                    const statusRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${geminiApiKey}`);
+                    if (statusRes.ok) {
+                        const info = await statusRes.json();
+                        state = info.state || 'ACTIVE';
+                    } else {
+                        break;
+                    }
+                }
+                
                 const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
                 const parts = [
                     { text: systemPrompt },
                     { text: 'Transcribe the audio verbatim and extract key details into the specified format.' },
-                    { inlineData: { mimeType: audioMime, data: base64 } }
+                    { fileData: { fileUri, mimeType: audioMime } }
                 ];
-
+                
                 const geminiResp = await fetch(geminiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -9617,9 +9669,14 @@ Rules:
                         contents: [{ role: 'user', parts }],
                         generationConfig: { temperature: 0.1, maxOutputTokens: 8000 },
                     }),
-                    signal: AbortSignal.timeout(60_000),
+                    signal: AbortSignal.timeout(90_000),
                 });
-
+                
+                // Cleanup file from Gemini asynchronously
+                fetch(`https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${geminiApiKey}`, {
+                    method: 'DELETE'
+                }).catch(e => console.error('Failed to delete Gemini file:', e.message));
+                
                 if (geminiResp.ok) {
                     const geminiData = await geminiResp.json();
                     const text = geminiData.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
@@ -9899,7 +9956,7 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
                 const transcriptDur = getDurationFromTranscript(audioTranscript);
                 if (transcriptDur > 0) {
                     console.log(`[Storyboard Create] Calculated duration from audio transcript timecodes: ${transcriptDur}s`);
-                    totalDuration = transcriptDur;
+                    totalDuration = Math.max(totalDuration, transcriptDur);
                 }
             }
         }
