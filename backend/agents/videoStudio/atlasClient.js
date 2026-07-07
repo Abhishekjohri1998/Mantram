@@ -651,6 +651,8 @@ export async function submitAtlasCloudVideoGeneration({
                 desc = `${tag} = CHARACTER REFERENCE SHEET — contains one or more named characters. LOCK: exact face shape, facial features, hair colour/style, skin tone, eye colour. DO NOT LOCK wardrobe or clothing — costume/attire is defined per scene in the prompt text and must be followed exactly as written, overriding anything worn in this reference image.`;
             } else if (role === 'logo') {
                 desc = `${tag} = brand logo — show in closing shot / overlay without distortion.`;
+            } else if (role === 'location_reference' || role === 'location') {
+                desc = `${tag} = Location/Scene reference image — Visual guide for the background environment, setting, or scenery.`;
             } else {
                 desc = `${tag} = product reference — maintain exact shape, colour & surface detail.`;
             }
@@ -695,7 +697,15 @@ export async function submitAtlasCloudVideoGeneration({
             targetRes = '720p';
         }
     }
-    taskInput.resolution = targetRes === '4k' ? '4k' : (targetRes === '1080p' ? '1080p' : (targetRes === '480p' ? '480p' : '720p'));
+    
+    // Seedance workflow reference-to-video (r2v) models do not support the resolution parameter.
+    const isWorkflowSeedance = modelName.includes('atlascloud/workflow');
+    const isR2V = modelName.includes('reference-to-video');
+    if (isWorkflowSeedance && isR2V) {
+        console.log(`📌 [Atlas] Omitting resolution parameter for workflow Seedance r2v model to prevent API rejection.`);
+    } else {
+        taskInput.resolution = targetRes === '4k' ? '4k' : (targetRes === '1080p' ? '1080p' : (targetRes === '480p' ? '480p' : '720p'));
+    }
 
     if (refAudio) {
         taskInput.audio_url = refAudio;

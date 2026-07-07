@@ -17,7 +17,7 @@ const s3Client = new S3Client({
 
 /**
  * Helper to upload files to public anonymous image hosting when AWS S3 is down or not configured.
- * Tries Catbox.moe first, falls back to tmpfiles.org.
+ * Tries tmpfile.link first, falls back to Catbox.moe.
  */
 const uploadToPublicFallback = async (buffer, mimeType = "image/png") => {
     const ext = mimeType.includes('wav') ? 'wav' : 
@@ -28,7 +28,37 @@ const uploadToPublicFallback = async (buffer, mimeType = "image/png") => {
     const fileName = `upload-${Date.now()}.${ext}`;
     const errors = [];
 
-    // 1. Try Catbox.moe
+    // 1. Try tmpfile.link (safely caught)
+    try {
+        console.log(`📤 Trying tmpfile.link public fallback...`);
+        const formData = new globalThis.FormData();
+        const fileBlob = new globalThis.Blob([buffer], { type: mimeType });
+        formData.append("file", fileBlob, fileName);
+        
+        const response = await globalThis.fetch("https://tmpfile.link/api/upload", {
+            method: "POST",
+            body: formData
+        });
+
+        if (!response.ok) {
+            const text = await response.text().catch(() => "");
+            throw new Error(`HTTP ${response.status}: ${text.substring(0, 100)}`);
+        }
+
+        const responseData = await response.json();
+        if (responseData && responseData.downloadLink) {
+            const directUrl = responseData.downloadLink;
+            console.log(`✅ tmpfile.link upload success: ${directUrl}`);
+            return directUrl;
+        } else {
+            throw new Error(`Response missing downloadLink: ${JSON.stringify(responseData).substring(0, 100)}`);
+        }
+    } catch (err) {
+        console.warn("⚠️ tmpfile.link upload failed:", err.message);
+        errors.push(`tmpfile.link: ${err.message}`);
+    }
+
+    // 2. Try Catbox.moe
     try {
         console.log(`📤 Trying Catbox public fallback...`);
         const formData = new globalThis.FormData();
@@ -381,8 +411,12 @@ export const getSignedUrlForPath = async (urlOrKey, expiresIn = 3600) => { // SE
     try {
         let key = urlOrKey;
         
-        // If it's a full URL, extract the key
+        // If it's a full URL, check if it's an S3 URL. If not, return as-is
         if (urlOrKey.startsWith('http')) {
+            const isS3 = urlOrKey.includes('.amazonaws.com') || urlOrKey.includes('mantram-assets');
+            if (!isS3) {
+                return urlOrKey;
+            }
             try {
                 const url = new URL(urlOrKey);
                 const isS3Host = url.hostname.includes('.amazonaws.com') || url.hostname.includes('mantram-assets');

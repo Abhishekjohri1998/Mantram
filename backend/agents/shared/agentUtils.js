@@ -509,16 +509,15 @@ export async function callMultimodalAgent(systemPrompt, userPrompt, imageUrls = 
         try {
             result = await _runVisionCall(primaryVisionProvider);
         } catch (primaryErr) {
-            // If Gemini is overloaded (503), retry with Claude before giving up
-            const is503 = primaryErr.message?.includes('503') ||
-                          primaryErr.message?.toLowerCase().includes('overloaded') ||
-                          primaryErr.message?.toLowerCase().includes('high demand') ||
-                          primaryErr.message?.toLowerCase().includes('capacity');
-            if (is503 && primaryVisionProvider !== 'anthropic' && primaryVisionProvider !== 'claude') {
-                console.warn(`🧠 MCoT: Primary vision provider (${primaryVisionProvider}) is 503. Retrying with Claude...`);
-                result = await _runVisionCall('anthropic');
-            } else {
-                throw primaryErr;
+            console.warn(`🧠 MCoT: Primary provider (${primaryVisionProvider}) failed:`, primaryErr.message);
+            // Decide fallback provider (Gemini for Claude/Anthropic, and vice-versa)
+            const fallbackProvider = (primaryVisionProvider === 'anthropic' || primaryVisionProvider === 'claude') ? 'gemini' : 'anthropic';
+            console.warn(`🧠 MCoT: Retrying with fallback provider (${fallbackProvider})...`);
+            try {
+                result = await _runVisionCall(fallbackProvider);
+            } catch (fallbackErr) {
+                console.error(`🧠 MCoT: Fallback provider (${fallbackProvider}) also failed:`, fallbackErr.message);
+                throw primaryErr; // surface original primary error if fallback also fails
             }
         }
 

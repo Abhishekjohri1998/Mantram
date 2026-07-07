@@ -836,71 +836,7 @@ router.post('/agent/create', protect, requireCredits('videoGenerate'), async (re
         // ── Step 3.6: Audio Transcription — transcribe uploaded audio so AI knows the script ──
         let audioTranscript = '';
         if (audioFileUrl) {
-            try {
-                console.log('   🎧 Transcribing uploaded audio...');
-                const audioResp = await fetch(audioFileUrl);
-                if (audioResp.ok) {
-                    const audioBuffer = Buffer.from(await audioResp.arrayBuffer());
-                    const audioMime = audioResp.headers.get('content-type') || 'audio/mpeg';
-                    const ext = audioMime.includes('wav') ? 'wav' : audioMime.includes('mp4') || audioMime.includes('m4a') ? 'm4a' : audioMime.includes('ogg') ? 'ogg' : 'mp3';
-
-                    // Try OpenAI Whisper first (best for all languages)
-                    const openaiKey = process.env.OPENAI_API_KEY;
-                    if (openaiKey) {
-                        const form = new FormData();
-                        const audioBlob = new Blob([audioBuffer], { type: audioMime });
-                        form.append('file', audioBlob, `audio.${ext}`);
-                        form.append('model', 'whisper-1');
-                        form.append('response_format', 'verbose_json');
-
-                        const whisperResp = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-                            method: 'POST',
-                            headers: { 'Authorization': `Bearer ${openaiKey}` },
-                            body: form,
-                        });
-
-                        if (whisperResp.ok) {
-                            const whisperData = await whisperResp.json();
-                            if (whisperData.segments && Array.isArray(whisperData.segments)) {
-                                audioTranscript = whisperData.segments.map(seg => 
-                                    `[${seg.start.toFixed(1)}s - ${seg.end.toFixed(1)}s] ${seg.text.trim()}`
-                                ).join('\n');
-                            } else {
-                                audioTranscript = whisperData.text || '';
-                            }
-                            console.log(`   ✅ Audio transcribed with timecodes (${audioTranscript.length} chars): "${audioTranscript.substring(0, 100)}..."`);
-                        } else {
-                            console.warn('   ⚠️ Whisper transcription failed:', (await whisperResp.json().catch(() => ({}))).error?.message);
-                        }
-                    }
-
-                    // Fallback: try Sarvam STT for Indian languages
-                    if (!audioTranscript) {
-                        const sarvamKey = process.env.SARVAM_API_KEY;
-                        if (sarvamKey) {
-                            const form = new FormData();
-                            const audioBlob = new Blob([audioBuffer], { type: audioMime });
-                            form.append('file', audioBlob, `audio.${ext}`);
-                            form.append('model', 'saaras:v3');
-                            form.append('language_code', 'unknown');
-                            form.append('mode', 'transcribe');
-
-                            const sarvamResp = await fetch('https://api.sarvam.ai/speech-to-text', {
-                                method: 'POST',
-                                headers: { 'api-subscription-key': sarvamKey },
-                                body: form,
-                            });
-                            if (sarvamResp.ok) {
-                                const sarvamData = await sarvamResp.json();
-                                audioTranscript = sarvamData.transcript || '';
-                                console.log(`   ✅ Audio transcribed via Sarvam (${audioTranscript.length} chars)`);
-                            }
-                        }
-                    }
-                }
-            } catch (transcribeErr) {
-                console.warn('   ⚠️ Audio transcription failed:', transcribeErr.message);
-            }
+            audioTranscript = await transcribeAudioFromUrl(audioFileUrl, voiceover?.langCode || 'English');
         }
 
         // ── Step 4: AI Storyboard — use Claude for intelligent film direction ──
@@ -9205,7 +9141,6 @@ router.post('/storyboard/analyze-brief-media', protect, (req, res) => {
                         .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
                         .jpeg({ quality: 88 })
                         .toBuffer();
-                    const base64 = resized.toString('base64');
 
                     const { getRouter } = await import('../ai/router.js');
                     const router = getRouter();
@@ -9251,17 +9186,6 @@ CRITICAL RULES:
 - suggestedDuration MUST be one of: 15, 30, 60, 90
 - suggestedFormat MUST be one of: "9:16", "16:9", "1:1"`;
 
-                    // ═══════════════════════════════════════════════════════════════
-                    // VISION: Use router.nativeGemini directly — exact same pattern
-                    // as callMultimodalAgent() used in YouTube Studio, Creative Studio,
-                    // and all other studios. nativeGemini = real GeminiProvider (direct
-                    // Google API, NOT the Laozhang OpenAI-format proxy in providers.gemini).
-                    //
-                    // GeminiProvider.generateText accepts images[] as data: URIs or
-                    // http URLs — it fetches/decodes them into inlineData automatically.
-                    // ═══════════════════════════════════════════════════════════════
-                    console.log(`[analyze-brief-media] 🔍 Calling Gemini vision directly via fetch (base64 length=${base64.length})...`);
-
                     const geminiApiKey = process.env.GEMINI_API_KEY;
                     if (!geminiApiKey) {
                         return res.status(503).json({
@@ -9270,11 +9194,47 @@ CRITICAL RULES:
                         });
                     }
 
+                    // Upload to S3 if not already uploaded, and also upload to Gemini Files API
+                    console.log(`🚀 Uploading resized image buffer (${Math.round(resized.length / 1024)}KB) to Gemini Files API...`);
+                    const initRes = await fetch(
+                        `https://generativelanguage.googleapis.com/upload/v1beta/files?uploadType=resumable&key=${geminiApiKey}`,
+                        {
+                            method: 'POST',
+                            headers: {
+                                'X-Goog-Upload-Protocol': 'resumable',
+                                'X-Goog-Upload-Command': 'start',
+                                'X-Goog-Upload-Header-Content-Length': resized.length.toString(),
+                                'X-Goog-Upload-Header-Content-Type': 'image/jpeg',
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ file: { displayName: `image_brief_${Date.now()}` } })
+                        }
+                    );
+                    if (!initRes.ok) throw new Error(`Gemini Files API initialization failed: ${initRes.statusText}`);
+                    const uploadUrl = initRes.headers.get('x-goog-upload-url');
+                    if (!uploadUrl) throw new Error('No upload URL returned from Gemini');
+
+                    const uploadRes = await fetch(uploadUrl, {
+                        method: 'POST',
+                        headers: {
+                            'X-Goog-Upload-Protocol': 'resumable',
+                            'X-Goog-Upload-Command': 'upload, finalize',
+                            'X-Goog-Upload-Offset': '0',
+                            'Content-Length': resized.length.toString(),
+                        },
+                        body: resized
+                    });
+                    if (!uploadRes.ok) throw new Error(`Gemini Files API upload failed: ${uploadRes.statusText}`);
+                    const fileInfo = await uploadRes.json();
+                    const fileUri = fileInfo.file.uri;
+                    const fileName = fileInfo.file.name;
+                    console.log(`✅ Gemini Files API Upload Success: ${fileUri}`);
+
                     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
                     const parts = [
                         { text: systemPrompt },
                         { text: 'Read every word from this image. Extract ALL text verbatim and generate the advertising brief.' },
-                        { inlineData: { mimeType: mime || 'image/jpeg', data: base64 } }
+                        { fileData: { fileUri, mimeType: 'image/jpeg' } }
                     ];
 
                     const geminiResp = await fetch(geminiUrl, {
@@ -9286,6 +9246,11 @@ CRITICAL RULES:
                         }),
                         signal: AbortSignal.timeout(40_000),
                     });
+
+                    // Cleanup file from Gemini asynchronously
+                    fetch(`https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${geminiApiKey}`, {
+                        method: 'DELETE'
+                    }).catch(e => console.error('Failed to delete Gemini file:', e.message));
 
                     if (!geminiResp.ok) {
                         const errText = await geminiResp.text();
@@ -9451,11 +9416,62 @@ CRITICAL RULES:
 - suggestedFormat MUST be one of: "9:16" portrait, "16:9" landscape, "1:1" square.
 - Return ONLY JSON. Do not include any explanations or markdown wrappers outside the JSON object.`;
 
+                    console.log(`🚀 Uploading audio buffer (${Math.round(file.buffer.length / 1024)}KB) to Gemini Files API...`);
+                    const initRes = await fetch(
+                        `https://generativelanguage.googleapis.com/upload/v1beta/files?uploadType=resumable&key=${geminiApiKey}`,
+                        {
+                            method: 'POST',
+                            headers: {
+                                'X-Goog-Upload-Protocol': 'resumable',
+                                'X-Goog-Upload-Command': 'start',
+                                'X-Goog-Upload-Header-Content-Length': file.buffer.length.toString(),
+                                'X-Goog-Upload-Header-Content-Type': mime,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ file: { displayName: `audio_brief_${Date.now()}` } })
+                        }
+                    );
+                    if (!initRes.ok) throw new Error(`Gemini Files API initialization failed: ${initRes.statusText}`);
+                    const uploadUrl = initRes.headers.get('x-goog-upload-url');
+                    if (!uploadUrl) throw new Error('No upload URL returned from Gemini');
+
+                    const uploadRes = await fetch(uploadUrl, {
+                        method: 'POST',
+                        headers: {
+                            'X-Goog-Upload-Protocol': 'resumable',
+                            'X-Goog-Upload-Command': 'upload, finalize',
+                            'X-Goog-Upload-Offset': '0',
+                            'Content-Length': file.buffer.length.toString(),
+                        },
+                        body: file.buffer
+                    });
+                    if (!uploadRes.ok) throw new Error(`Gemini Files API upload failed: ${uploadRes.statusText}`);
+                    const fileInfo = await uploadRes.json();
+                    const fileUri = fileInfo.file.uri;
+                    const fileName = fileInfo.file.name;
+                    console.log(`✅ Gemini Files API Upload Success: ${fileUri}`);
+
+                    // Poll until active (usually fast for audio)
+                    let state = 'PROCESSING';
+                    let attempts = 0;
+                    while (state === 'PROCESSING' && attempts < 30) {
+                        attempts++;
+                        await new Promise(r => setTimeout(r, 1000));
+                        const statusRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${geminiApiKey}`);
+                        if (statusRes.ok) {
+                            const info = await statusRes.json();
+                            state = info.state || 'ACTIVE';
+                        } else {
+                            break;
+                        }
+                    }
+                    console.log(`✅ File state: ${state}`);
+
                     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
                     const parts = [
                         { text: systemPrompt },
                         { text: 'Transcribe the audio verbatim and extract key details into the specified JSON format.' },
-                        { inlineData: { mimeType: mime, data: base64 } }
+                        { fileData: { fileUri, mimeType: mime } }
                     ];
 
                     const geminiResp = await fetch(geminiUrl, {
@@ -9465,8 +9481,13 @@ CRITICAL RULES:
                             contents: [{ role: 'user', parts }],
                             generationConfig: { temperature: 0.1, maxOutputTokens: 6000, responseMimeType: 'application/json' },
                         }),
-                        signal: AbortSignal.timeout(60_000),
+                        signal: AbortSignal.timeout(90_000),
                     });
+
+                    // Cleanup file from Gemini asynchronously
+                    fetch(`https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${geminiApiKey}`, {
+                        method: 'DELETE'
+                    }).catch(e => console.error('Failed to delete Gemini file:', e.message));
 
                     if (!geminiResp.ok) {
                         const errText = await geminiResp.text();
@@ -9475,7 +9496,7 @@ CRITICAL RULES:
 
                     const geminiData = await geminiResp.json();
                     const raw = geminiData.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
-                    const audioProviderUsed = 'gemini-2.5-flash-direct';
+                    const audioProviderUsed = 'gemini-2.5-flash-files-api';
 
                     if (!raw) {
                         throw new Error('Gemini returned an empty response for audio analysis');
@@ -9546,6 +9567,302 @@ CRITICAL RULES:
 
 const storyboardUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
+// Audio Transcription and timing helpers
+async function transcribeAudioFromUrl(audioFileUrl, dialogueLanguage = 'English') {
+    if (!audioFileUrl) return '';
+    try {
+        console.log(`[Audio Transcribe] Fetching audio from URL: ${audioFileUrl}`);
+        const audioResp = await fetch(audioFileUrl);
+        if (!audioResp.ok) {
+            console.warn(`[Audio Transcribe] Failed to fetch audio file: HTTP ${audioResp.status}`);
+            return '';
+        }
+        const audioBuffer = Buffer.from(await audioResp.arrayBuffer());
+        const audioMime = audioResp.headers.get('content-type') || 'audio/mpeg';
+        const ext = audioMime.includes('wav') ? 'wav' : audioMime.includes('mp4') || audioMime.includes('m4a') ? 'm4a' : audioMime.includes('ogg') ? 'ogg' : 'mp3';
+
+        let audioTranscript = '';
+
+        // Try Gemini 2.5 Flash first (natively supports audio and returns precise timecodes)
+        const geminiApiKey = process.env.GEMINI_API_KEY;
+        if (geminiApiKey) {
+            try {
+                console.log('   🎧 Transcribing audio using Gemini 2.5 Flash (via Files API)...');
+                
+                const systemPrompt = `You are a highly accurate audio transcription engine.
+Your job is to transcribe the audio verbatim and split it into segments with start and end times.
+Output the transcript in this exact format for each segment:
+[startTime - endTime] Text
+For example:
+[0.0s - 4.5s] Hello, welcome to Mantram AI.
+[4.5s - 9.0s] We build brand operating systems.
+
+Rules:
+- Include all spoken words verbatim. Do not summarize or skip anything.
+- Start and end times must be in seconds, followed by 's' (e.g., 0.0s, 4.5s).
+- Keep segments to around 3-10 seconds each.
+- Output ONLY the formatted transcription. No introduction, no markdown wrappers, no formatting other than the lines.`;
+                
+                // Upload buffer to Gemini Files API
+                const initRes = await fetch(
+                    `https://generativelanguage.googleapis.com/upload/v1beta/files?uploadType=resumable&key=${geminiApiKey}`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'X-Goog-Upload-Protocol': 'resumable',
+                            'X-Goog-Upload-Command': 'start',
+                            'X-Goog-Upload-Header-Content-Length': audioBuffer.length.toString(),
+                            'X-Goog-Upload-Header-Content-Type': audioMime,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ file: { displayName: `audio_transcribe_${Date.now()}` } })
+                    }
+                );
+                
+                if (!initRes.ok) throw new Error(`Gemini Files API init failed: ${initRes.statusText}`);
+                const uploadUrl = initRes.headers.get('x-goog-upload-url');
+                if (!uploadUrl) throw new Error('No upload URL returned from Gemini');
+                
+                const uploadRes = await fetch(uploadUrl, {
+                    method: 'POST',
+                    headers: {
+                        'X-Goog-Upload-Protocol': 'resumable',
+                        'X-Goog-Upload-Command': 'upload, finalize',
+                        'X-Goog-Upload-Offset': '0',
+                        'Content-Length': audioBuffer.length.toString(),
+                    },
+                    body: audioBuffer
+                });
+                
+                if (!uploadRes.ok) throw new Error(`Gemini Files API upload failed: ${uploadRes.statusText}`);
+                const fileInfo = await uploadRes.json();
+                const fileUri = fileInfo.file.uri;
+                const fileName = fileInfo.file.name;
+                console.log(`   ✅ Gemini Files API Upload Success: ${fileUri}`);
+                
+                // Poll until active
+                let state = 'PROCESSING';
+                let attempts = 0;
+                while (state === 'PROCESSING' && attempts < 30) {
+                    attempts++;
+                    await new Promise(r => setTimeout(r, 1000));
+                    const statusRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${geminiApiKey}`);
+                    if (statusRes.ok) {
+                        const info = await statusRes.json();
+                        state = info.state || 'ACTIVE';
+                    } else {
+                        break;
+                    }
+                }
+                
+                const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
+                const parts = [
+                    { text: systemPrompt },
+                    { text: 'Transcribe the audio verbatim and extract key details into the specified format.' },
+                    { fileData: { fileUri, mimeType: audioMime } }
+                ];
+                
+                const geminiResp = await fetch(geminiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ role: 'user', parts }],
+                        generationConfig: { temperature: 0.1, maxOutputTokens: 8000 },
+                    }),
+                    signal: AbortSignal.timeout(90_000),
+                });
+                
+                // Cleanup file from Gemini asynchronously
+                fetch(`https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${geminiApiKey}`, {
+                    method: 'DELETE'
+                }).catch(e => console.error('Failed to delete Gemini file:', e.message));
+                
+                if (geminiResp.ok) {
+                    const geminiData = await geminiResp.json();
+                    const text = geminiData.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
+                    if (text && text.includes('[') && text.includes('s]')) {
+                        audioTranscript = text.trim();
+                        console.log(`   ✅ Audio transcribed via Gemini 2.5 Flash with timecodes (${audioTranscript.length} chars)`);
+                    }
+                } else {
+                    console.warn('   ⚠️ Gemini audio transcription API returned status:', geminiResp.status);
+                }
+            } catch (geminiErr) {
+                console.warn('   ⚠️ Gemini audio transcription failed, falling back:', geminiErr.message);
+            }
+        }
+
+        // Try OpenAI Whisper as fallback (best for all languages)
+        const openaiKey = process.env.OPENAI_API_KEY;
+        if (openaiKey && !audioTranscript) {
+            try {
+                const form = new FormData();
+                const audioBlob = new Blob([audioBuffer], { type: audioMime });
+                form.append('file', audioBlob, `audio.${ext}`);
+                form.append('model', 'whisper-1');
+                form.append('response_format', 'verbose_json');
+
+                const whisperResp = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${openaiKey}` },
+                    body: form,
+                });
+
+                if (whisperResp.ok) {
+                    const whisperData = await whisperResp.json();
+                    if (whisperData.segments && Array.isArray(whisperData.segments)) {
+                        audioTranscript = whisperData.segments.map(seg => 
+                            `[${seg.start.toFixed(1)}s - ${seg.end.toFixed(1)}s] ${seg.text.trim()}`
+                        ).join('\n');
+                    } else {
+                        audioTranscript = whisperData.text || '';
+                    }
+                    console.log(`   ✅ Audio transcribed with timecodes (${audioTranscript.length} chars): "${audioTranscript.substring(0, 100)}..."`);
+                } else {
+                    console.warn('   ⚠️ Whisper transcription failed:', (await whisperResp.json().catch(() => ({}))).error?.message);
+                }
+            } catch (e) {
+                console.warn('   ⚠️ Whisper fallback failed:', e.message);
+            }
+        }
+
+        // Fallback: try Sarvam STT for Indian languages
+        if (!audioTranscript) {
+            const sarvamKey = process.env.SARVAM_API_KEY;
+            if (sarvamKey) {
+                try {
+                    const form = new FormData();
+                    const audioBlob = new Blob([audioBuffer], { type: audioMime });
+                    form.append('file', audioBlob, `audio.${ext}`);
+                    form.append('model', 'saaras:v3');
+                    form.append('language_code', 'unknown');
+                    form.append('mode', 'transcribe');
+
+                    const sarvamResp = await fetch('https://api.sarvam.ai/speech-to-text', {
+                        method: 'POST',
+                        headers: { 'api-subscription-key': sarvamKey },
+                        body: form,
+                    });
+                    if (sarvamResp.ok) {
+                        const sarvamData = await sarvamResp.json();
+                        audioTranscript = sarvamData.transcript || '';
+                        console.log(`   ✅ Audio transcribed via Sarvam (${audioTranscript.length} chars)`);
+                    }
+                } catch (e) {
+                    console.warn('   ⚠️ Sarvam fallback failed:', e.message);
+                }
+            }
+        }
+
+        return audioTranscript;
+    } catch (err) {
+        console.warn(`[Audio Transcribe] Global transcription helper failed:`, err.message);
+        return '';
+    }
+}
+
+function mergeTranscriptSegments(transcript, targetDuration = 8) {
+    if (!transcript) return '';
+    const lines = transcript.split('\n').map(l => l.trim()).filter(Boolean);
+    const regex = /^\[(\d+(?:\.\d+)?)s\s*-\s*(\d+(?:\.\d+)?)s\]\s*(.*)$/;
+    
+    const parsed = [];
+    for (const line of lines) {
+        const match = line.match(regex);
+        if (match) {
+            parsed.push({
+                start: parseFloat(match[1]),
+                end: parseFloat(match[2]),
+                text: match[3].trim()
+            });
+        }
+    }
+    
+    if (parsed.length === 0) return transcript;
+    
+    const merged = [];
+    let current = null;
+    
+    for (const item of parsed) {
+        if (!current) {
+            current = { ...item };
+        } else {
+            const currentDur = current.end - current.start;
+            // If current segment duration is under targetDuration, merge the next item into it
+            if (currentDur < targetDuration) {
+                current.end = item.end;
+                current.text = (current.text + ' ' + item.text).trim();
+            } else {
+                merged.push(current);
+                current = { ...item };
+            }
+        }
+    }
+    if (current) merged.push(current);
+    
+    return merged.map(item => `[${item.start.toFixed(1)}s - ${item.end.toFixed(1)}s] ${item.text}`).join('\n');
+}
+
+function mergePreSeededCuts(cuts = [], targetDuration = 8) {
+    if (!cuts || cuts.length === 0) return [];
+    
+    const merged = [];
+    let current = null;
+    
+    for (const cut of cuts) {
+        const cutDur = Math.max(2, parseInt(cut.duration) || 3);
+        if (!current) {
+            current = {
+                ...cut,
+                duration: cutDur,
+                startTime: cut.startTime || 0,
+                endTime: cut.endTime || cutDur,
+                dialogue: cut.dialogue || cut.voiceover || ''
+            };
+        } else {
+            // If current segment duration is under targetDuration, merge this cut into it
+            if (current.duration < targetDuration) {
+                current.endTime = cut.endTime || (current.endTime + cutDur);
+                current.duration += cutDur;
+                current.scene = (current.scene + ' ' + (cut.scene || '')).trim();
+                current.framePrompt = (current.framePrompt + ' ' + (cut.framePrompt || '')).trim();
+                current.dialogue = (current.dialogue + ' ' + (cut.dialogue || cut.voiceover || '')).trim();
+            } else {
+                merged.push(current);
+                current = {
+                    ...cut,
+                    duration: cutDur,
+                    startTime: cut.startTime || current.endTime,
+                    endTime: cut.endTime || (current.endTime + cutDur),
+                    dialogue: cut.dialogue || cut.voiceover || ''
+                };
+            }
+        }
+    }
+    if (current) merged.push(current);
+    
+    // Re-index IDs and format fields
+    return merged.map((c, idx) => ({
+        ...c,
+        id: idx + 1,
+        voiceover: c.dialogue
+    }));
+}
+
+function getDurationFromTranscript(transcript) {
+    if (!transcript) return 0;
+    const regex = /\[(\d+(?:\.\d+)?)s\s*-\s*(\d+(?:\.\d+)?)s\]/g;
+    let match;
+    let maxTime = 0;
+    while ((match = regex.exec(transcript)) !== null) {
+        const endTime = parseFloat(match[2]);
+        if (endTime > maxTime) {
+            maxTime = endTime;
+        }
+    }
+    return Math.ceil(maxTime);
+}
+
 // ── POST /api/video-studio/storyboard/create ─────────────────────────────────
 // Step 1: Director Brain (Claude) generates shot plan + Gemini generates frames
 // Returns full storyboard JSON with frameUrls
@@ -9593,6 +9910,7 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
             directorModel = 'claude',
             imageModel = 'gpt-image-2',
             dialogueLanguage = 'English',
+            videoModel = 'seedance-2.0-fast',
             // Brochure pipeline: full extracted text + flag from analyze-brief-media
             brochureExtractedText = '',
             isBrochure: bodyIsBrochure = 'false',
@@ -9627,7 +9945,21 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
         const RESOLUTION_TO_IMAGESIZE = { '480p': '1K', '720p': '1K', '1080p': '1K', '2k': '2K', '4k': '4K' };
         const imageSizeForModel = RESOLUTION_TO_IMAGESIZE[resolution] || '2K';
 
-        const totalDuration = Math.max(5, Math.min(600, parseInt(duration) || 30));
+        let totalDuration = Math.max(5, Math.min(600, parseInt(duration) || 30));
+        let audioTranscript = '';
+
+        if (briefAudioUrl) {
+            console.log(`[Storyboard Create] Transcribing brief audio url: ${briefAudioUrl}`);
+            audioTranscript = await transcribeAudioFromUrl(briefAudioUrl, dialogueLanguage);
+            if (audioTranscript) {
+                audioTranscript = mergeTranscriptSegments(audioTranscript, 8); // target ~8s per segment
+                const transcriptDur = getDurationFromTranscript(audioTranscript);
+                if (transcriptDur > 0) {
+                    console.log(`[Storyboard Create] Calculated duration from audio transcript timecodes: ${transcriptDur}s`);
+                    totalDuration = Math.max(totalDuration, transcriptDur);
+                }
+            }
+        }
 
         // ══════ DIAGNOSTIC LOGGING ══════
         console.log(`\n🔍 [Storyboard Create] ══ INCOMING REQUEST DUMP ══`);
@@ -9725,144 +10057,47 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
         console.log(`[Storyboard Create] brand=${brandId}, duration=${totalDuration}s, style=${style}, imgs=${productImageUrls.length}, avatars=${avatarUrls.length}, refs=${refImageUrls.length}, branding=${includeBranding}`);
         console.log(`🔍 [Storyboard Create] ══ END DUMP ══\n`);
 
-        // Step 1: Director Brain — generate shot plan via Claude (or use pre-seeded cuts if provided)
-        let plan;
+        // Step 1: Director Brain — generate shot plan via Claude
+        let parsedCuts = [];
         if (req.body.preSeededCuts) {
-            let parsedCuts = [];
             try {
                 parsedCuts = typeof req.body.preSeededCuts === 'string'
                     ? JSON.parse(req.body.preSeededCuts)
                     : req.body.preSeededCuts;
+                if (parsedCuts && parsedCuts.length > 0) {
+                    parsedCuts = mergePreSeededCuts(parsedCuts, 8); // merge to target ~8s segments
+                    console.log(`[Storyboard Create] 🎬 Merged pre-seeded cuts down to ${parsedCuts.length} segments`);
+                }
             } catch (e) {
                 console.warn('[Storyboard Create] Failed to parse preSeededCuts:', e.message);
             }
-
-            if (parsedCuts && parsedCuts.length > 0) {
-                console.log(`[Storyboard Create] 🎬 Using ${parsedCuts.length} pre-seeded cuts/scenes!`);
-                const cuts = parsedCuts.map((c, i) => {
-                    const vo = c.voiceover || c.dialogue || '';
-                    return {
-                        id: c.id || i + 1,
-                        lens: c.lens || '50mm prime',
-                        duration: Math.max(2, parseInt(c.duration) || 3),
-                        move: c.move || 'STEADICAM',
-                        shot: c.shot || 'MEDIUM',
-                        scene: c.scene || '',
-                        framePrompt: c.framePrompt || c.scene || '',
-                        voiceover: vo,
-                        dialogue: vo,
-                    };
-                });
-
-                const totalCalculatedDuration = cuts.reduce((sum, c) => sum + c.duration, 0);
-
-                // Load brand context colors and logo watermarks
-                let brandColors = ['#1A1A1A', '#E1306C', '#FFFFFF'];
-                let brandColorNames = ['Dark Studio', 'Reel Pink', 'Pure White'];
-                let brandLogoUrl = null;
-                let brandLogoDescription = '';
-                let brandContext = '';
-
-                if (brandId) {
-                    const brand = await Brand.findById(brandId).lean();
-                    if (brand) {
-                        brandContext = brand.dna?.description || '';
-                        if (brand.dna?.colors?.length > 0) {
-                            brandColors = brand.dna.colors.slice(0, 3);
-                            brandColorNames = brandColors.map((c, idx) => `Brand Color ${idx + 1}`);
-                        }
-                        if (brand.dna?.logo?.url) {
-                            brandLogoUrl = brand.dna.logo.url;
-                            brandLogoDescription = brand.dna.logo.metadata?.visionDescription || '';
-                        }
-                    }
-                }
-
-                // Construct structured plan
-                plan = {
-                    colorPalette: brandColors,
-                    paletteNames: brandColorNames,
-                    materialNotes: 'Clean studio lighting, brand colors, minimal layout',
-                    environmentFingerprint: 'A high-end, clean creator studio set with soft background lighting',
-                    cuts,
-                    voiceoverScript: cuts.map(c => c.voiceover).filter(Boolean).join(' '),
-                    audioSync,
-                    moodKeywords: ['engaging', 'modern', 'clean', 'professional', 'bold'],
-                    cinematographyRules: 'Soft key light, shallow depth of field, steady focus tracking.',
-                    emotionalArc: 'hook → explain → solve → detail → CTA',
-                    narrativeArc: brief || 'A D2C brand marketing video.',
-                    hookStrategy: cuts[0]?.scene || 'Stop paying agencies ₹4 lakh for one ad',
-                    requestedDuration: totalCalculatedDuration,
-                    format,
-                    defaultStyle: style,
-                    productImageUrls,
-                    avatarUrls,
-                    avatarNames,
-                    refImageUrls,
-                    dialogueLanguage,
-                    logoUrl: includeBranding ? brandLogoUrl : null,
-                    includeBranding,
-                };
-
-                // Build imagePrompt automatically for the grid poster
-                const panelCount = Math.min(Math.max(cuts.length, 5), 8);
-                const visible = cuts.slice(0, 8);
-                const panelBlock = visible.map((cut, i) => (
-                    `  - Panel ${i + 1} (Cut ${cut.id || i + 1}): ${cut.scene || cut.framePrompt || `Shot ${i + 1}`} (max 12 words).`
-                )).join('\n');
-                
-                const charRefBlock = avatarNames.length > 0
-                    ? `- CHARACTER REFERENCE: ${avatarNames.length} panels — one per character: ${avatarNames.map(n => `"${n}" (front view + face close-up)`).join(', ')}. Label each panel with the character name.`
-                    : `- CHARACTER REFERENCE: 6 panels showing the presenter/model from angles (front, side, back, face close-up, side close-up, wardrobe detail).`;
-
-                plan.imagePrompt = `Create a highly detailed, professional pre-production storyboard pitch deck sheet in a structured billboard layout for a ${productName || 'product'} advertisement.
-Beige/creme background canvas.
-Top Meta Header: Display 'Cut Count: ${panelCount}', 'Color Palette: [${brandColors.join(', ')}]', 'Environment Fingerprint: A high-end, clean creator studio set with soft background lighting' in clean black typography.
-
-Section 1 (CHARACTER & HERO PRODUCT REFERENCE):
-- ${charRefBlock}
-- HERO PRODUCT REFERENCE: 5 panels showing the product from angles (front view, three-quarter view, side view, macro detail, in-context lifestyle).
-- Bottom row: Color palette circular swatches and text material notes.
-
-Section 2 (ENVIRONMENT / SET DESIGN):
-- Left side: A large 16:9 set design render of the environment (A high-end, clean creator studio set with soft background lighting).
-- Right side: A top-down floor plan schematic diagram showing furniture layout and camera paths/arrows labeled with cut numbers.
-
-Section 3 (STORYBOARD):
-- A clean horizontal row of ${panelCount} storyboard panels showing:
-${panelBlock}
-- Below each panel, include clear black typography: 'Lens | Duration | Move | Shot Type'.
-
-Section 4 (LIGHTING / MOOD / STYLE NOTES):
-- 4 small lighting panels showing soft backlight, warm glow, rim light, and bokeh details with descriptions.
-- On the right: 'MOOD KEYWORDS' list and bulleted 'CINEMATOGRAPHY NOTES'.
-
-Format: ${format} | Style: ${style === '3d' ? 'Pixar/Unreal Engine 3D animated' : style === '2d' ? 'Clean 2D flat animated illustration' : 'Hyperrealistic cinematic live-action photography'} | ${totalCalculatedDuration}s total. Negative prompt: [cartoonish styles, low quality, distorted panels, text errors, smiling models, watermarks, talking head closeups, close-up heads]. Note: The product's original color shade, shape, and label must remain completely unchanged and must not be recolored with the brand colors. Panels showing presenters must depict a proper moving person explaining while doing something (e.g. typing on a laptop, gesturing at a screen, pointing, walking, demonstrating features, interacting with props/environments) and not just a talking head or moving head close-up.`;
-            }
         }
 
-        if (!plan) {
-            plan = await runStoryboardDirector({
-                brandId,
-                brief,
-                productName,
-                productFeatures,
-                productImageUrls,
-                avatarUrls,
-                avatarNames,
-                refImageUrls,
-                includeBranding,
-                style,
-                duration: totalDuration,
-                format,
-                userId: req.user._id,
-                directorModel,
-                dialogueLanguage,
-                // Brochure pipeline
-                brochureExtractedText,
-                isBrochure,
-            });
-            plan.audioSync = audioSync;
+        const plan = await runStoryboardDirector({
+            brandId,
+            brief,
+            productName,
+            productFeatures,
+            productImageUrls,
+            avatarUrls,
+            avatarNames,
+            refImageUrls,
+            includeBranding,
+            style,
+            duration: totalDuration,
+            format,
+            userId: req.user._id,
+            directorModel,
+            dialogueLanguage,
+            // Brochure pipeline
+            brochureExtractedText,
+            isBrochure,
+            audioTranscript,
+            preSeededCuts: parsedCuts,
+        });
+        plan.audioSync = audioSync;
+        if (audioTranscript && !plan.voiceoverScript) {
+            plan.voiceoverScript = audioTranscript.replace(/\[\d+(?:\.\d+)?s\s*-\s*\d+(?:\.\d+)?s\]/g, '').replace(/\s+/g, ' ').trim();
         }
 
         // Step 2: Generate single storyboard poster via LaoZhang → GPT Image 2 / NanoBanana
@@ -10009,7 +10244,7 @@ Format: ${format} | Style: ${style === '3d' ? 'Pixar/Unreal Engine 3D animated' 
                 videoPrompt: plan.videoPrompt,
                 imageUrl: plan.imageUrl,
                 targetDuration: totalDuration,
-                model: req.body.videoModel || 'seedance-2.0-fast',
+                model: videoModel,
                 language: dialogueLanguage,
                 brandContext: includeBranding ? dbBrandContext : '',
                 productName,
@@ -10047,6 +10282,9 @@ Format: ${format} | Style: ${style === '3d' ? 'Pixar/Unreal Engine 3D animated' 
             status: 'storyboard-ready',
             refAudio: briefAudioUrl || '',
             title: req.body.title || 'Untitled',
+            routing: {
+                selectedModel: videoModel,
+            },
             input: {
                 brief,
                 productName: productName || '',
@@ -10503,22 +10741,22 @@ The environment (${structuredPlan.environmentFingerprint}) must remain visually 
     const systemPrompt = isGeminiFlash
         ? `You are a world-class AI Film Director specializing in writing video generation prompts for Google Gemini Omni Flash Image-to-Video.
 
-Your task: Write a single, continuous cinematic narrative prose prompt (NOT a shot list) that will animate an approved storyboard into a high-end commercial video.
+Your task: Write a single, continuous cinematic narrative prose prompt that will animate an approved storyboard into a high-end commercial video.
 
 CRITICAL PROMPT RULES:
 1. MUST start with: "${openingInstruction}"
 2. The video OPENS with @image1 (${firstFrameIsAvatar ? 'the presenter/avatar' : 'the product image'}) as the first frame.
 3. Use @imageN tags precisely. The mapping is:
 ${tagMap.map(t => `   ${t}`).join('\n')}
-4. Write ONE continuous cinematic narrative prose describing the scene-by-scene action. Use camera terms: slow push-in, handheld, overhead pan, rack-focus.
+4. Write the prompt by explicitly prefixing each cut with its exact timecode range from the cut plan (e.g., "[0s-3s]: [Detailed visual description of Cut 1...]\\n[3s-6s]: [Detailed visual description of Cut 2...]"). Use camera terms: slow push-in, handheld, overhead pan, rack-focus, match-cuts, and whip-pans.
 5. MANDATORY DIALOGUES: Write all spoken dialogues / voiceover in ${dialogueLanguage} script directly inside the prompt.
-6. Specify timing for the cuts in the narrative prose.
+6. Specify timing for the cuts in the narrative prose and structure them as distinct timed shots.
 7. Describe product interaction: how the product is handled, held, or shown.
 ${brandingRule}
 9. 300–600 words. Extremely specific. Directly executable by Gemini Omni Flash.
 10. Return ONLY the raw video prompt text. No JSON, no markdown, no explanation.
 11. NO TEXT OR LOGO RENDERING (CRITICAL): Do not describe specific text, letters, slogans, or logos on the product, screen, or background. Describe packaging and labels generically (e.g. "a sleek amber glass bottle with a clean white label", NOT "says 'GLOW' on the front"). Video generation models fail at rendering written text and instead produce garbled, hallucinatory letter-like shapes. Keep all scenes, products, and backgrounds completely text-free and logo-free.
-12. CRITICAL DESIGN AND COLOR FIDELITY: You must explicitly instruct the video AI model to preserve the original product design, shape, colors, branding, labels, and packaging details exactly as shown in the reference image. Under no circumstances should the product's colors, branding, or design elements be altered, simplified, or stylized. The brand colors must only be applied to the environment, background, or graphics, never to recolor or color-shift the product itself.`
+12. CRITICAL DESIGN AND COLOR FIDELITY: You must explicitly instruct the video AI model to preserve the original product design, shape, colors, branding, labels, and packaging details exactly as shown in the reference image. Under no circumstances should the product's colors, branding, or design elements be altered, simplified, or stylized. The brand colors must only be applied to the environment, background, or graphics, never to recolor or color-shift the product itself. Keep visual storytelling highly creative, multi-shot, and engaging, avoiding repetitive generic camera angles.`
         : `You are a world-class AI Film Director specializing in writing video generation prompts for Seedance / Atlas video AI models.
 
 Your task: Write a single, richly detailed, cinematic VIDEO PROMPT that will animate an approved storyboard into a high-end commercial video.
@@ -10528,14 +10766,14 @@ CRITICAL PROMPT RULES:
 2. The video OPENS with @image1 (${firstFrameIsAvatar ? 'the presenter/avatar' : 'the product image'}) as the first frame.
 3. Use @imageN tags precisely. The mapping is:
 ${tagMap.map(t => `   ${t}`).join('\n')}
-4. Use professional cinematography terms: rack focus, dolly zoom, kinetic whip-pans, 3D tracking cameras, slow-motion.
+4. Write the prompt by explicitly prefixing each cut with its exact timecode range from the cut plan (e.g., "[0s-3s]: [Detailed visual description of Cut 1...]\\n[3s-6s]: [Detailed visual description of Cut 2...]"). Use camera terms: slow push-in, handheld, overhead pan, rack-focus, dolly zoom, kinetic whip-pans, 3D tracking cameras, slow-motion.
 5. MANDATORY DIALOGUES: Write all spoken dialogues / voiceover in ${dialogueLanguage} script directly inside the prompt.
 6. Specify EXACT shot durations that sum to ${duration}s total — follow the cut plan if provided.
 7. Describe product interaction: how the product moves, catches light, is handled.
 ${brandingRule}
 9. 300–600 words. Extremely specific. Directly executable by Seedance.
 10. Return ONLY the raw video prompt text. No JSON, no markdown, no explanation.
-11. CRITICAL DESIGN AND COLOR FIDELITY: You must explicitly instruct the video AI model to preserve the original product design, shape, colors, branding, labels, and packaging details exactly as shown in the reference image. Under no circumstances should the product's colors, branding, or design elements be altered, simplified, or stylized. The brand colors must only be applied to the environment, background, or graphics, never to recolor or color-shift the product itself.`;
+11. CRITICAL DESIGN AND COLOR FIDELITY: You must explicitly instruct the video AI model to preserve the original product design, shape, colors, branding, labels, and packaging details exactly as shown in the reference image. Under no circumstances should the product's colors, branding, or design elements be altered, simplified, or stylized. The brand colors must only be applied to the environment, background, or graphics, never to recolor or color-shift the product itself. Keep visual storytelling highly creative, multi-shot, and engaging, avoiding repetitive generic camera angles.`;
 
     const userPrompt = `APPROVED STORYBOARD STYLE (from @image2 poster):
 IMPORTANT: @image2 is a STORYBOARD STYLE REFERENCE GRID — NOT the opening frame. The video must OPEN with @image1.
@@ -10624,7 +10862,24 @@ router.post('/storyboard/animate', protect, async (req, res) => {
     try {
         const rawDuration  = parseInt(req.body.duration) || 10;
         const modelParam   = req.body.model || 'seedance-2.0-fast';
-        const isLongForm   = (modelParam === 'gemini-flash' || modelParam === 'gemini-omni-flash') ? rawDuration > 10 : rawDuration > 15;
+
+        // Check if the project has multiple scenes/cuts or audio sync, which requires segment-by-segment generation
+        let hasMultipleCuts = false;
+        if (req.body.projectId) {
+            try {
+                const project = await VideoProject.findById(req.body.projectId).lean();
+                const sceneCount = project?.storyboard?.scenes?.length || project?.storyboard?.structuredPlan?.cuts?.length || 0;
+                const audioSync = project?.storyboard?.audioSync;
+                if (sceneCount > 1 || audioSync) {
+                    hasMultipleCuts = true;
+                }
+            } catch (e) {
+                console.warn('[Storyboard Animate] Failed to check scene count for long-form routing:', e.message);
+            }
+        }
+
+        const isLongForm   = hasMultipleCuts || 
+                           ((modelParam === 'gemini-flash' || modelParam === 'gemini-omni-flash') ? rawDuration > 10 : rawDuration > 15);
         const creditAction = isLongForm ? 'storyboardAnimateLongForm' : 'storyboardAnimate';
 
         await new Promise((resolve, reject) =>
@@ -11025,6 +11280,8 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                         'storyboard.voiceoverScript': voiceoverScript,
                         'storyboard.audioSync': resolvedAudioSync,
                         status: 'animating',
+                        'routing.selectedModel': model,
+                        'routing.resolution': resolution,
                     },
                 });
             }
@@ -11080,6 +11337,8 @@ router.post('/storyboard/animate', protect, async (req, res) => {
                         'storyboard.status': 'animating',
                         'storyboard.audioSync': resolvedAudioSync,
                         status: 'animating',
+                        'routing.selectedModel': model,
+                        'routing.resolution': resolution,
                     }
                 });
             }
@@ -11413,7 +11672,7 @@ router.post('/storyboard/regenerate-segment', protect, async (req, res) => {
         );
         if (res.headersSent) return;
 
-        const { projectId, segmentIndex, prompt: userPrompt } = req.body;
+        const { projectId, segmentIndex, prompt: userPrompt, model: bodyModel, resolution: bodyResolution } = req.body;
         if (!projectId) return res.status(400).json({ success: false, error: 'projectId required' });
         const segIdx = parseInt(segmentIndex);
         if (isNaN(segIdx) || segIdx < 0) return res.status(400).json({ success: false, error: 'Valid segmentIndex required' });
@@ -11501,8 +11760,21 @@ router.post('/storyboard/regenerate-segment', protect, async (req, res) => {
 
         const duration = storedScenes[segIdx]?.duration || 10;
         const format   = sb.format || '9:16';
-        const resolution = project.routing?.resolution || '480p';
-        const model = project.routing?.selectedModel || 'seedance-2.0-fast';
+
+        // Save to DB if model/resolution parameters are explicitly passed in this request
+        if (bodyModel || bodyResolution) {
+            try {
+                const updateFields = {};
+                if (bodyModel) updateFields['routing.selectedModel'] = bodyModel;
+                if (bodyResolution) updateFields['routing.resolution'] = bodyResolution;
+                await VideoProject.findByIdAndUpdate(projectId, { $set: updateFields });
+            } catch (e) {
+                console.warn(`[SB RegenSeg] Failed to save updated model/resolution to DB:`, e.message);
+            }
+        }
+
+        const resolution = bodyResolution || project.routing?.resolution || '480p';
+        const model = bodyModel || project.routing?.selectedModel || 'seedance-2.0-fast';
         const qualityMode = model === 'seedance-2.0' ? 'quality' : 'fast';
 
         console.log(`[SB RegenSeg] Project=${projectId} seg=${segIdx} dur=${duration}s — submitting async`);

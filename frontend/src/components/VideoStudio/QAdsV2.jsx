@@ -547,8 +547,8 @@ function CfgMenu({ value, onChange, options, icon }) {
         }
         return false;
     }) || options[0]
-    return <div style={{ position: 'relative' }} ref={ref}>
-        <button type="button" className="scott-btn-cfg" onClick={() => setOpen(!open)}>
+    return <div style={{ position: 'relative', flexShrink: 0 }} ref={ref}>
+        <button type="button" className="scott-btn-cfg" onClick={() => setOpen(!open)} style={{ flexShrink: 0 }}>
             {icon && <span className="material-symbols-outlined">{icon}</span>}
             <span>{sel?.label || value}</span>
         </button>
@@ -1342,7 +1342,7 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
                 </div>
 
                 {/* Row 2: Config + blocks + generate */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', flexWrap: 'wrap', rowGap: 8 }}>
 
                     {/* Format picker */}
                     <button type="button" className="scott-btn-cfg" onClick={() => setShowCats(true)} style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 12px', whiteSpace: 'nowrap', flex: '0 0 auto' }}>
@@ -1389,7 +1389,7 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
                     <div style={{ flex: 1 }} />
 
                     {/* Product block — shows first image + count badge if multiple */}
-                    <button className={`scott-block-btn ${productData || productImgs.length ? 'active' : ''}`} onClick={() => setShowProduct(true)} style={{ width: 64, height: 56, position: 'relative' }}>
+                    <button className={`scott-block-btn ${productData || productImgs.length ? 'active' : ''}`} onClick={() => setShowProduct(true)} style={{ width: 64, height: 56, position: 'relative', flexShrink: 0 }}>
                         {productImgs?.[0] ? (
                             <>
                                 <img src={productImgs[0]} className="scott-block-img" alt="" style={{ opacity: 1 }} />
@@ -1413,7 +1413,7 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
                     </button>
 
                     {/* Avatar block */}
-                    <button className={`scott-block-btn ${avatarUrl ? 'active' : ''}`} onClick={() => setShowAvatar(true)} style={{ width: 64, height: 56, position: 'relative' }}>
+                    <button className={`scott-block-btn ${avatarUrl ? 'active' : ''}`} onClick={() => setShowAvatar(true)} style={{ width: 64, height: 56, position: 'relative', flexShrink: 0 }}>
                         {avatarUrl ? (
                             <img src={avatarUrl} className="scott-block-img" alt="" style={{ opacity: 1 }} />
                         ) : (
@@ -1425,7 +1425,7 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
                     </button>
 
                     {/* Generate */}
-                    <button className="scott-generate" onClick={generatePrompts} disabled={isGeneratingPrompts || (!productUrl && !productImgs.length)} style={{ height: 56, padding: '0 20px', fontSize: 13 }}>
+                    <button className="scott-generate" onClick={generatePrompts} disabled={isGeneratingPrompts || (!productUrl && !productImgs.length)} style={{ height: 56, padding: '0 20px', fontSize: 13, flexShrink: 0 }}>
                         {isGeneratingPrompts
                             ? <><span className="material-symbols-outlined spin" style={{ fontSize: 16 }}>autorenew</span> Writing...</>
                             : <>GET 1 VARIANT <span className="material-symbols-outlined" style={{ fontSize: 16 }}>auto_awesome</span></>}
