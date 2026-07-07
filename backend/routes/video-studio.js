@@ -9387,11 +9387,62 @@ CRITICAL RULES:
 - suggestedFormat MUST be one of: "9:16" portrait, "16:9" landscape, "1:1" square.
 - Return ONLY JSON. Do not include any explanations or markdown wrappers outside the JSON object.`;
 
+                    console.log(`🚀 Uploading audio buffer (${Math.round(file.buffer.length / 1024)}KB) to Gemini Files API...`);
+                    const initRes = await fetch(
+                        `https://generativelanguage.googleapis.com/upload/v1beta/files?uploadType=resumable&key=${geminiApiKey}`,
+                        {
+                            method: 'POST',
+                            headers: {
+                                'X-Goog-Upload-Protocol': 'resumable',
+                                'X-Goog-Upload-Command': 'start',
+                                'X-Goog-Upload-Header-Content-Length': file.buffer.length.toString(),
+                                'X-Goog-Upload-Header-Content-Type': mime,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ file: { displayName: `audio_brief_${Date.now()}` } })
+                        }
+                    );
+                    if (!initRes.ok) throw new Error(`Gemini Files API initialization failed: ${initRes.statusText}`);
+                    const uploadUrl = initRes.headers.get('x-goog-upload-url');
+                    if (!uploadUrl) throw new Error('No upload URL returned from Gemini');
+
+                    const uploadRes = await fetch(uploadUrl, {
+                        method: 'POST',
+                        headers: {
+                            'X-Goog-Upload-Protocol': 'resumable',
+                            'X-Goog-Upload-Command': 'upload, finalize',
+                            'X-Goog-Upload-Offset': '0',
+                            'Content-Length': file.buffer.length.toString(),
+                        },
+                        body: file.buffer
+                    });
+                    if (!uploadRes.ok) throw new Error(`Gemini Files API upload failed: ${uploadRes.statusText}`);
+                    const fileInfo = await uploadRes.json();
+                    const fileUri = fileInfo.file.uri;
+                    const fileName = fileInfo.file.name;
+                    console.log(`✅ Gemini Files API Upload Success: ${fileUri}`);
+
+                    // Poll until active (usually fast for audio)
+                    let state = 'PROCESSING';
+                    let attempts = 0;
+                    while (state === 'PROCESSING' && attempts < 30) {
+                        attempts++;
+                        await new Promise(r => setTimeout(r, 1000));
+                        const statusRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${geminiApiKey}`);
+                        if (statusRes.ok) {
+                            const info = await statusRes.json();
+                            state = info.state || 'ACTIVE';
+                        } else {
+                            break;
+                        }
+                    }
+                    console.log(`✅ File state: ${state}`);
+
                     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
                     const parts = [
                         { text: systemPrompt },
                         { text: 'Transcribe the audio verbatim and extract key details into the specified JSON format.' },
-                        { inlineData: { mimeType: mime, data: base64 } }
+                        { fileData: { fileUri, mimeType: mime } }
                     ];
 
                     const geminiResp = await fetch(geminiUrl, {
@@ -9401,8 +9452,13 @@ CRITICAL RULES:
                             contents: [{ role: 'user', parts }],
                             generationConfig: { temperature: 0.1, maxOutputTokens: 6000, responseMimeType: 'application/json' },
                         }),
-                        signal: AbortSignal.timeout(60_000),
+                        signal: AbortSignal.timeout(90_000),
                     });
+
+                    // Cleanup file from Gemini asynchronously
+                    fetch(`https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${geminiApiKey}`, {
+                        method: 'DELETE'
+                    }).catch(e => console.error('Failed to delete Gemini file:', e.message));
 
                     if (!geminiResp.ok) {
                         const errText = await geminiResp.text();
@@ -9411,7 +9467,7 @@ CRITICAL RULES:
 
                     const geminiData = await geminiResp.json();
                     const raw = geminiData.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
-                    const audioProviderUsed = 'gemini-2.5-flash-direct';
+                    const audioProviderUsed = 'gemini-2.5-flash-files-api';
 
                     if (!raw) {
                         throw new Error('Gemini returned an empty response for audio analysis');
