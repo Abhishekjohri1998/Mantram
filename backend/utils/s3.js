@@ -314,6 +314,13 @@ export const getSignedUrlForPath = async (urlOrKey, expiresIn = 3600) => { // SE
         if (urlOrKey.startsWith('http')) {
             try {
                 const url = new URL(urlOrKey);
+                const isS3Host = url.hostname.includes('.amazonaws.com') || url.hostname.includes('mantram-assets');
+                
+                if (!isS3Host) {
+                    // External or fallback URL (e.g. tmpfile.link, catbox.moe) — bypass S3 signing entirely
+                    return urlOrKey;
+                }
+
                 // For path-style URLs: /bucket-name/key/path
                 // For virtual-hosted URLs: /key/path
                 let pathname = url.pathname;
