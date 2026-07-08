@@ -103,6 +103,8 @@ export default function SuperAdminDashboard() {
     const [videoRatesProviderFilter, setVideoRatesProviderFilter] = useState('all')
     const [videoRatesCategoryFilter, setVideoRatesCategoryFilter] = useState('all')
     const [loadingVideoRates, setLoadingVideoRates] = useState(false)
+    const [videoRatesResolutionFilter, setVideoRatesResolutionFilter] = useState('all')
+    const [expandedVideoModelId, setExpandedVideoModelId] = useState(null)
     const [monitorSubTab, setMonitorSubTab] = useState('providers')
     const [monitorTypeFilter, setMonitorTypeFilter] = useState('all')
     // Impersonation search
@@ -4906,6 +4908,15 @@ export default function SuperAdminDashboard() {
                                         )}
                                     </div>
                                     <div className="flex items-center gap-3 flex-wrap">
+                                        <div className="flex gap-1 bg-[var(--sys-surface)] p-1 rounded-xl border border-[var(--sys-border)]">
+                                            {['all', '480p', '720p', '1080p', '4k'].map(res => (
+                                                <button key={res} onClick={() => { setVideoRatesResolutionFilter(res); setExpandedVideoModelId(null); }}
+                                                    className={`px-3.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                                        videoRatesResolutionFilter === res ? 'bg-[var(--sys-primary-dim)] text-primary' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
+                                                    {res === 'all' ? '👁️ Base (1080p)' : res}
+                                                </button>
+                                            ))}
+                                        </div>
                                         <select value={videoRatesProviderFilter} onChange={e => setVideoRatesProviderFilter(e.target.value)}
                                             className="px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-xs text-[var(--sys-text)] cursor-pointer">
                                             <option value="all">All Providers</option>
@@ -4969,10 +4980,10 @@ export default function SuperAdminDashboard() {
                                                         <th className="px-4 py-3">Model Details</th>
                                                         <th className="px-4 py-3">Provider</th>
                                                         <th className="px-4 py-3">Category</th>
-                                                        <th className="px-4 py-3 text-right">USD/sec</th>
-                                                        <th className="px-4 py-3 text-right">INR/sec</th>
-                                                        <th className="px-4 py-3 text-right">USD/min</th>
-                                                        <th className="px-4 py-3 text-right">INR/min</th>
+                                                        <th className="px-4 py-3 text-right">USD/sec {videoRatesResolutionFilter !== 'all' ? `(${videoRatesResolutionFilter})` : ''}</th>
+                                                        <th className="px-4 py-3 text-right">INR/sec {videoRatesResolutionFilter !== 'all' ? `(${videoRatesResolutionFilter})` : ''}</th>
+                                                        <th className="px-4 py-3 text-right">USD/min {videoRatesResolutionFilter !== 'all' ? `(${videoRatesResolutionFilter})` : ''}</th>
+                                                        <th className="px-4 py-3 text-right">INR/min {videoRatesResolutionFilter !== 'all' ? `(${videoRatesResolutionFilter})` : ''}</th>
                                                         <th className="px-4 py-3 text-right">Suggested Retail INR/sec (Margin)</th>
                                                         <th className="px-4 py-3 text-right font-black text-primary">Est Credits/sec</th>
                                                     </tr>
@@ -4989,8 +5000,16 @@ export default function SuperAdminDashboard() {
                                                             return true;
                                                         })
                                                         .map(m => {
-                                                            const inrPerSec = m.usdPerSec * calcExRate;
-                                                            const usdPerMin = m.usdPerSec * 60;
+                                                            const RESOLUTION_MULTIPLIERS = {
+                                                                '480p': 0.5,
+                                                                '720p': 0.7,
+                                                                '1080p': 1.0,
+                                                                '4k': 2.0
+                                                            };
+                                                            const mult = RESOLUTION_MULTIPLIERS[videoRatesResolutionFilter] || 1.0;
+                                                            const usdPerSecScaled = m.usdPerSec * mult;
+                                                            const inrPerSec = usdPerSecScaled * calcExRate;
+                                                            const usdPerMin = usdPerSecScaled * 60;
                                                             const inrPerMin = inrPerSec * 60;
                                                             // Retail target with margin: retail = cost / (1 - margin)
                                                             const suggestedRetailPerSec = inrPerSec / (1 - (calcMargin / 100));
@@ -4998,20 +5017,78 @@ export default function SuperAdminDashboard() {
                                                             const estCreditsPerSec = Math.ceil(suggestedRetailPerSec / calcCreditPrice);
 
                                                             return (
-                                                                <tr key={m.id} className="text-sm hover:bg-[var(--sys-surface)] transition-all">
-                                                                    <td className="px-4 py-3.5">
-                                                                        <p className="font-bold text-[var(--sys-text)] text-xs">{m.name}</p>
-                                                                        <span className="text-[9px] font-mono text-[var(--sys-text-muted)]">{m.id}</span>
-                                                                    </td>
-                                                                    <td className="px-4 py-3.5 text-xs font-semibold uppercase text-[var(--sys-text-muted)]">{m.provider}</td>
-                                                                    <td className="px-4 py-3.5 text-xs text-[var(--sys-text-muted)]">{m.category}</td>
-                                                                    <td className="px-4 py-3.5 text-right font-mono text-xs">${m.usdPerSec.toFixed(3)}</td>
-                                                                    <td className="px-4 py-3.5 text-right font-mono text-xs text-[var(--sys-text-muted)]">₹{inrPerSec.toFixed(2)}</td>
-                                                                    <td className="px-4 py-3.5 text-right font-mono text-xs text-[var(--sys-text-muted)]">${usdPerMin.toFixed(2)}</td>
-                                                                    <td className="px-4 py-3.5 text-right font-mono text-xs text-[var(--sys-text-muted)]">₹{inrPerMin.toFixed(2)}</td>
-                                                                    <td className="px-4 py-3.5 text-right font-mono text-xs font-bold text-emerald-400">₹{suggestedRetailPerSec.toFixed(2)}</td>
-                                                                    <td className="px-4 py-3.5 text-right font-mono text-xs font-black text-primary">{estCreditsPerSec} cr/s</td>
-                                                                </tr>
+                                                                <React.Fragment key={m.id}>
+                                                                    <tr className="text-sm hover:bg-[var(--sys-surface)] transition-all cursor-pointer"
+                                                                        onClick={() => setExpandedVideoModelId(expandedVideoModelId === m.id ? null : m.id)}>
+                                                                        <td className="px-4 py-3.5">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="material-symbols-outlined text-xs text-[var(--sys-text-muted)] transition-all" style={{ transform: expandedVideoModelId === m.id ? 'rotate(90deg)' : 'none' }}>chevron_right</span>
+                                                                                <div>
+                                                                                    <p className="font-bold text-[var(--sys-text)] text-xs">{m.name}</p>
+                                                                                    <span className="text-[9px] font-mono text-[var(--sys-text-muted)]">{m.id}</span>
+                                                                                </div>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="px-4 py-3.5 text-xs font-semibold uppercase text-[var(--sys-text-muted)]">{m.provider}</td>
+                                                                        <td className="px-4 py-3.5 text-xs text-[var(--sys-text-muted)]">{m.category}</td>
+                                                                        <td className="px-4 py-3.5 text-right font-mono text-xs">${usdPerSecScaled.toFixed(3)}</td>
+                                                                        <td className="px-4 py-3.5 text-right font-mono text-xs text-[var(--sys-text-muted)]">₹{inrPerSec.toFixed(2)}</td>
+                                                                        <td className="px-4 py-3.5 text-right font-mono text-xs text-[var(--sys-text-muted)]">${usdPerMin.toFixed(2)}</td>
+                                                                        <td className="px-4 py-3.5 text-right font-mono text-xs text-[var(--sys-text-muted)]">₹{inrPerMin.toFixed(2)}</td>
+                                                                        <td className="px-4 py-3.5 text-right font-mono text-xs font-bold text-emerald-400">₹{suggestedRetailPerSec.toFixed(2)}</td>
+                                                                        <td className="px-4 py-3.5 text-right font-mono text-xs font-black text-primary">{estCreditsPerSec} cr/s</td>
+                                                                    </tr>
+                                                                    {expandedVideoModelId === m.id && (
+                                                                        <tr className="bg-[var(--sys-surface)]/30">
+                                                                            <td colSpan={9} className="px-6 py-4">
+                                                                                <div className="glass-panel border border-[var(--sys-border)] rounded-2xl p-4 animate-in fade-in duration-300">
+                                                                                    <h5 className="text-xs font-black uppercase tracking-wider text-primary mb-3 flex items-center gap-1.5">
+                                                                                        <span className="material-symbols-outlined text-sm">grid_view</span>
+                                                                                        Complete Resolution Pricing Breakdown for {m.name}
+                                                                                    </h5>
+                                                                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                                                                                        {['480p', '720p', '1080p', '4k'].map(res => {
+                                                                                            const multiplier = RESOLUTION_MULTIPLIERS[res];
+                                                                                            const rUsdPerSec = m.usdPerSec * multiplier;
+                                                                                            const rInrPerSec = rUsdPerSec * calcExRate;
+                                                                                            const rUsdPerMin = rUsdPerSec * 60;
+                                                                                            const rInrPerMin = rInrPerSec * 60;
+                                                                                            const rSuggestedRetailPerSec = rInrPerSec / (1 - (calcMargin / 100));
+                                                                                            const rEstCreditsPerSec = Math.ceil(rSuggestedRetailPerSec / calcCreditPrice);
+
+                                                                                            return (
+                                                                                                <div key={res} className="bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-xl p-3 hover:border-primary/30 transition-all">
+                                                                                                    <div className="flex items-center justify-between border-b border-[var(--sys-border)] pb-2 mb-2">
+                                                                                                        <span className="text-xs font-black text-[var(--sys-text)] uppercase">{res}</span>
+                                                                                                        <span className="text-[9px] bg-[var(--sys-primary-dim)] text-primary px-1.5 py-0.5 rounded-full font-mono">{multiplier}x scale</span>
+                                                                                                    </div>
+                                                                                                    <div className="space-y-1.5 text-xs">
+                                                                                                        <div className="flex justify-between">
+                                                                                                            <span className="text-[10px] text-[var(--sys-text-muted)]">Cost/second:</span>
+                                                                                                            <span className="font-bold text-[var(--sys-text)] font-mono">${rUsdPerSec.toFixed(3)} <span className="text-[10px] text-[var(--sys-text-muted)] font-normal">(₹{rInrPerSec.toFixed(2)})</span></span>
+                                                                                                        </div>
+                                                                                                        <div className="flex justify-between">
+                                                                                                            <span className="text-[10px] text-[var(--sys-text-muted)]">Cost/minute:</span>
+                                                                                                            <span className="font-bold text-[var(--sys-text-muted)] font-mono">${rUsdPerMin.toFixed(2)} <span className="text-[10px] text-[var(--sys-text-muted)] font-normal">(₹{rInrPerMin.toFixed(2)})</span></span>
+                                                                                                        </div>
+                                                                                                        <div className="flex justify-between">
+                                                                                                            <span className="text-[10px] text-[var(--sys-text-muted)]">Retail (Margin):</span>
+                                                                                                            <span className="font-bold text-emerald-400 font-mono">₹{rSuggestedRetailPerSec.toFixed(2)}/s</span>
+                                                                                                        </div>
+                                                                                                        <div className="flex justify-between border-t border-white/[0.03] pt-1.5 mt-1.5">
+                                                                                                            <span className="text-[10px] text-[var(--sys-text-muted)] uppercase font-bold">Est Credits:</span>
+                                                                                                            <span className="font-black text-primary font-mono">{rEstCreditsPerSec} cr/s</span>
+                                                                                                        </div>
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                            );
+                                                                                        })}
+                                                                                    </div>
+                                                                                </div>
+                                                                            </td>
+                                                                        </tr>
+                                                                    )}
+                                                                </React.Fragment>
                                                             );
                                                         })}
                                                 </tbody>
