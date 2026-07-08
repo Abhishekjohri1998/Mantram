@@ -896,6 +896,7 @@ export const superadmin = {
     // Pricing Command Center
     getPricingCalculator: (params = {}) => { const q = new URLSearchParams(params).toString(); return apiFetch(`/superadmin/pricing-calculator?${q}`); },
     getPricingPolicy: () => apiFetch('/superadmin/pricing-policy'),
+    getVideoModelCosts: () => apiFetch('/superadmin/video-model-costs'),
     getPricingMonitor: () => apiFetch('/superadmin/pricing-monitor'),
     triggerPricingCheck: () => apiFetch('/superadmin/pricing-monitor/check', { method: 'POST' }),
     dismissPricingAlerts: () => apiFetch('/superadmin/pricing-monitor/dismiss', { method: 'POST' }),

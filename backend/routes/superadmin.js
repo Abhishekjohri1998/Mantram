@@ -28,6 +28,7 @@ import { protect, authorize, generateToken } from '../middleware/auth.js';
 import { safeErrorMessage } from '../utils/safeError.js';
 import { logAudit } from '../utils/audit.js';
 import CreditUsage from '../models/CreditUsage.js';
+import { VIDEO_MODEL_RATES } from '../utils/videoModelRates.js';
 import { uploadToS3 } from '../utils/s3.js';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
@@ -3024,6 +3025,18 @@ router.post('/credit-packs/seed-defaults', async (req, res) => {
 import { PROVIDER_PRICING, checkPricingChanges, simulateImpact } from '../agents/pricingMonitor.js';
 import { COST_PER_SECOND, MODEL_CAPABILITIES, estimateCost } from '../agents/videoStudio/falClient.js';
 
+// GET /superadmin/video-model-costs — Master cost per second rates of all video models
+router.get('/video-model-costs', async (req, res) => {
+    try {
+        res.json({
+            success: true,
+            models: VIDEO_MODEL_RATES
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 // GET /superadmin/pricing-policy — Full pricing policy document
 router.get('/pricing-policy', async (req, res) => {
     try {
@@ -3077,7 +3090,8 @@ router.get('/pricing-policy', async (req, res) => {
         const videoMatrix = Object.entries(COST_PER_SECOND || {}).map(([model, rates]) => {
             const caps = MODEL_CAPABILITIES?.[model] || {};
             return {
-                model: 'claude-3-opus-20240229',
+                model,
+                name: caps.name || model,
                 fastPerSec: rates.fast, qualityPerSec: rates.quality,
                 // Cost examples at different durations
                 examples: [5, 10, 15].map(dur => ({

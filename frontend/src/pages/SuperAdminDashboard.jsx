@@ -98,6 +98,11 @@ export default function SuperAdminDashboard() {
     const [calcMargin, setCalcMargin] = useState(60)
     const [calcExRate, setCalcExRate] = useState(85)
     const [policySection, setPolicySection] = useState('calculator')
+    const [videoModelRates, setVideoModelRates] = useState([])
+    const [videoRatesSearch, setVideoRatesSearch] = useState('')
+    const [videoRatesProviderFilter, setVideoRatesProviderFilter] = useState('all')
+    const [videoRatesCategoryFilter, setVideoRatesCategoryFilter] = useState('all')
+    const [loadingVideoRates, setLoadingVideoRates] = useState(false)
     const [monitorSubTab, setMonitorSubTab] = useState('providers')
     const [monitorTypeFilter, setMonitorTypeFilter] = useState('all')
     // Impersonation search
@@ -233,7 +238,7 @@ export default function SuperAdminDashboard() {
         if (tab === 'integrations') loadIntegrations()
         if (tab === 'packages') loadPackages()
         if (tab === 'logs') loadLogs()
-        if (tab === 'pricing') { loadPolicyData(); loadMonitorData(); loadPricingData(calcCreditPrice) }
+        if (tab === 'pricing') { loadPolicyData(); loadMonitorData(); loadPricingData(calcCreditPrice); loadVideoModelRates() }
         if (tab === 'creditPacks') loadCreditPacks()
         if (tab === 'growth') loadGrowthData()
     }, [tab, debouncedSearch, planFilter, userPage, logsPage])
@@ -771,6 +776,7 @@ export default function SuperAdminDashboard() {
     const creditCostLabels = { content: 'Content Generate', contentRefine: 'Content Refine/Regen', creative: 'Creative (Image)', photoshoot: 'AI Photoshoot', seoHealthCheck: 'SEO Health Check', seoTraffic: 'SEO Traffic', seoCompetitors: 'SEO Competitors', seoAiVisibility: 'SEO AI Visibility', seoAsk: 'SEO Ask', seoAuditPage: 'SEO Page Audit', seoCompetitorDiscover: 'SEO Discover', seoBacklinks: 'SEO Backlinks', seoWarRoom: 'SEO War Room', seoLlmProbe: 'SEO LLM Probe', seoAutoFix: 'SEO Auto-Fix', seoPromptMining: 'SEO Prompt Mining', brainstorm: 'Brainstorm Generate', brainstormRefine: 'Brainstorm Refine', brainstormChat: 'Brainstorm Chat', brainstormScreenplay: 'Screenplay', trendRefresh: 'Trend Refresh', videoBrainstorm: 'Video Brainstorm', videoGenerate: 'Video Generate', videoEdit: 'Video Edit', socialMedia: 'Social Strategy', socialMediaCalendar: 'Social Calendar', socialMediaAudit: 'Social Audit', socialMediaCompetitor: 'Social Competitor', socialMediaScore: 'Social Score', canvasGenerate: 'Canvas AI Gen', canvasBgRemove: 'Canvas BG Remove', canvasExtend: 'Canvas Extend', adCreative: 'Ad Creative', voiceClone: 'Voice Clone', voiceTranscribe: 'Voice Transcribe' }
     const loadPricingData = async (price, margin, exRate) => { setPricingLoading(true); try { const d = await API.getPricingCalculator({ creditPriceINR: price || calcCreditPrice, usdToInr: exRate || calcExRate, targetMargin: margin || calcMargin }); setPricingData(d) } catch (e) { console.error('Pricing calc error:', e) } finally { setPricingLoading(false) } }
     const loadPolicyData = async () => { try { const d = await API.getPricingPolicy(); setPolicyData(d.policy) } catch (e) { console.error(e) } }
+    const loadVideoModelRates = async () => { setLoadingVideoRates(true); try { const d = await API.getVideoModelCosts(); setVideoModelRates(d.models || []) } catch (e) { console.error('Failed to load video rates:', e) } finally { setLoadingVideoRates(false) } }
     const loadMonitorData = async () => { try { const d = await API.getPricingMonitor(); setMonitorData(d) } catch (e) { console.error(e) } }
     const handlePricingCheck = async () => { setMonitorChecking(true); try { const d = await API.triggerPricingCheck(); showToast(d.message); loadMonitorData() } catch (e) { showToast(e.error || 'Check failed', 'error') } finally { setMonitorChecking(false) } }
     const handleDismissAlerts = async () => { try { await API.dismissPricingAlerts(); showToast('Alerts dismissed'); loadMonitorData() } catch { showToast('Failed', 'error') } }
@@ -4331,7 +4337,8 @@ export default function SuperAdminDashboard() {
                         <div className="flex gap-2 mb-6">
                             {[{ id: 'calculator', label: '🧮 Margin Calculator', icon: 'tune' },
                               { id: 'policy', label: '📋 Pricing Policy', icon: 'description' },
-                              { id: 'monitor', label: '🤖 Price Monitor', icon: 'monitoring' }].map(s => (
+                              { id: 'monitor', label: '🤖 Price Monitor', icon: 'monitoring' },
+                              { id: 'video-rates', label: '🎥 Video Model Rates', icon: 'slow_motion_video' }].map(s => (
                                 <button key={s.id} onClick={() => setPolicySection(s.id)}
                                     className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                                         policySection === s.id ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
@@ -4879,6 +4886,139 @@ export default function SuperAdminDashboard() {
                                         )}
                                     </div>
                                 )}
+                            </div>
+                        )}
+
+                        {/* ─── SECTION 4: VIDEO MODEL RATES ─── */}
+                        {policySection === 'video-rates' && (
+                            <div className="space-y-6">
+                                {/* Search and Filters */}
+                                <div className="glass-panel rounded-2xl p-4 border border-[var(--sys-border)] flex flex-wrap items-center gap-4 justify-between">
+                                    <div className="flex items-center gap-3 flex-1 min-w-[280px]">
+                                        <div className="relative flex-1">
+                                            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--sys-text-muted)]">search</span>
+                                            <input type="text" value={videoRatesSearch} onChange={e => setVideoRatesSearch(e.target.value)}
+                                                placeholder="Search video models by name or id..."
+                                                className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] outline-none focus:border-primary transition-all" />
+                                        </div>
+                                        {videoRatesSearch && (
+                                            <button onClick={() => setVideoRatesSearch('')} className="text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">Clear</button>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-3 flex-wrap">
+                                        <select value={videoRatesProviderFilter} onChange={e => setVideoRatesProviderFilter(e.target.value)}
+                                            className="px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-xs text-[var(--sys-text)] cursor-pointer">
+                                            <option value="all">All Providers</option>
+                                            <option value="laozhang">Laozhang</option>
+                                            <option value="atlascloud">AtlasCloud</option>
+                                            <option value="fal">Fal.ai</option>
+                                            <option value="grok">Grok (xAI)</option>
+                                            <option value="hailuo">Hailuo (MiniMax)</option>
+                                            <option value="piapi">PiAPI</option>
+                                        </select>
+                                        <select value={videoRatesCategoryFilter} onChange={e => setVideoRatesCategoryFilter(e.target.value)}
+                                            className="px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-xs text-[var(--sys-text)] cursor-pointer">
+                                            <option value="all">All Categories</option>
+                                            <option value="Text-to-Video">Text-to-Video</option>
+                                            <option value="Image-to-Video">Image-to-Video</option>
+                                            <option value="Reference-to-Video">Reference-to-Video</option>
+                                            <option value="Video-Edit">Video Edit</option>
+                                            <option value="Audio-to-Video">Audio-to-Video</option>
+                                            <option value="Video-Extension">Video Extension</option>
+                                            <option value="Video-to-Video">Video-to-Video</option>
+                                            <option value="Video-Upscale">Video Upscale</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* Cost & Margin Config Info */}
+                                <div className="bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] rounded-2xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                    <div>
+                                        <h4 className="text-sm font-black text-primary uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                                            <span className="material-symbols-outlined text-sm">settings_suggest</span>
+                                            Margin and Exchange Simulator
+                                        </h4>
+                                        <p className="text-xs text-[var(--sys-text-muted)]">
+                                            These cost metrics are synchronized dynamically with your Margin Calculator settings above: <strong className="text-[var(--sys-text)]">₹{calcCreditPrice}/credit</strong> floor, <strong className="text-[var(--sys-text)]">{calcMargin}% target margin</strong>, and exchange rate of <strong className="text-[var(--sys-text)]">₹{calcExRate}/USD</strong>.
+                                        </p>
+                                    </div>
+                                    <div className="flex gap-4 text-xs font-bold text-[var(--sys-text)]">
+                                        <div className="bg-[var(--sys-surface)] border border-[var(--sys-border)] px-3 py-2 rounded-xl">
+                                            <span className="text-[10px] text-[var(--sys-text-muted)] block uppercase">Ex Rate</span>
+                                            ₹{calcExRate} / USD
+                                        </div>
+                                        <div className="bg-[var(--sys-surface)] border border-[var(--sys-border)] px-3 py-2 rounded-xl">
+                                            <span className="text-[10px] text-[var(--sys-text-muted)] block uppercase">Target Margin</span>
+                                            {calcMargin}%
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Rates Table */}
+                                <div className="glass-panel rounded-2xl overflow-hidden border border-[var(--sys-border)]">
+                                    {loadingVideoRates ? (
+                                        <div className="flex flex-col items-center justify-center p-12 text-[var(--sys-text-muted)]">
+                                            <span className="material-symbols-outlined text-4xl animate-spin text-primary mb-2">progress_activity</span>
+                                            <p className="text-xs">Loading video model rates...</p>
+                                        </div>
+                                    ) : (
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left min-w-[900px]">
+                                                <thead>
+                                                    <tr className="text-[10px] text-[var(--sys-text-muted)] font-black uppercase tracking-wider border-b border-[var(--sys-border)] bg-[var(--sys-surface)]">
+                                                        <th className="px-4 py-3">Model Details</th>
+                                                        <th className="px-4 py-3">Provider</th>
+                                                        <th className="px-4 py-3">Category</th>
+                                                        <th className="px-4 py-3 text-right">USD/sec</th>
+                                                        <th className="px-4 py-3 text-right">INR/sec</th>
+                                                        <th className="px-4 py-3 text-right">USD/min</th>
+                                                        <th className="px-4 py-3 text-right">INR/min</th>
+                                                        <th className="px-4 py-3 text-right">Suggested Retail INR/sec (Margin)</th>
+                                                        <th className="px-4 py-3 text-right font-black text-primary">Est Credits/sec</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-white/[0.03]">
+                                                    {videoModelRates
+                                                        .filter(m => {
+                                                            if (videoRatesProviderFilter !== 'all' && m.provider !== videoRatesProviderFilter) return false;
+                                                            if (videoRatesCategoryFilter !== 'all' && m.category !== videoRatesCategoryFilter) return false;
+                                                            if (videoRatesSearch) {
+                                                                const s = videoRatesSearch.toLowerCase();
+                                                                return m.name.toLowerCase().includes(s) || m.id.toLowerCase().includes(s);
+                                                            }
+                                                            return true;
+                                                        })
+                                                        .map(m => {
+                                                            const inrPerSec = m.usdPerSec * calcExRate;
+                                                            const usdPerMin = m.usdPerSec * 60;
+                                                            const inrPerMin = inrPerSec * 60;
+                                                            // Retail target with margin: retail = cost / (1 - margin)
+                                                            const suggestedRetailPerSec = inrPerSec / (1 - (calcMargin / 100));
+                                                            // Recommended credits per second = suggested retail / credit price
+                                                            const estCreditsPerSec = Math.ceil(suggestedRetailPerSec / calcCreditPrice);
+
+                                                            return (
+                                                                <tr key={m.id} className="text-sm hover:bg-[var(--sys-surface)] transition-all">
+                                                                    <td className="px-4 py-3.5">
+                                                                        <p className="font-bold text-[var(--sys-text)] text-xs">{m.name}</p>
+                                                                        <span className="text-[9px] font-mono text-[var(--sys-text-muted)]">{m.id}</span>
+                                                                    </td>
+                                                                    <td className="px-4 py-3.5 text-xs font-semibold uppercase text-[var(--sys-text-muted)]">{m.provider}</td>
+                                                                    <td className="px-4 py-3.5 text-xs text-[var(--sys-text-muted)]">{m.category}</td>
+                                                                    <td className="px-4 py-3.5 text-right font-mono text-xs">${m.usdPerSec.toFixed(3)}</td>
+                                                                    <td className="px-4 py-3.5 text-right font-mono text-xs text-[var(--sys-text-muted)]">₹{inrPerSec.toFixed(2)}</td>
+                                                                    <td className="px-4 py-3.5 text-right font-mono text-xs text-[var(--sys-text-muted)]">${usdPerMin.toFixed(2)}</td>
+                                                                    <td className="px-4 py-3.5 text-right font-mono text-xs text-[var(--sys-text-muted)]">₹{inrPerMin.toFixed(2)}</td>
+                                                                    <td className="px-4 py-3.5 text-right font-mono text-xs font-bold text-emerald-400">₹{suggestedRetailPerSec.toFixed(2)}</td>
+                                                                    <td className="px-4 py-3.5 text-right font-mono text-xs font-black text-primary">{estCreditsPerSec} cr/s</td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>
