@@ -367,7 +367,7 @@ async function submitAtlasCloudPayload(payload) {
     const imageCountInPayload = (payload.input?.image_urls?.length || 0) + (payload.input?.reference_images?.length || 0) + (payload.input?.images?.length || 0);
     const customCharacterNames = payload.input?.customCharacterNames || [];
     
-    const isGemini = payload.model === 'gemini-flash' || payload.model === 'gemini-omni-flash';
+    const isGemini = payload.model && payload.model.startsWith('gemini-');
     const providerKey = isGemini ? 'gemini-flash' : 'atlascloud';
     
     const { prompt: sanitizedPromptFromSanitizer, warnings: sanitizerWarnings } = sanitizePromptForProvider(
@@ -916,13 +916,16 @@ export async function submitInfiniteTalkVideoGeneration({
 export async function submitGeminiFlashVideoGeneration({
     prompt, imageUrl, duration, aspectRatio, resolution = '720p',
     referenceImages = [],
-    customCharacterNames = []
+    customCharacterNames = [],
+    refAudio = null,
+    refVideo = null,
+    model = 'gemini-omni-flash'
 }) {
     // Gemini Omni Flash Image-to-Video supports 1–7 reference images (images[] field)
     // Prompt: up to 20,000 characters
     // Durations: 4, 6, 8, 10s (enum)
     // Ref: https://www.atlascloud.ai/models/google/gemini-omni-flash/image-to-video-developer
-    console.log(`⚡ [Gemini Flash Video] submitGeminiFlashVideoGeneration: refs=${referenceImages.length} | imageUrl=${imageUrl ? 'yes' : 'no'}`);
+    console.log(`⚡ [Gemini Flash Video] submitGeminiFlashVideoGeneration: model=${model} | refs=${referenceImages.length} | imageUrl=${imageUrl ? 'yes' : 'no'}`);
 
     // Extract ZH prompt if bilingual
     let finalPromptText = prompt;
@@ -985,10 +988,18 @@ export async function submitGeminiFlashVideoGeneration({
     }
 
     const hasImages = cdnImageUrls.length > 0;
-    // Use I2V model when any images are provided, T2V otherwise
-    const modelName = hasImages
-        ? 'google/gemini-omni-flash/image-to-video-developer'
-        : 'google/gemini-omni-flash/text-to-video-developer';
+    
+    // Resolve Gemini workflow model name based on requested model
+    let modelName;
+    if (model === 'gemini-omni-flash-edit') {
+        modelName = 'google/gemini-omni-flash/video-edit';
+    } else if (model === 'gemini-omni-flash-r2v-dev') {
+        modelName = 'google/gemini-omni-flash/reference-to-video-developer';
+    } else {
+        modelName = hasImages
+            ? 'google/gemini-omni-flash/image-to-video-developer'
+            : 'google/gemini-omni-flash/text-to-video-developer';
+    }
 
     // Durations: enum [4, 6, 8, 10] per Atlas Cloud docs (I2V model)
     const allowedDurations = [4, 6, 8, 10];
@@ -1015,6 +1026,15 @@ export async function submitGeminiFlashVideoGeneration({
         seed: -1,
         customCharacterNames,
     };
+
+    if (refVideo) {
+        console.log(`📹 [Gemini Flash] Uploading refVideo to Atlas CDN...`);
+        taskInput.video_url = await uploadMediaToAtlasCDN(refVideo);
+    }
+    if (refAudio) {
+        console.log(`🔊 [Gemini Flash] Uploading refAudio to Atlas CDN...`);
+        taskInput.audio_url = await uploadMediaToAtlasCDN(refAudio);
+    }
 
     // Pass all images as `images[]` array — Gemini Omni Flash uses this field for 1–7 refs
     if (cdnImageUrls.length > 0) {

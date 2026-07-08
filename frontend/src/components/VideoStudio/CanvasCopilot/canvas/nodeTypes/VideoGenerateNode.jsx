@@ -203,6 +203,34 @@ export default function VideoGenerateNode({ data, selected }) {
                             <option value="veo-3.1-lite">Veo 3.1 Lite</option>
                             <option value="grok-imagine">Grok</option>
                             <option value="gemini-flash">Gemini</option>
+                            <option value="gemini-omni-flash-edit">Gemini Video Edit</option>
+                            <option value="gemini-omni-flash-r2v-dev">Gemini Ref-to-Video Dev</option>
+                            <option value="kling-video-o3-pro">Kling O3 Pro</option>
+                            <option value="kling-video-o3-std">Kling O3 Std</option>
+                            <option value="kling-video-o3-4k">Kling O3 4K</option>
+                            <option value="kling-video-o1">Kling O1</option>
+                            <option value="kling-3.0-turbo">Kling 3.0 Turbo</option>
+                            <option value="kling-3.0-4k">Kling 3.0 4K</option>
+                            <option value="kling-3.0-pro">Kling 3.0 Pro</option>
+                            <option value="kling-3.0-std">Kling 3.0 Std</option>
+                            <option value="kling-2.6-pro-avatar">Kling v2.6 Pro Avatar</option>
+                            <option value="kling-2.6-std-avatar">Kling v2.6 Std Avatar</option>
+                            <option value="kling-2.6-pro-motion">Kling v2.6 Pro Motion</option>
+                            <option value="kling-2.6-std-motion">Kling v2.6 Std Motion</option>
+                            <option value="kling-2.5-turbo-pro">Kling v2.5 Turbo Pro</option>
+                            <option value="kling-2.1-i2v-pro-start-end">Kling v2.1 Start-End</option>
+                            <option value="kling-2.1-t2v-master">Kling v2.1 T2V Master</option>
+                            <option value="kling-2.0-t2v-master">Kling v2.0 T2V Master</option>
+                            <option value="kling-2.1-i2v-master">Kling v2.1 I2V Master</option>
+                            <option value="kling-2.0-i2v-master">Kling v2.0 I2V Master</option>
+                            <option value="kling-2.1-i2v-pro">Kling v2.1 I2V Pro</option>
+                            <option value="kling-2.1-i2v-std">Kling v2.1 I2V Std</option>
+                            <option value="kling-1.6-multi-i2v-pro">Kling v1.6 Multi Pro</option>
+                            <option value="kling-1.6-multi-i2v-std">Kling v1.6 Multi Std</option>
+                            <option value="kling-1.6-t2v-std">Kling v1.6 T2V Std</option>
+                            <option value="kling-1.6-i2v-pro">Kling v1.6 I2V Pro</option>
+                            <option value="kling-1.6-i2v-std">Kling v1.6 I2V Std</option>
+                            <option value="kling-effects">Kling Effects</option>
                         </select>
 
                         {/* Aspect ratio select */}

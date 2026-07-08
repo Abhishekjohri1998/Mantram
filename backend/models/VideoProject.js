@@ -116,7 +116,18 @@ const videoProjectSchema = new mongoose.Schema({
 
     // ── Step 5: Model Router Output ──
     routing: {
-        selectedModel: { type: String, enum: ['veo-3.1', 'veo-3.1-fast', 'veo-3.1-lite', 'kling-3.0', 'kling-3.0-o', 'seedance-2.0', 'seedance-2.0-fast', 'seedance-2.0-mini', 'seedance-1.0', 'grok-imagine', 'hunyuan', 'sora-2', 'happyhorse-1.0', 'happyhorse-1.1', 'gemini-flash', 'gemini-omni-flash', 'heygen', 'heygen-photo-avatar', 'heygen-product-placement', 'heygen-audio-avatar', 'heygen-video-agent'], default: 'kling-3.0' },
+        selectedModel: { type: String, enum: [
+            'veo-3.1', 'veo-3.1-fast', 'veo-3.1-lite', 'kling-3.0', 'kling-3.0-o', 'seedance-2.0', 'seedance-2.0-fast', 'seedance-2.0-mini', 'seedance-1.0', 'grok-imagine', 'hunyuan', 'sora-2', 'happyhorse-1.0', 'happyhorse-1.1', 'gemini-flash', 'gemini-omni-flash', 'heygen', 'heygen-photo-avatar', 'heygen-product-placement', 'heygen-audio-avatar', 'heygen-video-agent',
+            'gemini-omni-flash-edit', 'gemini-omni-flash-r2v-dev',
+            'kling-video-o3-pro', 'kling-video-o3-std', 'kling-video-o3-4k', 'kling-video-o1',
+            'kling-3.0-turbo', 'kling-3.0-4k', 'kling-3.0-pro', 'kling-3.0-std',
+            'kling-2.6-pro-avatar', 'kling-2.6-std-avatar', 'kling-2.6-pro-motion', 'kling-2.6-std-motion',
+            'kling-2.5-turbo-pro',
+            'kling-2.1-i2v-pro-start-end', 'kling-2.1-t2v-master', 'kling-2.1-i2v-master', 'kling-2.1-i2v-pro', 'kling-2.1-i2v-std',
+            'kling-2.0-i2v-master', 'kling-2.0-t2v-master',
+            'kling-1.6-multi-i2v-pro', 'kling-1.6-multi-i2v-std', 'kling-1.6-t2v-std', 'kling-1.6-i2v-pro', 'kling-1.6-i2v-std',
+            'kling-effects'
+        ], default: 'kling-3.0' },
         resolution: { type: String, enum: ['480p', '720p', '1080p', '4k'], default: '1080p' },
         mode: { type: String, enum: ['fast', 'quality'], default: 'fast' },
         reasoning: { type: String, default: '' },

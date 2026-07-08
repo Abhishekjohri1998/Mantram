@@ -1,6 +1,6 @@
 export const NODE_PARAM_SCHEMAS = {
     video_generate: {
-        model:       { type: 'enum',   label: 'Model',        options: ['seedance-2.0','seedance-2.0-mini','kling-3.0','veo-3.1','veo-3.1-fast','veo-3.1-lite','grok-imagine','gemini-flash'] },
+        model:       { type: 'enum',   label: 'Model',        options: ['seedance-2.0','seedance-2.0-mini','kling-3.0','veo-3.1','veo-3.1-fast','veo-3.1-lite','grok-imagine','gemini-flash','gemini-omni-flash-edit','gemini-omni-flash-r2v-dev','kling-video-o3-pro','kling-video-o3-std','kling-video-o3-4k','kling-video-o1','kling-3.0-turbo','kling-3.0-4k','kling-3.0-pro','kling-3.0-std','kling-2.6-pro-avatar','kling-2.6-std-avatar','kling-2.6-pro-motion','kling-2.6-std-motion','kling-2.5-turbo-pro','kling-2.1-i2v-pro-start-end','kling-2.1-t2v-master','kling-2.1-i2v-master','kling-2.1-i2v-pro','kling-2.1-i2v-std','kling-2.0-i2v-master','kling-2.0-t2v-master','kling-1.6-multi-i2v-pro','kling-1.6-multi-i2v-std','kling-1.6-t2v-std','kling-1.6-i2v-pro','kling-1.6-i2v-std','kling-effects'] },
         duration:    { type: 'number', label: 'Duration (s)',  min: 3, max: 120 },
         aspectRatio: { type: 'enum',   label: 'Aspect Ratio', options: ['9:16','16:9','1:1','4:5','21:9'] },
         motionMode:  { type: 'enum',   label: 'Motion Mode',  options: ['subtle','balanced','dynamic'] },
@@ -17,7 +17,7 @@ export const NODE_PARAM_SCHEMAS = {
         quality:     { type: 'enum', label: 'Quality',      options: ['draft','standard','hd'] },
     },
     prompt_expand: {
-        targetModel: { type: 'enum',   label: 'Target Model',  options: ['seedance-2.0','seedance-2.0-mini','kling-3.0','veo-3.1','veo-3.1-fast','veo-3.1-lite','grok-imagine','gemini-flash'] },
+        targetModel: { type: 'enum',   label: 'Target Model',  options: ['seedance-2.0','seedance-2.0-mini','kling-3.0','veo-3.1','veo-3.1-fast','veo-3.1-lite','grok-imagine','gemini-flash','gemini-omni-flash-edit','gemini-omni-flash-r2v-dev','kling-video-o3-pro','kling-video-o3-std','kling-video-o3-4k','kling-video-o1','kling-3.0-turbo','kling-3.0-4k','kling-3.0-pro','kling-3.0-std','kling-2.6-pro-avatar','kling-2.6-std-avatar','kling-2.6-pro-motion','kling-2.6-std-motion','kling-2.5-turbo-pro','kling-2.1-i2v-pro-start-end','kling-2.1-t2v-master','kling-2.1-i2v-master','kling-2.1-i2v-pro','kling-2.1-i2v-std','kling-2.0-i2v-master','kling-2.0-t2v-master','kling-1.6-multi-i2v-pro','kling-1.6-multi-i2v-std','kling-1.6-t2v-std','kling-1.6-i2v-pro','kling-1.6-i2v-std','kling-effects'] },
         style:       { type: 'string', label: 'Style Override' },
     },
     voiceover: {
