@@ -18,6 +18,7 @@ import CreditUsage from '../models/CreditUsage.js';
 import CreditTransaction from '../models/CreditTransaction.js';
 import { CREDITS_PER_SECOND, COST_PER_SECOND_INR } from '../constants/credits.js';
 import { estimateCost } from '../agents/videoStudio/falClient.js';
+import { IMAGE_MODEL_RATES } from '../utils/imageModelRates.js';
 
 // Human-readable labels for actions
 const ACTION_LABELS = {
@@ -69,8 +70,8 @@ export const PROVIDER_MULTIPLIERS = {
 const DEFAULT_CREDIT_COSTS = {
     content: 3,
     contentRefine: 2,
-    creative: 8,                   // ↑ from 5 — Gemini Flash image ≈ ₹6.24; 8cr × ₹5 = ₹40 → 84% margin
-    photoshoot: 25,               // ↑ from 10 — 4×Gemini images ≈ ₹25; 25cr × ₹5 = ₹125 → 80% margin
+    creative: 'dynamic',                   // dynamic based on model, resolution, quality
+    photoshoot: 'dynamic',                 // dynamic based on model, resolution, quality
     seoHealthCheck: 5,             // Crawls 600+ pages, heavy compute
     seoTraffic: 3,
     seoCompetitors: 3,
@@ -98,14 +99,14 @@ const DEFAULT_CREDIT_COSTS = {
     socialMediaAudit: 4,
     socialMediaCompetitor: 4,
     socialMediaScore: 2,
-    canvasGenerate: 3,
+    canvasGenerate: 'dynamic',     // dynamic based on model, resolution, quality
     canvasBgRemove: 2,
     canvasExtend: 3,
     fidatoCanvas: 2,               // Fidato Canvas AI Director (Gemini fallback)
     fidatoCanvasClaude: 4,         // Fidato Canvas with Claude tool-use (premium)
     creativeCampaign: 15,          // ↑ from 8 — Multi-platform campaign (4–6 image gens)
     creativeCritique: 1,           // MCoT post-gen quality critique
-    adCreative: 8,                 // ↑ from 5 — aligns with creative image cost
+    adCreative: 'dynamic',                 // dynamic based on model, resolution, quality
     voiceClone: 5,
     voiceTranscribe: 1,
     promptEnhance: 1,
@@ -118,7 +119,7 @@ const DEFAULT_CREDIT_COSTS = {
     qAdsEnhance:   2,              // Q-Ads Stage 1 legacy — kept for backward compat
     qAdsDirector:  1,              // Q-Ads Stage 2 legacy — kept for backward compat
     qAdsGenerate:  50,             // ↑↑ CRITICAL FIX from 8 — Q-Ads Seedance 2.0 video (5s ≈ ₹46); 50cr × ₹5 = ₹250 → 81% margin
-    avatarGenerate: 6,             // ↑ from 4 — Avatar Studio: 3 variants via LaoZhang NanoBanana 2
+    avatarGenerate: 'dynamic',             // dynamic based on model, resolution, quality
     storyboardCreate: 8,           // Storyboard Director (Claude) + Gemini frame gen for all shots
     storyboardAnimate: 'dynamic',  // DYNAMIC — Seedance 2.0 I2V per shot
     storyboardAnimateLongForm: 'dynamic',
@@ -187,8 +188,25 @@ export const requireCredits = (actionOrCost = 1) => {
                 const costs = await getCreditCosts();
                 const rawCost = costs[actionOrCost];
 
-                // Dynamic video credits — calculated per request
-                if (rawCost === 'dynamic' && actionOrCost === 'videoGenerate') {
+                // Dynamic image credits — calculated per request based on model, resolution, quality
+                if (rawCost === 'dynamic' && ['creative', 'photoshoot', 'adCreative', 'canvasGenerate', 'avatarGenerate'].includes(actionOrCost)) {
+                    const model = req.body.model || req.body.imageModel || 'nano-banana-2-t2i';
+                    const resolution = req.body.resolution || req.body._imageSize || '1K';
+                    const quality = req.body.quality || req.body.agenticQuality || 'Medium';
+
+                    let defaultCount = 1;
+                    if (actionOrCost === 'photoshoot') defaultCount = 4;
+                    else if (actionOrCost === 'avatarGenerate') defaultCount = 3;
+
+                    const count = parseInt(req.body.numImages || req.body.count || req.body.quantity || defaultCount) || defaultCount;
+
+                    const exRate = 95.56;
+                    const margin = 60;
+                    const creditPrice = 5;
+
+                    cost = calculateImageCredits(model, resolution, quality, count, exRate, margin, creditPrice);
+                    console.log(`🖼️ Dynamic image credits for ${actionOrCost}: ${model} (${resolution}, ${quality}) × ${count} → ${cost} credits`);
+                } else if (rawCost === 'dynamic' && actionOrCost === 'videoGenerate') {
                     const duration = parseInt(req.body.duration) || 5;
                     cost = Math.ceil(duration * CREDITS_PER_SECOND);
                     console.log(`🎬 Dynamic video credits: ${duration}s → ${cost} credits`);
@@ -662,4 +680,34 @@ export const logTokenUsage = async (userId, tokenData, meta = {}) => {
         console.warn('Token usage log failed:', err.message);
     }
 };
+
+export function calculateImageCredits(modelId, resolution = '1K', quality = 'Medium', count = 1, exRate = 95.56, margin = 60, creditPrice = 5) {
+    const model = IMAGE_MODEL_RATES.find(m => m.id === modelId || m.name === modelId) || { usdPerPic: 0.04 };
+    const RESOLUTION_MULTIPLIERS = { '1K': 1.0, '2K': 1.5, '4K': 2.5 };
+    const QUALITY_MULTIPLIERS = { 'Low': 0.5, 'Medium': 1.0, 'High': 1.8 };
+
+    let res = resolution || '1K';
+    if (res === '512px') res = '1K';
+
+    let qual = quality || 'Medium';
+    if (qual === 'fast' || qual === 'speed') qual = 'Low';
+    if (qual === 'quality' || qual === 'pro') qual = 'High';
+
+    res = res.toUpperCase();
+    qual = qual.charAt(0).toUpperCase() + qual.slice(1).toLowerCase();
+
+    const resMult = RESOLUTION_MULTIPLIERS[res] || 1.0;
+    const qualMult = QUALITY_MULTIPLIERS[qual] || 1.0;
+    const combinedMult = resMult * qualMult;
+
+    const baseUsd = model.usdPerPic !== undefined ? model.usdPerPic : 0.04;
+    const usdPerPicScaled = baseUsd * combinedMult;
+    if (usdPerPicScaled === 0) return 0;
+
+    const inrPerPic = usdPerPicScaled * exRate;
+    const suggestedRetailPerPic = inrPerPic / (1 - (margin / 100));
+    const estCreditsPerPic = Math.ceil(suggestedRetailPerPic / creditPrice);
+
+    return Math.max(1, estCreditsPerPic * count);
+}
 

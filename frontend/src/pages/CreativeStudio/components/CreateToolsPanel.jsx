@@ -460,13 +460,13 @@ const CreateToolsPanel = memo(({
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <CreditTooltipWrapper action="creative">
+                    <CreditTooltipWrapper action="creative" model={imageModel} resolution={templateFields?._imageSize || '1K'} quality={agenticQuality || 'Medium'}>
                         <button onClick={handleGenerate} disabled={!prompt.trim() || !activeBrand || activeGenerations.length >= 3}
                             className="studio-btn-primary flex-1">
                             {activeGenerations.length > 0 ? (
                                 <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Generating...</>
                             ) : (
-                                <><span className="material-symbols-outlined text-sm">auto_awesome</span> Generate <CreditBadge action="creative" /></>
+                                <><span className="material-symbols-outlined text-sm">auto_awesome</span> Generate <CreditBadge action="creative" model={imageModel} resolution={templateFields?._imageSize || '1K'} quality={agenticQuality || 'Medium'} /></>
                             )}
                         </button>
                     </CreditTooltipWrapper>
