@@ -105,6 +105,14 @@ export default function SuperAdminDashboard() {
     const [loadingVideoRates, setLoadingVideoRates] = useState(false)
     const [videoRatesResolutionFilter, setVideoRatesResolutionFilter] = useState('all')
     const [expandedVideoModelId, setExpandedVideoModelId] = useState(null)
+    const [imageModelRates, setImageModelRates] = useState([])
+    const [imageRatesSearch, setImageRatesSearch] = useState('')
+    const [imageRatesProviderFilter, setImageRatesProviderFilter] = useState('all')
+    const [imageRatesCategoryFilter, setImageRatesCategoryFilter] = useState('all')
+    const [imageRatesResolutionFilter, setImageRatesResolutionFilter] = useState('all')
+    const [imageRatesQualityFilter, setImageRatesQualityFilter] = useState('all')
+    const [expandedImageModelId, setExpandedImageModelId] = useState(null)
+    const [loadingImageRates, setLoadingImageRates] = useState(false)
     const [monitorSubTab, setMonitorSubTab] = useState('providers')
     const [monitorTypeFilter, setMonitorTypeFilter] = useState('all')
     // Impersonation search
@@ -240,7 +248,7 @@ export default function SuperAdminDashboard() {
         if (tab === 'integrations') loadIntegrations()
         if (tab === 'packages') loadPackages()
         if (tab === 'logs') loadLogs()
-        if (tab === 'pricing') { loadPolicyData(); loadMonitorData(); loadPricingData(calcCreditPrice); loadVideoModelRates() }
+        if (tab === 'pricing') { loadPolicyData(); loadMonitorData(); loadPricingData(calcCreditPrice); loadVideoModelRates(); loadImageModelRates(); }
         if (tab === 'creditPacks') loadCreditPacks()
         if (tab === 'growth') loadGrowthData()
     }, [tab, debouncedSearch, planFilter, userPage, logsPage])
@@ -779,6 +787,7 @@ export default function SuperAdminDashboard() {
     const loadPricingData = async (price, margin, exRate) => { setPricingLoading(true); try { const d = await API.getPricingCalculator({ creditPriceINR: price || calcCreditPrice, usdToInr: exRate || calcExRate, targetMargin: margin || calcMargin }); setPricingData(d) } catch (e) { console.error('Pricing calc error:', e) } finally { setPricingLoading(false) } }
     const loadPolicyData = async () => { try { const d = await API.getPricingPolicy(); setPolicyData(d.policy) } catch (e) { console.error(e) } }
     const loadVideoModelRates = async () => { setLoadingVideoRates(true); try { const d = await API.getVideoModelCosts(); setVideoModelRates(d.models || []) } catch (e) { console.error('Failed to load video rates:', e) } finally { setLoadingVideoRates(false) } }
+    const loadImageModelRates = async () => { setLoadingImageRates(true); try { const d = await API.getImageModelCosts(); setImageModelRates(d.models || []) } catch (e) { console.error('Failed to load image rates:', e) } finally { setLoadingImageRates(false) } }
     const loadMonitorData = async () => { try { const d = await API.getPricingMonitor(); setMonitorData(d) } catch (e) { console.error(e) } }
     const handlePricingCheck = async () => { setMonitorChecking(true); try { const d = await API.triggerPricingCheck(); showToast(d.message); loadMonitorData() } catch (e) { showToast(e.error || 'Check failed', 'error') } finally { setMonitorChecking(false) } }
     const handleDismissAlerts = async () => { try { await API.dismissPricingAlerts(); showToast('Alerts dismissed'); loadMonitorData() } catch { showToast('Failed', 'error') } }
@@ -4340,7 +4349,8 @@ export default function SuperAdminDashboard() {
                             {[{ id: 'calculator', label: '🧮 Margin Calculator', icon: 'tune' },
                               { id: 'policy', label: '📋 Pricing Policy', icon: 'description' },
                               { id: 'monitor', label: '🤖 Price Monitor', icon: 'monitoring' },
-                              { id: 'video-rates', label: '🎥 Video Model Rates', icon: 'slow_motion_video' }].map(s => (
+                              { id: 'video-rates', label: '🎥 Video Model Rates', icon: 'slow_motion_video' },
+                              { id: 'image-rates', label: '🖼️ Image Model Rates', icon: 'image' }].map(s => (
                                 <button key={s.id} onClick={() => setPolicySection(s.id)}
                                     className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                                         policySection === s.id ? 'bg-[var(--sys-primary-dim)] text-primary' : 'bg-[var(--sys-surface)] text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
@@ -5083,6 +5093,218 @@ export default function SuperAdminDashboard() {
                                                                                                 </div>
                                                                                             );
                                                                                         })}
+                                                                                    </div>
+                                                                                </div>
+                                                                            </td>
+                                                                        </tr>
+                                                                    )}
+                                                                </React.Fragment>
+                                                            );
+                                                        })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ─── SECTION 5: IMAGE MODEL RATES ─── */}
+                        {policySection === 'image-rates' && (
+                            <div className="space-y-6">
+                                {/* Search and Filters */}
+                                <div className="glass-panel rounded-2xl p-4 border border-[var(--sys-border)] flex flex-wrap items-center gap-4 justify-between">
+                                    <div className="flex items-center gap-3 flex-1 min-w-[280px]">
+                                        <div className="relative flex-1">
+                                            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--sys-text-muted)]">search</span>
+                                            <input type="text" value={imageRatesSearch} onChange={e => setImageRatesSearch(e.target.value)}
+                                                placeholder="Search image models by name or id..."
+                                                className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-[var(--sys-text)] outline-none focus:border-primary transition-all" />
+                                        </div>
+                                        {imageRatesSearch && (
+                                            <button onClick={() => setImageRatesSearch('')} className="text-xs text-[var(--sys-text-muted)] hover:text-[var(--sys-text)] cursor-pointer">Clear</button>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-3 flex-wrap">
+                                        {/* Resolution Selector */}
+                                        <div className="flex gap-1 bg-[var(--sys-surface)] p-1 rounded-xl border border-[var(--sys-border)]">
+                                            {['all', '1K', '2K', '4K'].map(res => (
+                                                <button key={res} onClick={() => { setImageRatesResolutionFilter(res); setExpandedImageModelId(null); }}
+                                                    className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                                        imageRatesResolutionFilter === res ? 'bg-[var(--sys-primary-dim)] text-primary' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
+                                                    {res === 'all' ? '👁️ All Res' : res}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        {/* Quality Selector */}
+                                        <div className="flex gap-1 bg-[var(--sys-surface)] p-1 rounded-xl border border-[var(--sys-border)]">
+                                            {['all', 'Low', 'Medium', 'High'].map(q => (
+                                                <button key={q} onClick={() => { setImageRatesQualityFilter(q); setExpandedImageModelId(null); }}
+                                                    className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                                        imageRatesQualityFilter === q ? 'bg-[var(--sys-primary-dim)] text-primary' : 'text-[var(--sys-text-muted)] hover:text-[var(--sys-text)]'}`}>
+                                                    {q === 'all' ? '👁️ All Qual' : q}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <select value={imageRatesProviderFilter} onChange={e => setImageRatesProviderFilter(e.target.value)}
+                                            className="px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-xs text-[var(--sys-text)] cursor-pointer">
+                                            <option value="all">All Providers</option>
+                                            <option value="google">Google</option>
+                                            <option value="microsoft">Microsoft</option>
+                                            <option value="openai">OpenAI</option>
+                                            <option value="baidu">Baidu</option>
+                                            <option value="grok">Grok (xAI)</option>
+                                            <option value="laozhang">Laozhang (Alibaba)</option>
+                                            <option value="bytedance">ByteDance</option>
+                                            <option value="piapi">PiAPI</option>
+                                            <option value="fal">Fal.ai</option>
+                                        </select>
+                                        <select value={imageRatesCategoryFilter} onChange={e => setImageRatesCategoryFilter(e.target.value)}
+                                            className="px-3 py-2 rounded-xl bg-[var(--sys-surface)] border border-[var(--sys-border)] text-xs text-[var(--sys-text)] cursor-pointer">
+                                            <option value="all">All Categories</option>
+                                            <option value="Text-to-Image">Text-to-Image</option>
+                                            <option value="Image-to-Image">Image-to-Image</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* Cost & Margin Config Info */}
+                                <div className="bg-[var(--sys-primary-dim)] border border-[var(--sys-border)] rounded-2xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                    <div>
+                                        <h4 className="text-sm font-black text-primary uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                                            <span className="material-symbols-outlined text-sm">settings_suggest</span>
+                                            Margin and Exchange Simulator (Image)
+                                        </h4>
+                                        <p className="text-xs text-[var(--sys-text-muted)]">
+                                            These cost metrics are synchronized dynamically with your Margin Calculator settings above: <strong className="text-[var(--sys-text)]">₹{calcCreditPrice}/credit</strong> floor, <strong className="text-[var(--sys-text)]">{calcMargin}% target margin</strong>, and exchange rate of <strong className="text-[var(--sys-text)]">₹{calcExRate}/USD</strong>.
+                                        </p>
+                                    </div>
+                                    <div className="flex gap-4 text-xs font-bold text-[var(--sys-text)]">
+                                        <div className="bg-[var(--sys-surface)] border border-[var(--sys-border)] px-3 py-2 rounded-xl">
+                                            <span className="text-[10px] text-[var(--sys-text-muted)] block uppercase">Ex Rate</span>
+                                            ₹{calcExRate} / USD
+                                        </div>
+                                        <div className="bg-[var(--sys-surface)] border border-[var(--sys-border)] px-3 py-2 rounded-xl">
+                                            <span className="text-[10px] text-[var(--sys-text-muted)] block uppercase">Target Margin</span>
+                                            {calcMargin}%
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Rates Table */}
+                                <div className="glass-panel rounded-2xl overflow-hidden border border-[var(--sys-border)]">
+                                    {loadingImageRates ? (
+                                        <div className="flex flex-col items-center justify-center p-12 text-[var(--sys-text-muted)]">
+                                            <span className="material-symbols-outlined text-4xl animate-spin text-primary mb-2">progress_activity</span>
+                                            <p className="text-xs">Loading image model rates...</p>
+                                        </div>
+                                    ) : (
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left min-w-[900px]">
+                                                <thead>
+                                                    <tr className="text-[10px] text-[var(--sys-text-muted)] font-black uppercase tracking-wider border-b border-[var(--sys-border)] bg-[var(--sys-surface)]">
+                                                        <th className="px-4 py-3">Model Details</th>
+                                                        <th className="px-4 py-3">Provider</th>
+                                                        <th className="px-4 py-3">Category</th>
+                                                        <th className="px-4 py-3 text-right">USD/PIC {imageRatesResolutionFilter !== 'all' || imageRatesQualityFilter !== 'all' ? `(Scaled)` : ''}</th>
+                                                        <th className="px-4 py-3 text-right">INR/PIC {imageRatesResolutionFilter !== 'all' || imageRatesQualityFilter !== 'all' ? `(Scaled)` : ''}</th>
+                                                        <th className="px-4 py-3 text-right">Suggested Retail INR/PIC (Margin)</th>
+                                                        <th className="px-4 py-3 text-right font-black text-primary">Est Credits/PIC</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-white/[0.03]">
+                                                    {imageModelRates
+                                                        .filter(m => {
+                                                            if (imageRatesProviderFilter !== 'all' && m.provider !== imageRatesProviderFilter) return false;
+                                                            if (imageRatesCategoryFilter !== 'all' && m.category !== imageRatesCategoryFilter) return false;
+                                                            if (imageRatesSearch) {
+                                                                const s = imageRatesSearch.toLowerCase();
+                                                                return m.name.toLowerCase().includes(s) || m.id.toLowerCase().includes(s);
+                                                            }
+                                                            return true;
+                                                        })
+                                                        .map(m => {
+                                                            const RESOLUTION_MULTIPLIERS = { '1K': 1.0, '2K': 1.5, '4K': 2.5 };
+                                                            const QUALITY_MULTIPLIERS = { 'Low': 0.5, 'Medium': 1.0, 'High': 1.8 };
+
+                                                            const resMult = RESOLUTION_MULTIPLIERS[imageRatesResolutionFilter] || 1.0;
+                                                            const qualMult = QUALITY_MULTIPLIERS[imageRatesQualityFilter] || 1.0;
+                                                            const combinedMult = resMult * qualMult;
+
+                                                            const usdPerPicScaled = m.usdPerPic * combinedMult;
+                                                            const inrPerPic = usdPerPicScaled * calcExRate;
+                                                            const suggestedRetailPerPic = inrPerPic / (1 - (calcMargin / 100));
+                                                            const estCreditsPerPic = Math.ceil(suggestedRetailPerPic / calcCreditPrice);
+
+                                                            return (
+                                                                <React.Fragment key={m.id}>
+                                                                    <tr className="text-sm hover:bg-[var(--sys-surface)] transition-all cursor-pointer"
+                                                                        onClick={() => setExpandedImageModelId(expandedImageModelId === m.id ? null : m.id)}>
+                                                                        <td className="px-4 py-3.5">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="material-symbols-outlined text-xs text-[var(--sys-text-muted)] transition-all" style={{ transform: expandedImageModelId === m.id ? 'rotate(90deg)' : 'none' }}>chevron_right</span>
+                                                                                <div>
+                                                                                    <p className="font-bold text-[var(--sys-text)] text-xs">{m.name}</p>
+                                                                                    <span className="text-[9px] font-mono text-[var(--sys-text-muted)]">{m.id}</span>
+                                                                                </div>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="px-4 py-3.5 text-xs font-semibold uppercase text-[var(--sys-text-muted)]">{m.provider}</td>
+                                                                        <td className="px-4 py-3.5 text-xs text-[var(--sys-text-muted)]">{m.category}</td>
+                                                                        <td className="px-4 py-3.5 text-right font-mono text-xs">${usdPerPicScaled.toFixed(4)}</td>
+                                                                        <td className="px-4 py-3.5 text-right font-mono text-xs text-[var(--sys-text-muted)]">₹{inrPerPic.toFixed(3)}</td>
+                                                                        <td className="px-4 py-3.5 text-right font-mono text-xs font-bold text-emerald-400">₹{suggestedRetailPerPic.toFixed(3)}</td>
+                                                                        <td className="px-4 py-3.5 text-right font-mono text-xs font-black text-primary">{estCreditsPerPic} cr</td>
+                                                                    </tr>
+                                                                    {expandedImageModelId === m.id && (
+                                                                        <tr className="bg-[var(--sys-surface)]/30">
+                                                                            <td colSpan={7} className="px-6 py-4">
+                                                                                <div className="glass-panel border border-[var(--sys-border)] rounded-2xl p-4 animate-in fade-in duration-300">
+                                                                                    <h5 className="text-xs font-black uppercase tracking-wider text-primary mb-1.5 flex items-center gap-1.5">
+                                                                                        <span className="material-symbols-outlined text-sm">grid_view</span>
+                                                                                        Resolution vs Quality Pricing Matrix for {m.name}
+                                                                                    </h5>
+                                                                                    <p className="text-[10px] text-[var(--sys-text-muted)] mb-3">
+                                                                                        Shows the dynamic pricing for each permutation of Resolution (1K, 2K, 4K) and Quality (Low, Medium, High).
+                                                                                    </p>
+                                                                                    <div className="overflow-x-auto">
+                                                                                        <table className="w-full text-left border border-[var(--sys-border)] rounded-xl overflow-hidden mt-3 text-xs min-w-[700px]">
+                                                                                            <thead>
+                                                                                                <tr className="bg-[var(--sys-surface)] text-[10px] text-[var(--sys-text-muted)] font-black uppercase tracking-wider">
+                                                                                                    <th className="px-3 py-2 border-b border-[var(--sys-border)]">Resolution \ Quality</th>
+                                                                                                    <th className="px-3 py-2 text-right border-b border-[var(--sys-border)]">Low (0.5x)</th>
+                                                                                                    <th className="px-3 py-2 text-right border-b border-[var(--sys-border)]">Medium (1.0x)</th>
+                                                                                                    <th className="px-3 py-2 text-right border-b border-[var(--sys-border)]">High (1.8x)</th>
+                                                                                                </tr>
+                                                                                            </thead>
+                                                                                            <tbody className="divide-y divide-white/[0.03]">
+                                                                                                {['1K', '2K', '4K'].map(res => {
+                                                                                                    const resMultiplier = RESOLUTION_MULTIPLIERS[res];
+                                                                                                    return (
+                                                                                                        <tr key={res} className="hover:bg-white/[0.01]">
+                                                                                                            <td className="px-3 py-2.5 font-bold text-[var(--sys-text)] uppercase bg-[var(--sys-surface)]/20 border-r border-[var(--sys-border)]">{res} ({resMultiplier}x scale)</td>
+                                                                                                            {['Low', 'Medium', 'High'].map(qual => {
+                                                                                                                const qualMultiplier = QUALITY_MULTIPLIERS[qual];
+                                                                                                                const cellMult = resMultiplier * qualMultiplier;
+                                                                                                                const cellUsd = m.usdPerPic * cellMult;
+                                                                                                                const cellInr = cellUsd * calcExRate;
+                                                                                                                const cellSuggestedRetail = cellInr / (1 - (calcMargin / 100));
+                                                                                                                const cellEstCredits = Math.ceil(cellSuggestedRetail / calcCreditPrice);
+
+                                                                                                                return (
+                                                                                                                    <td key={qual} className="px-3 py-2.5 text-right font-mono">
+                                                                                                                        <div className="font-bold text-[var(--sys-text)]">${cellUsd.toFixed(4)}</div>
+                                                                                                                        <div className="text-[10px] text-[var(--sys-text-muted)]">₹{cellInr.toFixed(3)}</div>
+                                                                                                                        <div className="text-[10px] text-emerald-400 font-bold">₹{cellSuggestedRetail.toFixed(3)} retail</div>
+                                                                                                                        <div className="text-primary font-black text-[11px] mt-0.5">{cellEstCredits} cr</div>
+                                                                                                                    </td>
+                                                                                                                );
+                                                                                                            })}
+                                                                                                        </tr>
+                                                                                                    );
+                                                                                                })}
+                                                                                            </tbody>
+                                                                                        </table>
                                                                                     </div>
                                                                                 </div>
                                                                             </td>

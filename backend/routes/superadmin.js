@@ -29,6 +29,7 @@ import { safeErrorMessage } from '../utils/safeError.js';
 import { logAudit } from '../utils/audit.js';
 import CreditUsage from '../models/CreditUsage.js';
 import { VIDEO_MODEL_RATES } from '../utils/videoModelRates.js';
+import { IMAGE_MODEL_RATES } from '../utils/imageModelRates.js';
 import { uploadToS3 } from '../utils/s3.js';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
@@ -3031,6 +3032,18 @@ router.get('/video-model-costs', async (req, res) => {
         res.json({
             success: true,
             models: VIDEO_MODEL_RATES
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// GET /superadmin/image-model-costs — Master cost per picture rates of all image models
+router.get('/image-model-costs', async (req, res) => {
+    try {
+        res.json({
+            success: true,
+            models: IMAGE_MODEL_RATES
         });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
