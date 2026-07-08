@@ -190,22 +190,29 @@ export const requireCredits = (actionOrCost = 1) => {
 
                 // Dynamic image credits — calculated per request based on model, resolution, quality
                 if (rawCost === 'dynamic' && ['creative', 'photoshoot', 'adCreative', 'canvasGenerate', 'avatarGenerate'].includes(actionOrCost)) {
-                    const model = req.body.model || req.body.imageModel || 'nano-banana-2-t2i';
-                    const resolution = req.body.resolution || req.body._imageSize || '1K';
-                    const quality = req.body.quality || req.body.agenticQuality || 'Medium';
+                    const model = req.body.model || req.body.imageModel;
+                    
+                    if (!model && ['adCreative', 'canvasGenerate'].includes(actionOrCost)) {
+                        // Fallback static costs for text/general pipelines
+                        const fallbacks = { adCreative: 8, canvasGenerate: 3 };
+                        cost = fallbacks[actionOrCost] || 8;
+                    } else {
+                        const resolution = req.body.resolution || req.body._imageSize || '1K';
+                        const quality = req.body.quality || req.body.agenticQuality || 'Medium';
 
-                    let defaultCount = 1;
-                    if (actionOrCost === 'photoshoot') defaultCount = 4;
-                    else if (actionOrCost === 'avatarGenerate') defaultCount = 3;
+                        let defaultCount = 1;
+                        if (actionOrCost === 'photoshoot') defaultCount = 4;
+                        else if (actionOrCost === 'avatarGenerate') defaultCount = 3;
 
-                    const count = parseInt(req.body.numImages || req.body.count || req.body.quantity || defaultCount) || defaultCount;
+                        const count = parseInt(req.body.numImages || req.body.count || req.body.quantity || defaultCount) || defaultCount;
 
-                    const exRate = 95.56;
-                    const margin = 60;
-                    const creditPrice = 5;
+                        const exRate = 95.56;
+                        const margin = 60;
+                        const creditPrice = 5;
 
-                    cost = calculateImageCredits(model, resolution, quality, count, exRate, margin, creditPrice);
-                    console.log(`🖼️ Dynamic image credits for ${actionOrCost}: ${model} (${resolution}, ${quality}) × ${count} → ${cost} credits`);
+                        cost = calculateImageCredits(model || 'nano-banana-2-t2i', resolution, quality, count, exRate, margin, creditPrice);
+                    }
+                    console.log(`🖼️ Dynamic image credits for ${actionOrCost}: model=${model || 'none'} → ${cost} credits`);
                 } else if (rawCost === 'dynamic' && actionOrCost === 'videoGenerate') {
                     const duration = parseInt(req.body.duration) || 5;
                     cost = Math.ceil(duration * CREDITS_PER_SECOND);
@@ -682,7 +689,18 @@ export const logTokenUsage = async (userId, tokenData, meta = {}) => {
 };
 
 export function calculateImageCredits(modelId, resolution = '1K', quality = 'Medium', count = 1, exRate = 95.56, margin = 60, creditPrice = 5) {
-    const model = IMAGE_MODEL_RATES.find(m => m.id === modelId || m.name === modelId) || { usdPerPic: 0.04 };
+    let resolvedModelId = modelId || 'nano-banana-2-t2i';
+    const aliases = {
+        'nanobanana-2': 'nano-banana-2-t2i',
+        'nanobanana-lite': 'nano-banana-2-lite-t2i',
+        'nanobanana-pro': 'nano-banana-pro-t2i',
+        'gpt-image-2': 'openai-gpt-image-2-t2i'
+    };
+    if (aliases[resolvedModelId]) {
+        resolvedModelId = aliases[resolvedModelId];
+    }
+
+    const model = IMAGE_MODEL_RATES.find(m => m.id === resolvedModelId || m.name === resolvedModelId) || { usdPerPic: 0.04 };
     const RESOLUTION_MULTIPLIERS = { '1K': 1.0, '2K': 1.5, '4K': 2.5 };
     const QUALITY_MULTIPLIERS = { 'Low': 0.5, 'Medium': 1.0, 'High': 1.8 };
 

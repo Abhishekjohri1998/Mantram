@@ -14,6 +14,7 @@ import SEOHead from '../components/SEOHead';
 import AvatarOptionsForm from '../components/AvatarOptionsForm';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
+import { CreditBadge } from '../components/CreditBadge';
 
 // ─── Default option state ─────────────────────────────────────────────────────
 const DEFAULT_OPTIONS = {
@@ -384,7 +385,9 @@ export default function AvatarGenerator() {
                         {!isSuperAdmin && (
                             <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: 14, color: 'rgba(255,255,255,0.3)' }}>token</span>
-                                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>4 credits · covers all 3 variants</span>
+                                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>
+                                    <CreditBadge action="avatarGenerate" model="nanobanana-2" count={3} className="!ml-0" /> · covers all 3 variants
+                                </span>
                             </div>
                         )}
                         {isSuperAdmin && (

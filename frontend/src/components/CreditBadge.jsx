@@ -36,7 +36,12 @@ export function CreditBadge({ action, className = '', model, resolution = '1K', 
 
     if (cost === 'dynamic') {
         if (['creative', 'photoshoot', 'adCreative', 'canvasGenerate', 'avatarGenerate'].includes(action)) {
-            cost = calculateFrontendImageCredits(model, resolution, quality, count, action);
+            if (!model && ['adCreative', 'canvasGenerate'].includes(action)) {
+                const fallbacks = { adCreative: 8, canvasGenerate: 3 };
+                cost = fallbacks[action] || 8;
+            } else {
+                cost = calculateFrontendImageCredits(model, resolution, quality, count, action);
+            }
         } else {
             cost = 8; // fallback
         }
@@ -73,7 +78,12 @@ export function CreditTooltipWrapper({ action, children, position = 'top', class
 
     if (cost === 'dynamic') {
         if (['creative', 'photoshoot', 'adCreative', 'canvasGenerate', 'avatarGenerate'].includes(action)) {
-            cost = calculateFrontendImageCredits(model, resolution, quality, count, action);
+            if (!model && ['adCreative', 'canvasGenerate'].includes(action)) {
+                const fallbacks = { adCreative: 8, canvasGenerate: 3 };
+                cost = fallbacks[action] || 8;
+            } else {
+                cost = calculateFrontendImageCredits(model, resolution, quality, count, action);
+            }
         } else {
             cost = 8; // fallback
         }
