@@ -96,7 +96,7 @@ export default function SuperAdminDashboard() {
     const [monitorChecking, setMonitorChecking] = useState(false)
     const [calcCreditPrice, setCalcCreditPrice] = useState(5)
     const [calcMargin, setCalcMargin] = useState(60)
-    const [calcExRate, setCalcExRate] = useState(85)
+    const [calcExRate, setCalcExRate] = useState(95.56)
     const [policySection, setPolicySection] = useState('calculator')
     const [videoModelRates, setVideoModelRates] = useState([])
     const [videoRatesSearch, setVideoRatesSearch] = useState('')
@@ -3858,7 +3858,7 @@ export default function SuperAdminDashboard() {
                                         <div className="glass-panel rounded-xl p-4 text-center">
                                             <p className="text-xs text-[var(--sys-text-muted)] mb-1">Total API Cost (Est.)</p>
                                             <p className="text-xl font-extrabold text-primary">${providerUsageData.totalEstimatedCostUSD}</p>
-                                            <p className="text-[10px] text-[var(--sys-text-muted)]">≈ ₹{Math.round((providerUsageData.totalEstimatedCostUSD || 0) * 85).toLocaleString()}</p>
+                                            <p className="text-[10px] text-[var(--sys-text-muted)]">≈ ₹{Math.round((providerUsageData.totalEstimatedCostUSD || 0) * calcExRate).toLocaleString()}</p>
                                         </div>
                                         <div className="glass-panel rounded-xl p-4 text-center">
                                             <p className="text-xs text-[var(--sys-text-muted)] mb-1">Total API Calls</p>
@@ -4382,10 +4382,10 @@ export default function SuperAdminDashboard() {
                                                 <label className="text-xs font-bold text-[var(--sys-text-muted)]">USD/INR Rate</label>
                                                 <span className="text-lg font-black text-[#FF4D00]">₹{calcExRate}</span>
                                             </div>
-                                            <input type="range" min="80" max="95" step="1" value={calcExRate}
-                                                onChange={e => { setCalcExRate(parseInt(e.target.value)); loadPricingData(calcCreditPrice, calcMargin, parseInt(e.target.value)) }}
+                                            <input type="range" min="80" max="105" step="0.1" value={calcExRate}
+                                                onChange={e => { setCalcExRate(parseFloat(e.target.value)); loadPricingData(calcCreditPrice, calcMargin, parseFloat(e.target.value)) }}
                                                 className="w-full accent-blue-500" />
-                                            <div className="flex justify-between text-[9px] text-[var(--sys-text-muted)] mt-1"><span>₹80</span><span>₹85 (default)</span><span>₹95</span></div>
+                                            <div className="flex justify-between text-[9px] text-[var(--sys-text-muted)] mt-1"><span>₹80</span><span>₹95.56 (default)</span><span>₹105</span></div>
                                         </div>
                                     </div>
                                 </div>

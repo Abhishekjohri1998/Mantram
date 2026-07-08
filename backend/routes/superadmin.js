@@ -3109,7 +3109,7 @@ router.get('/pricing-policy', async (req, res) => {
                     text: 'credits = max(ceil(USD_cost × 34), floor)',
                     floorPrice: '₹5/credit minimum',
                     targetMargin: '≥50% gross margin on all actions',
-                    exchangeRate: 'USD/INR = 85 (configurable)',
+                    exchangeRate: 'USD/INR = 95.56 (configurable)',
                 },
                 creditCostsByStudio,
                 videoMatrix,
@@ -3356,7 +3356,7 @@ router.post('/credit-costs/reset', async (req, res) => {
 router.get('/pricing-calculator', async (req, res) => {
     try {
         const costs = await getCreditCosts();
-        const { creditPriceINR = 2, usdToInr = 85, targetMargin = 60 } = req.query;
+        const { creditPriceINR = 2, usdToInr = 95.56, targetMargin = 60 } = req.query;
         const pricePerCredit = parseFloat(creditPriceINR);
         const exchangeRate = parseFloat(usdToInr);
         const margin = parseFloat(targetMargin);
@@ -3740,8 +3740,8 @@ router.get('/stats/token-usage', async (req, res) => {
             },
             profitability: {
                 monthlyRevenue,
-                estimatedCostINR: Math.round((t.estimatedCost || 0) * 85), // approx USD→INR
-                margin: monthlyRevenue > 0 ? Math.round(((monthlyRevenue - (t.estimatedCost || 0) * 85) / monthlyRevenue) * 100) : 0,
+                estimatedCostINR: Math.round((t.estimatedCost || 0) * 95.56), // approx USD→INR
+                margin: monthlyRevenue > 0 ? Math.round(((monthlyRevenue - (t.estimatedCost || 0) * 95.56) / monthlyRevenue) * 100) : 0,
             },
             providerWallets: Object.keys(providerBudgets).map(p => {
               const stats = (totals[1] || []).find(s => s._id === p) || {};
