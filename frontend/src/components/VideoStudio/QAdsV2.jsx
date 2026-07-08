@@ -17,6 +17,7 @@ async function api(path, opts = {}) {
     return data
 }
 import ViralityMiniPanel from '../ViralityMiniPanel'
+import { calculateFrontendVideoCredits } from '../CreditBadge'
 
 const DURS = [{value:5,label:'5s',msIcon:'timer'},{value:8,label:'8s',msIcon:'timer'},{value:10,label:'10s',msIcon:'timer'},{value:15,label:'15s',msIcon:'timer'},{value:20,label:'20s',msIcon:'timer'},{value:30,label:'30s',msIcon:'movie'},{value:45,label:'45s',msIcon:'movie'},{value:60,label:'60s',msIcon:'movie'},{value:90,label:'90s',msIcon:'movie'},{value:120,label:'120s',msIcon:'movie'}]
 const FMTS = [{value:'9:16',label:'9:16',msIcon:'crop_portrait'},{value:'16:9',label:'16:9',msIcon:'crop_landscape'},{value:'1:1',label:'1:1',msIcon:'crop_square'}]
@@ -710,6 +711,8 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
     const [selectedModel, setSelectedModel] = useState('seedance-2.0-fast')
     const [userBrief, setUserBrief] = useState('')
     const [hookShot, setHookShot] = useState(false)
+    const [showConfirmModal, setShowConfirmModal] = useState(false)
+    const [pendingVariant, setPendingVariant] = useState(null)
     const [language, setLanguage] = useState(() => {
         const brandLang = activeBrand?.dna?.defaultLanguage
         if (brandLang) {
@@ -720,36 +723,7 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
     })
 
     const getCredits = (modelId, dur, res) => {
-        const d = parseInt(dur) || 8;
-        const r = res || '720p';
-        const m = modelId || 'seedance-2.0';
-        
-        let costPerSec = 0.23;
-        if (m === 'seedance-2.0-fast') costPerSec = 0.1536;
-        else if (m === 'seedance-2.0-mini') costPerSec = 0.08;
-        else if (m === 'seedance-1.0') costPerSec = 0.08;
-        else if (m === 'happyhorse-1.0' || m === 'happyhorse-1.1') costPerSec = 0.15;
-        else if (m === 'gemini-flash' || m === 'gemini-omni-flash') costPerSec = 0.15;
-        else if (m === 'kling-3.0') costPerSec = 0.07;
-        else if (m === 'veo-3.1') costPerSec = 0.10;
-        else if (m === 'veo-3.1-lite') costPerSec = 0.05;
-        else if (m === 'grok-imagine') costPerSec = 0.08;
-        
-        let resMult = 1.0;
-        const ATLAS_MODELS = ['seedance-2.0', 'seedance-2.0-fast', 'seedance-2.0-mini', 'happyhorse-1.0', 'happyhorse-1.1', 'gemini-flash', 'gemini-omni-flash', 'veo-3.1-lite'];
-        if (ATLAS_MODELS.includes(m)) {
-            if (r === '480p') resMult = 0.5;
-            else if (r === '720p') resMult = 0.6;
-            else if (r === '1080p') resMult = 1.0;
-            else if (r === '4k') resMult = 2.0;
-        } else {
-            if (r === '480p') resMult = 0.5;
-            else if (r === '720p') resMult = 0.7;
-            else if (r === '4k') resMult = 2.0;
-        }
-        
-        const usd = costPerSec * d * resMult;
-        return Math.max(Math.ceil(usd * 20), 5);
+        return calculateFrontendVideoCredits(modelId, res, dur)
     };
 
     // Modals
@@ -1052,6 +1026,24 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
         }
     }, [selP, userBrief, productData, productUrl, productImgs, duration, format, resolution, selectedModel, hookShot, language, avatarUrl, activeBrand])
 
+    const triggerGenerateVideo = (variant) => {
+        setPendingVariant(variant)
+        setShowConfirmModal(true)
+    }
+
+    const executeGen = () => {
+        setShowConfirmModal(false)
+        if (pendingVariant) {
+            generateVideo(pendingVariant)
+        }
+        setPendingVariant(null)
+    }
+
+    const cancelGen = () => {
+        setShowConfirmModal(false)
+        setPendingVariant(null)
+    }
+
     // Step 2 — Generate video for one variant
     const generateVideo = useCallback(async (variant) => {
         if (!canCreateVideo) { onUpgradeRequired?.(); return }
@@ -1286,7 +1278,7 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
                                     <div style={{ color: '#ef4444', fontSize: 12, padding: '8px 0' }}>{job.error || 'Generation failed'}</div>
                                 ) : (
                                     <button
-                                        onClick={() => generateVideo(v)}
+                                        onClick={() => triggerGenerateVideo(v)}
                                         style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 0', fontWeight: 800, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, letterSpacing: 0.5 }}
                                     >
                                         <span className="material-symbols-outlined" style={{ fontSize: 18 }}>videocam</span>
@@ -1751,6 +1743,60 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
             defaultVideo={publishUrl}
             brandId={activeBrand?._id}
         />
+
+        {/* Cost Confirmation Modal */}
+        {showConfirmModal && (
+            <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', zIndex: 10001 }}>
+                <div style={{ background: '#0D0D12', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 24, padding: 28, maxWidth: 400, width: '90%', display: 'flex', flexDirection: 'column', gap: 20 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                        <div style={{ width: 48, height: 48, borderRadius: 24, background: 'rgba(168,85,247,0.1)', border: '1px solid #A855F7', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
+                            <span className="material-symbols-outlined text-primary text-2xl animate-pulse" style={{ color: '#A855F7', fontSize: 24 }}>toll</span>
+                        </div>
+                        <h3 style={{ fontSize: 18, fontWeight: 700, color: '#fff', margin: 0 }}>Confirm Video Generation</h3>
+                        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', margin: 0, textAlign: 'center' }}>Dynamic pricing calculation</p>
+                    </div>
+
+                    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                            <span style={{ color: 'rgba(255,255,255,0.4)' }}>Model</span>
+                            <span style={{ color: '#fff', fontWeight: 600 }}>{selectedModel}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                            <span style={{ color: 'rgba(255,255,255,0.4)' }}>Duration</span>
+                            <span style={{ color: '#fff', fontWeight: 600 }}>{duration}s</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                            <span style={{ color: 'rgba(255,255,255,0.4)' }}>Resolution</span>
+                            <span style={{ color: '#fff', fontWeight: 600 }}>{resolution}</span>
+                        </div>
+                        <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ color: '#fff', fontWeight: 600, fontSize: 13 }}>Estimated Cost</span>
+                            <span style={{ color: '#A855F7', fontWeight: 800, fontSize: 18, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>toll</span>
+                                {getCredits(selectedModel, duration, resolution)}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
+                        <button
+                            onClick={cancelGen}
+                            style={{ flex: 1, height: 44, borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={executeGen}
+                            style={{ flex: 1, height: 44, borderRadius: 12, border: 'none', background: '#A855F7', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                        >
+                            <span>Looks Good</span>
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_forward</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
 
     </div>
 }

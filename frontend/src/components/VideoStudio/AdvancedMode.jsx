@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import PublishModal from '../PublishModal'
 import { creatives as creativesAPI } from '../../services/api'
-import { CreditTooltipWrapper } from '../CreditBadge'
+import { CreditTooltipWrapper, calculateFrontendVideoCredits } from '../CreditBadge'
 import VideoHoverActions from './VideoHoverActions'
 
 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
@@ -658,6 +658,8 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
     const [extendDuration, setExtendDuration] = useState(5)
     const [extending, setExtending] = useState(false)
     const [language, setLanguage] = useState('English')
+    const [showConfirmModal, setShowConfirmModal] = useState(false)
+    const [pendingGen, setPendingGen] = useState(null)
 
     const firstFrameRef = useRef(null)
     const lastFrameRef = useRef(null)
@@ -684,7 +686,7 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
         else if (resolution === '4k') resMult = 2.0
     }
     
-    const credits = Math.max(Math.ceil(duration * 17), 5)
+    const credits = calculateFrontendVideoCredits(model, resolution, duration)
     const activeJobCount = jobs.filter(j => j.status === 'generating').length
     const canGenerate = activeJobCount < MAX_CONCURRENT
 
@@ -1039,6 +1041,36 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
             setJobs(prev => prev.filter(j => j.id !== jobId))
         }
         setLoading(false)
+    }
+
+    const executeGen = () => {
+        setShowConfirmModal(false)
+        if (!pendingGen) return
+        if (pendingGen.type === 'i2v') {
+            handleI2VGenerate()
+        } else if (pendingGen.type === 't2v') {
+            if (duration > 15) {
+                handleLongFormGenerate(pendingGen.finalPrompt, pendingGen.thumbUrl)
+            } else {
+                handleGenerate()
+            }
+        }
+        setPendingGen(null)
+    }
+
+    const triggerI2VGenerate = () => {
+        setPendingGen({ type: 'i2v' })
+        setShowConfirmModal(true)
+    }
+
+    const triggerT2VGenerate = (finalPrompt) => {
+        setPendingGen({ type: 't2v', finalPrompt, thumbUrl: firstFrame?.url || i2vImage?.url })
+        setShowConfirmModal(true)
+    }
+
+    const cancelGen = () => {
+        setShowConfirmModal(false)
+        setPendingGen(null)
     }
 
     // ── Extend ──
@@ -1512,15 +1544,14 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                         </div>
                         {/* GENERATE — inline right of prompt */}
                         {videoMode === 'i2v' ? (
-                            <button className="vm-generate" onClick={handleI2VGenerate} disabled={loading || !i2vImage?.url || !canGenerate}>
+                            <button className="vm-generate" onClick={triggerI2VGenerate} disabled={loading || !i2vImage?.url || !canGenerate}>
                                 {loading ? <><span className="material-symbols-outlined vm-spin" style={{ fontSize: 16 }}>progress_activity</span></>
                                     : <><span className="material-symbols-outlined" style={{ fontSize: 16 }}>animation</span><span style={{ fontSize: 11 }}>{credits}</span></>}
                             </button>
                         ) : (
                             <button className="vm-generate" onClick={() => {
                                 const finalPrompt = m.has.multishot ? shots.map(s => s.prompt).join(' | ') : prompt.trim()
-                                if (duration > 15) { handleLongFormGenerate(finalPrompt, firstFrame?.url || i2vImage?.url) }
-                                else { handleGenerate() }
+                                triggerT2VGenerate(finalPrompt)
                             }} disabled={loading || !(m.has.multishot ? shots[0].prompt : prompt).trim() || !canGenerate}>
                                 {loading ? <><span className="material-symbols-outlined vm-spin" style={{ fontSize: 16 }}>progress_activity</span></>
                                     : <><span className="material-symbols-outlined" style={{ fontSize: 16 }}>movie_creation</span><span style={{ fontSize: 11 }}>{credits}</span></>}
@@ -1777,6 +1808,60 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                         >
                             Understood
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Cost Confirmation Modal */}
+            {showConfirmModal && (
+                <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', zIndex: 10001 }}>
+                    <div style={{ background: '#0D0D12', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 24, padding: 28, maxWidth: 400, width: '90%', display: 'flex', flexDirection: 'column', gap: 20 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                            <div style={{ width: 48, height: 48, borderRadius: 24, background: 'rgba(168,85,247,0.1)', border: '1px solid #A855F7', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
+                                <span className="material-symbols-outlined text-primary text-2xl animate-pulse" style={{ color: '#A855F7', fontSize: 24 }}>toll</span>
+                            </div>
+                            <h3 style={{ fontSize: 18, fontWeight: 700, color: '#fff', margin: 0 }}>Confirm Video Generation</h3>
+                            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', margin: 0, textAlign: 'center' }}>Dynamic pricing calculation</p>
+                        </div>
+
+                        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                                <span style={{ color: 'rgba(255,255,255,0.4)' }}>Model</span>
+                                <span style={{ color: '#fff', fontWeight: 600 }}>{model}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                                <span style={{ color: 'rgba(255,255,255,0.4)' }}>Duration</span>
+                                <span style={{ color: '#fff', fontWeight: 600 }}>{duration}s</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                                <span style={{ color: 'rgba(255,255,255,0.4)' }}>Resolution</span>
+                                <span style={{ color: '#fff', fontWeight: 600 }}>{resolution}</span>
+                            </div>
+                            <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ color: '#fff', fontWeight: 600, fontSize: 13 }}>Estimated Cost</span>
+                                <span style={{ color: '#A855F7', fontWeight: 800, fontSize: 18, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>toll</span>
+                                    {calculateFrontendVideoCredits(model, resolution, duration)}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
+                            <button
+                                onClick={cancelGen}
+                                style={{ flex: 1, height: 44, borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={executeGen}
+                                style={{ flex: 1, height: 44, borderRadius: 12, border: 'none', background: '#A855F7', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                            >
+                                <span>Looks Good</span>
+                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_forward</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

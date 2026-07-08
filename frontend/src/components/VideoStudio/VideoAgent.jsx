@@ -13,6 +13,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import VideoHoverActions from './VideoHoverActions'
+import { calculateFrontendVideoCredits } from '../CreditBadge'
 
 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
 
@@ -171,6 +172,7 @@ export default function VideoAgent({ activeBrand, canCreateVideo = true, onUpgra
     const [products, setProducts]           = useState([])
     const [selProduct, setSelProduct]       = useState(null)
     const [showProducts, setShowProducts]   = useState(false)
+    const [showConfirmModal, setShowConfirmModal] = useState(false)
 
     // ── Refs ──────────────────────────────────────────────────────────────────
     const bottomRef  = useRef(null)
@@ -470,7 +472,20 @@ export default function VideoAgent({ activeBrand, canCreateVideo = true, onUpgra
         } finally { setInputDisabled(false) }
     }
 
-    async function doGenerate() {
+    function doGenerate() {
+        setShowConfirmModal(true)
+    }
+
+    const cancelGen = () => {
+        setShowConfirmModal(false)
+    }
+
+    const executeGen = () => {
+        setShowConfirmModal(false)
+        executeGenerateVideo()
+    }
+
+    async function executeGenerateVideo() {
         if (!canCreateVideo) { onUpgradeRequired?.(); return }
         setInputDisabled(true); setIsTyping(true)
         try {
@@ -1067,6 +1082,60 @@ export default function VideoAgent({ activeBrand, canCreateVideo = true, onUpgra
                     </button>
                 </div>
             </div>
+
+            {/* Cost Confirmation Modal */}
+            {showConfirmModal && (
+                <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', zIndex: 10001 }}>
+                    <div style={{ background: '#0D0D12', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 24, padding: 28, maxWidth: 400, width: '90%', display: 'flex', flexDirection: 'column', gap: 20 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                            <div style={{ width: 48, height: 48, borderRadius: 24, background: 'rgba(168,85,247,0.1)', border: '1px solid #A855F7', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
+                                <span className="material-symbols-outlined text-primary text-2xl animate-pulse" style={{ color: '#A855F7', fontSize: 24 }}>toll</span>
+                            </div>
+                            <h3 style={{ fontSize: 18, fontWeight: 700, color: '#fff', margin: 0 }}>Confirm Video Generation</h3>
+                            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', margin: 0, textAlign: 'center' }}>Dynamic pricing calculation</p>
+                        </div>
+
+                        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                                <span style={{ color: 'rgba(255,255,255,0.4)' }}>Model</span>
+                                <span style={{ color: '#fff', fontWeight: 600 }}>{selectedModel}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                                <span style={{ color: 'rgba(255,255,255,0.4)' }}>Duration</span>
+                                <span style={{ color: '#fff', fontWeight: 600 }}>{plan?.duration || 5}s</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                                <span style={{ color: 'rgba(255,255,255,0.4)' }}>Resolution</span>
+                                <span style={{ color: '#fff', fontWeight: 600 }}>{selectedRes}</span>
+                            </div>
+                            <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ color: '#fff', fontWeight: 600, fontSize: 13 }}>Estimated Cost</span>
+                                <span style={{ color: '#A855F7', fontWeight: 800, fontSize: 18, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>toll</span>
+                                    {calculateFrontendVideoCredits(selectedModel, selectedRes, plan?.duration || 5)}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
+                            <button
+                                onClick={cancelGen}
+                                style={{ flex: 1, height: 44, borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={executeGen}
+                                style={{ flex: 1, height: 44, borderRadius: 12, border: 'none', background: '#A855F7', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                            >
+                                <span>Looks Good</span>
+                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_forward</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
