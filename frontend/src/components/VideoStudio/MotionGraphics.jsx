@@ -199,6 +199,7 @@ export default function MotionGraphics({ activeBrand, canCreateVideo = true, onU
     const [error, setError] = useState('')
     const [copied, setCopied] = useState(false)
     const [drag, setDrag] = useState(false)
+    const [showConfirmModal, setShowConfirmModal] = useState(false)
     const fileRef = useRef()
     const pollRef = useRef()
 
@@ -234,10 +235,14 @@ export default function MotionGraphics({ activeBrand, canCreateVideo = true, onU
         handleFiles(e.dataTransfer.files)
     }, [handleFiles])
 
-    // ── Main pipeline ──
-    const handleGenerate = async () => {
+    const handleGenerate = async (forceProceed = false) => {
         if (!canCreateVideo) { onUpgradeRequired?.(); return }
         if (images.length === 0) { setError('Upload at least one logo or image first'); return }
+        if (forceProceed !== true) {
+            setShowConfirmModal(true);
+            return;
+        }
+        setShowConfirmModal(false);
         setError(''); setVideoUrl(null); setProgress(0)
 
         // Stage 1: Analyze with Gemini Vision
@@ -528,6 +533,48 @@ export default function MotionGraphics({ activeBrand, canCreateVideo = true, onU
                     </div>
                 )}
             </div>
+            {/* Cost Confirmation Modal */}
+            {showConfirmModal && (
+                <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', zIndex: 10001 }}>
+                    <div style={{ background: '#0D0D12', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 24, padding: 28, maxWidth: 400, width: '90%', display: 'flex', flexDirection: 'column', gap: 20 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                            <div style={{ width: 48, height: 48, borderRadius: 24, background: 'rgba(249,115,22,0.1)', border: '1px solid #F97316', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
+                                <span className="material-symbols-outlined text-primary text-2xl animate-pulse" style={{ color: '#F97316', fontSize: 24 }}>toll</span>
+                            </div>
+                            <h3 style={{ color: '#fff', fontSize: 18, fontWeight: 700, margin: 0 }}>Confirm Motion Graphic</h3>
+                            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, margin: 0 }}>Please review your configuration and cost before generating.</p>
+                        </div>
+                        
+                        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 16, textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                                <span style={{ color: 'rgba(255,255,255,0.5)' }}>Animation Style</span>
+                                <span style={{ color: '#fff', fontWeight: 700, textTransform: 'capitalize' }}>{style === 'custom' ? customStyle || 'Custom' : style}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                                <span style={{ color: 'rgba(255,255,255,0.5)' }}>Aspect Ratio</span>
+                                <span style={{ color: '#fff', fontWeight: 700 }}>{ratio || '9:16'}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                                <span style={{ color: 'rgba(255,255,255,0.5)' }}>Duration</span>
+                                <span style={{ color: '#fff', fontWeight: 700 }}>{duration || 5} seconds</span>
+                            </div>
+                            <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14 }}>
+                                <span style={{ color: '#F97316', fontWeight: 800, textTransform: 'uppercase' }}>Estimated Cost</span>
+                                <span style={{ color: '#F97316', fontWeight: 900, fontSize: 16 }}>50 Credits</span>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 12 }}>
+                            <button onClick={() => setShowConfirmModal(false)} style={{ flex: 1, padding: '12px 16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
+                                Cancel
+                            </button>
+                            <button onClick={() => handleGenerate(true)} style={{ flex: 1, padding: '12px 16px', borderRadius: 12, background: 'linear-gradient(135deg, #F97316 0%, #EA580C 100%)', border: 'none', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+                                Looks Good, Proceed
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     )
 }

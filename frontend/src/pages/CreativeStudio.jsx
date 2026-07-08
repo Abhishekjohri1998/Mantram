@@ -7752,10 +7752,10 @@ ${prodPrice?`- PRICE CALLOUT: Display "${prodPrice}" as a stylish badge or callo
                                                 const allUrls=campResults.map(r=>r.url).filter(Boolean);
                                                 const copies=campResults.map(r=>r.copy?.body).filter(Boolean);
                                                 const headlines=campResults.map(r=>r.copy?.headline).filter(Boolean);
-                                                const heroLine=campCampaignName||campKeyword||'Campaign';
+                                                const heroLine=campName||campKeyword||'Campaign';
                                                 const uniqueHeadlines=[...new Set(headlines)].slice(0,3).join(' | ');
                                                 const bestCopy=copies[0]||'';
-                                                const caption=`${heroLine}\n\n${uniqueHeadlines?uniqueHeadlines+'\n\n':''}${bestCopy}${campCTA?'\n\n'+campCTA:''}\n\n#${heroLine.replace(/\s+/g,'')} #Campaign #${campKeyword?.replace(/\s+/g,'')||'trending'}`;
+                                                const caption=`${heroLine}\n\n${uniqueHeadlines?uniqueHeadlines+'\n\n':''}${bestCopy}${campCta?'\n\n'+campCta:''}\n\n#${heroLine.replace(/\s+/g,'')} #Campaign #${campKeyword?.replace(/\s+/g,'')||'trending'}`;
                                                 setPublishData({images:allUrls,text:caption});
                                             }} className="px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] border border-[var(--sys-border)] border border-[var(--sys-text)] text-orange-50 text-xs font-bold hover:from-[#FF4D00]/30 hover:to-[#FF7A00]/30 transition-all cursor-pointer flex items-center gap-1.5"><span className="material-symbols-outlined text-sm">view_carousel</span>Publish as Carousel</button>
                                             <button onClick={()=>{setCampResults([]);setCampStep(2)}} className="px-3 py-1.5 rounded-lg bg-[var(--sys-surface)] text-[var(--sys-text)] text-xs font-medium hover:bg-[var(--sys-surface)] transition-all cursor-pointer">Regenerate All</button>

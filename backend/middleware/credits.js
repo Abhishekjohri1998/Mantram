@@ -19,6 +19,7 @@ import CreditTransaction from '../models/CreditTransaction.js';
 import { CREDITS_PER_SECOND, COST_PER_SECOND_INR } from '../constants/credits.js';
 import { estimateCost } from '../agents/videoStudio/falClient.js';
 import { IMAGE_MODEL_RATES } from '../utils/imageModelRates.js';
+import { VIDEO_MODEL_RATES } from '../utils/videoModelRates.js';
 
 // Human-readable labels for actions
 const ACTION_LABELS = {
@@ -214,36 +215,58 @@ export const requireCredits = (actionOrCost = 1) => {
                     }
                     console.log(`🖼️ Dynamic image credits for ${actionOrCost}: model=${model || 'none'} → ${cost} credits`);
                 } else if (rawCost === 'dynamic' && actionOrCost === 'videoGenerate') {
+                    const model = req.body.model || req.body.videoModel || 'seedance-2.0-fast-i2v';
+                    const resolution = req.body.resolution || req.body.aspectRatio || req.body.format || '1080p';
                     const duration = parseInt(req.body.duration) || 5;
-                    cost = Math.ceil(duration * CREDITS_PER_SECOND);
-                    console.log(`🎬 Dynamic video credits: ${duration}s → ${cost} credits`);
+
+                    const exRate = 95.56;
+                    const margin = 60;
+                    const creditPrice = 5;
+
+                    cost = calculateVideoCredits(model, resolution, duration, exRate, margin, creditPrice);
+                    console.log(`🎬 Dynamic video credits: ${model} (${resolution}) × ${duration}s → ${cost} credits`);
                 } else if (rawCost === 'dynamic' && actionOrCost === 'storyboardAnimate') {
                     const { projectId, segmentIndex } = req.body;
                     let duration = parseInt(req.body.duration) || 5;
+                    let model = req.body.model || req.body.videoModel || 'seedance-2.0-fast-i2v';
+                    let resolution = req.body.resolution || req.body.aspectRatio || req.body.format || '1080p';
+
                     if (projectId && segmentIndex !== undefined) {
                         try {
                             const VideoProject = mongoose.models.VideoProject || (await import('../models/VideoProject.js')).default;
                             const project = await VideoProject.findById(projectId).lean();
                             const scenes = project?.storyboard?.scenes || [];
                             const idx = parseInt(segmentIndex);
-                            if (scenes[idx]?.duration) {
-                                duration = scenes[idx].duration;
+                            if (scenes[idx]) {
+                                if (scenes[idx].duration) duration = scenes[idx].duration;
+                                if (scenes[idx].model) model = scenes[idx].model;
+                                if (scenes[idx].resolution) resolution = scenes[idx].resolution;
                             }
                         } catch (e) {
-                            console.warn(`[Credits Middleware] Failed to get segment duration: ${e.message}`);
+                            console.warn(`[Credits Middleware] Failed to get segment details: ${e.message}`);
                         }
                     }
-                    cost = Math.ceil(duration * CREDITS_PER_SECOND);
-                    console.log(`🎬 Dynamic storyboardAnimate credits: ${duration}s → ${cost} credits`);
+
+                    const exRate = 95.56;
+                    const margin = 60;
+                    const creditPrice = 5;
+
+                    cost = calculateVideoCredits(model, resolution, duration, exRate, margin, creditPrice);
+                    console.log(`🎬 Dynamic storyboardAnimate credits: ${model} (${resolution}) × ${duration}s → ${cost} credits`);
                 } else if (rawCost === 'dynamic' && actionOrCost === 'storyboardAnimateLongForm') {
                     // Long-form! Calculate cost based on duration, model, and subtract skipped segments if projectId is provided!
-                    const { model = 'seedance-2.0-fast', projectId } = req.body;
+                    const { model = 'seedance-2.0-fast', resolution = '1080p', projectId } = req.body;
                     let duration = parseInt(req.body.duration) || 30;
                     
                     const OPTIMAL_SEG = model === 'gemini-flash' ? 6 : (['veo-3.1', 'veo-3.1-fast', 'hunyuan'].includes(model) ? 8 : 10);
                     const segCount = Math.ceil(duration / OPTIMAL_SEG);
                     const perSegDuration = Math.min(OPTIMAL_SEG, duration);
-                    const perSegCost = Math.ceil(perSegDuration * CREDITS_PER_SECOND);
+
+                    const exRate = 95.56;
+                    const margin = 60;
+                    const creditPrice = 5;
+
+                    const perSegCost = calculateVideoCredits(model, resolution, perSegDuration, exRate, margin, creditPrice);
                     let activeSegCount = segCount;
                     
                     if (projectId) {
@@ -727,5 +750,49 @@ export function calculateImageCredits(modelId, resolution = '1K', quality = 'Med
     const estCreditsPerPic = Math.ceil(suggestedRetailPerPic / creditPrice);
 
     return Math.max(1, estCreditsPerPic * count);
+}
+
+export function calculateVideoCredits(modelId, resolution = '1080p', duration = 5, exRate = 95.56, margin = 60, creditPrice = 5) {
+    let resolvedModelId = modelId || 'seedance-2.0-fast-i2v';
+    const aliases = {
+        'seedance-2.0-fast': 'seedance-2.0-fast-i2v',
+        'seedance-2.0': 'seedance-2.0-i2v',
+        'veo-3.1-fast': 'veo-3.1-fast-i2v',
+        'veo-3.1': 'veo-3.1-i2v',
+        'kling-3.0-turbo': 'kling-3.0-turbo-i2v',
+        'grok-imagine': 'grok-imagine-1.5-i2v'
+    };
+    if (aliases[resolvedModelId]) {
+        resolvedModelId = aliases[resolvedModelId];
+    }
+
+    const model = VIDEO_MODEL_RATES.find(m => m.id === resolvedModelId || m.name === resolvedModelId) || { usdPerSec: 0.072 };
+    
+    const RESOLUTION_MULTIPLIERS = {
+        '480p': 0.5,
+        '720p': 0.7,
+        '1080p': 1.0,
+        '4k': 2.0
+    };
+    
+    let resKey = (resolution || '1080p').toLowerCase().trim();
+    if (resKey.includes('512') || resKey.includes('480')) resKey = '480p';
+    else if (resKey.includes('720')) resKey = '720p';
+    else if (resKey.includes('1080')) resKey = '1080p';
+    else if (resKey.includes('4k') || resKey.includes('2160') || resKey.includes('4096')) resKey = '4k';
+    else resKey = '1080p';
+
+    const resMult = RESOLUTION_MULTIPLIERS[resKey] || 1.0;
+    const baseUsdPerSec = model.usdPerSec !== undefined ? model.usdPerSec : 0.072;
+    const usdPerSecScaled = baseUsdPerSec * resMult;
+    
+    if (usdPerSecScaled === 0) return 0;
+
+    const inrPerSec = usdPerSecScaled * exRate;
+    const suggestedRetailPerSec = inrPerSec / (1 - (margin / 100));
+    
+    const estCreditsPerSec = Math.ceil(suggestedRetailPerSec / creditPrice);
+    
+    return Math.max(1, estCreditsPerSec * duration);
 }
 

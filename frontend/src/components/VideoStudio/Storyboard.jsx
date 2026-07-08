@@ -3,6 +3,7 @@ import './Storyboard.css';
 import AvatarPicker from './AvatarPicker';
 import { products, API_BASE } from '../../services/api';
 import VideoHoverActions from './VideoHoverActions';
+import { calculateFrontendVideoCredits } from '../CreditBadge';
 
 // --- Internal Component to prevent massive re-renders on keystroke ---
 const DebouncedInput = ({ value, onChange, placeholder, className, disabled, style }) => {
@@ -224,10 +225,10 @@ export default function Storyboard({
     const pollRef = useRef(null);
     const projectIdRef = useRef(null);
 
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
+
     const getStoryboardCredits = (m, d, r) => {
-        // Flat rate based on CREDITS_PER_SECOND
-        // e.g. 15 seconds = 255 credits -> 17 credits / second
-        return Math.ceil(d * 17);
+        return calculateFrontendVideoCredits(m, r || '1080p', d || 5);
     };
 
     const hasAttemptedReconnect = useRef(false);
@@ -699,9 +700,13 @@ export default function Storyboard({
         }
     };
 
-    // ── Animate single poster ──
-    const handleAnimate = async () => {
+    const handleAnimate = async (forceProceed = false) => {
         if (!projectId || !imageUrl) return;
+        if (forceProceed !== true) {
+            setShowConfirmModal(true);
+            return;
+        }
+        setShowConfirmModal(false);
         setPhase('animating');
         setError('');
         setIsLongForm(false);
@@ -2681,6 +2686,48 @@ export default function Storyboard({
                 </div>
             </div>
         )}
+            {/* Cost Confirmation Modal */}
+            {showConfirmModal && (
+                <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', zIndex: 10001 }}>
+                    <div style={{ background: '#0D0D12', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 24, padding: 28, maxWidth: 400, width: '90%', display: 'flex', flexDirection: 'column', gap: 20 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                            <div style={{ width: 48, height: 48, borderRadius: 24, background: 'rgba(168,85,247,0.1)', border: '1px solid #A855F7', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
+                                <span className="material-symbols-outlined text-primary text-2xl animate-pulse" style={{ color: '#A855F7', fontSize: 24 }}>toll</span>
+                            </div>
+                            <h3 style={{ color: '#fff', fontSize: 18, fontWeight: 700, margin: 0 }}>Confirm Storyboard Animation</h3>
+                            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, margin: 0 }}>Please review your configuration and cost before animating.</p>
+                        </div>
+                        
+                        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 16, textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                                <span style={{ color: 'rgba(255,255,255,0.5)' }}>Selected Model</span>
+                                <span style={{ color: '#fff', fontWeight: 700, textTransform: 'capitalize' }}>{(model || 'seedance-2.0').replace(/-/g, ' ')}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                                <span style={{ color: 'rgba(255,255,255,0.5)' }}>Resolution</span>
+                                <span style={{ color: '#fff', fontWeight: 700, textTransform: 'uppercase' }}>{resolution || '1080p'}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                                <span style={{ color: 'rgba(255,255,255,0.5)' }}>Video Duration</span>
+                                <span style={{ color: '#fff', fontWeight: 700 }}>{duration || 5} seconds</span>
+                            </div>
+                            <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14 }}>
+                                <span style={{ color: '#A855F7', fontWeight: 800, textTransform: 'uppercase' }}>Estimated Cost</span>
+                                <span style={{ color: '#A855F7', fontWeight: 900, fontSize: 16 }}>{getStoryboardCredits(model, duration, resolution)} Credits</span>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 12 }}>
+                            <button onClick={() => setShowConfirmModal(false)} style={{ flex: 1, padding: '12px 16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
+                                Cancel
+                            </button>
+                            <button onClick={() => handleAnimate(true)} style={{ flex: 1, padding: '12px 16px', borderRadius: 12, background: 'linear-gradient(135deg, #A855F7 0%, #7C3AED 100%)', border: 'none', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+                                Looks Good, Proceed
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

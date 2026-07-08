@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useBrand } from '../context/BrandContext'
 import { useCredits } from '../context/CreditContext'
 import { useSearchParams } from 'react-router-dom'
+import { calculateFrontendVideoCredits } from '../components/CreditBadge'
 import DashboardLayout from '../components/DashboardLayout'
 import GlobalLoader from '../components/GlobalLoader'
 import { creatives as creativesAPI, monthlyStrategy as monthlyStrategyAPI } from '../services/api'
@@ -188,6 +189,7 @@ export default function VideoStudio() {
     const [routing, setRouting] = useState(null)
     const [references, setReferences] = useState(null)
     const [generation, setGeneration] = useState(null)
+    const [showConfirmModal, setShowConfirmModal] = useState(false)
 
     // Voice over preview state
     const [voiceoverAudioUrl, setVoiceoverAudioUrl] = useState('')
@@ -215,6 +217,20 @@ export default function VideoStudio() {
     const [historyView, setHistoryView] = useState('list') // 'list' | 'grid'
     const [historyTab, setHistoryTab] = useState('all') // 'all' | 'completed' | 'progress' | 'drafts'
     const [copiedId, setCopiedId] = useState(null)
+
+    // Dynamic cost recalculation hook
+    useEffect(() => {
+        if (!routing || !routing.selectedModel) return;
+        const duration = script?.totalDuration || 5;
+        const credits = calculateFrontendVideoCredits(routing.selectedModel, routing.resolution || '1080p', duration);
+        const inr = credits * 5; // ₹5 per credit
+        if (routing.costPreview?.credits !== credits) {
+            setRouting(prev => ({
+                ...prev,
+                costPreview: { credits, inr }
+            }));
+        }
+    }, [routing?.selectedModel, routing?.resolution, script?.totalDuration]);
 
     // ── Monthly Strategy writeback — fires when a video project gets a finalVideoUrl ──
     useEffect(() => {
@@ -776,8 +792,13 @@ export default function VideoStudio() {
         setLoading(false)
     }
 
-    async function handleGenerateVideo() {
+    async function handleGenerateVideo(forceProceed = false) {
         if (!canCreateVideo) { setShowUpgradeModal(true); return; }
+        if (forceProceed !== true) {
+            setShowConfirmModal(true);
+            return;
+        }
+        setShowConfirmModal(false);
         setLoading(true); setError('')
         try {
             const data = await api(`/video-studio/${projectId}/generate`, {
@@ -2679,6 +2700,48 @@ export default function VideoStudio() {
                 />
             )}
 
+            {/* Cost Confirmation Modal */}
+            {showConfirmModal && (
+                <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in" style={{ animationDuration: '200ms' }}>
+                    <div className="glass-panel max-w-md w-full p-6 sm:p-7 rounded-3xl border border-[var(--sys-border)] bg-[#08080C]/90 shadow-2xl flex flex-col gap-5 text-center transform animate-in fade-in zoom-in-95 duration-200">
+                        <div className="flex flex-col items-center gap-2">
+                            <div className="w-12 h-12 rounded-full bg-[var(--sys-primary-dim)] border border-[var(--sys-primary)] flex items-center justify-center mb-1">
+                                <span className="material-symbols-outlined text-primary text-2xl animate-pulse">toll</span>
+                            </div>
+                            <h3 className="text-lg font-bold text-[var(--sys-text)]">Confirm Video Generation</h3>
+                            <p className="text-xs text-[var(--sys-text-muted)]">Please review your video configuration and cost before processing.</p>
+                        </div>
+                        
+                        <div className="bg-[var(--sys-surface)] border border-[var(--sys-border)] rounded-2xl p-4 text-left space-y-3">
+                            <div className="flex justify-between items-center text-xs">
+                                <span className="text-[var(--sys-text-muted)]">Selected Model</span>
+                                <span className="font-bold text-[var(--sys-text)] capitalize">{(routing?.selectedModel || 'seedance-2.0').replace(/-/g, ' ')}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-xs">
+                                <span className="text-[var(--sys-text-muted)]">Resolution</span>
+                                <span className="font-bold text-[var(--sys-text)] uppercase">{routing?.resolution || '1080p'}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-xs">
+                                <span className="text-[var(--sys-text-muted)]">Video Duration</span>
+                                <span className="font-bold text-[var(--sys-text)]">{script?.totalDuration || 5} seconds</span>
+                            </div>
+                            <div className="border-t border-[var(--sys-border)] pt-3 flex justify-between items-center text-sm font-black">
+                                <span className="text-primary uppercase tracking-wider">Estimated Cost</span>
+                                <span className="text-primary font-mono text-base">{routing?.costPreview?.credits || 15} Credits</span>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button onClick={() => setShowConfirmModal(false)} className="flex-1 py-3.5 rounded-xl border border-[var(--sys-border)] text-xs font-bold text-[var(--sys-text-muted)] hover:bg-[var(--sys-surface)] hover:text-[var(--sys-text)] transition-all cursor-pointer">
+                                Cancel
+                            </button>
+                            <button onClick={() => handleGenerateVideo(true)} className="flex-1 py-3.5 rounded-xl bg-[#FF4D00] text-white text-xs font-bold hover:bg-[#E64500] hover:shadow-xl hover:shadow-[#FF4D00]/20 transition-all cursor-pointer">
+                                Looks Good, Proceed
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             {/* ── Plan Upgrade Modal ── */}
             {showUpgradeModal && (
                 <VideoUpgradeModal onClose={() => setShowUpgradeModal(false)} />

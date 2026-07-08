@@ -42,6 +42,8 @@ export function CreditBadge({ action, className = '', model, resolution = '1K', 
             } else {
                 cost = calculateFrontendImageCredits(model, resolution, quality, count, action);
             }
+        } else if (['videoGenerate', 'storyboardAnimate', 'storyboardAnimateLongForm'].includes(action)) {
+            cost = calculateFrontendVideoCredits(model, resolution, count || 5);
         } else {
             cost = 8; // fallback
         }
@@ -84,6 +86,8 @@ export function CreditTooltipWrapper({ action, children, position = 'top', class
             } else {
                 cost = calculateFrontendImageCredits(model, resolution, quality, count, action);
             }
+        } else if (['videoGenerate', 'storyboardAnimate', 'storyboardAnimateLongForm'].includes(action)) {
+            cost = calculateFrontendVideoCredits(model, resolution, count || 5);
         } else {
             cost = 8; // fallback
         }
@@ -291,4 +295,153 @@ export function calculateFrontendImageCredits(modelId = 'nano-banana-2-t2i', res
     const estCreditsPerPic = Math.ceil(suggestedRetailPerPic / creditPrice);
 
     return Math.max(1, estCreditsPerPic * finalCount);
+}
+
+export function calculateFrontendVideoCredits(modelId = 'seedance-2.0-fast-i2v', resolution = '1080p', duration = 5) {
+    let resolvedModelId = modelId || 'seedance-2.0-fast-i2v';
+    const aliases = {
+        'seedance-2.0-fast': 'seedance-2.0-fast-i2v',
+        'seedance-2.0': 'seedance-2.0-i2v',
+        'veo-3.1-fast': 'veo-3.1-fast-i2v',
+        'veo-3.1': 'veo-3.1-i2v',
+        'kling-3.0-turbo': 'kling-3.0-turbo-i2v',
+        'grok-imagine': 'grok-imagine-1.5-i2v'
+    };
+    if (aliases[resolvedModelId]) {
+        resolvedModelId = aliases[resolvedModelId];
+    }
+
+    const videoModelLookup = {
+        'seedance-2.0-mini-r2v': 0.045,
+        'seedance-2.0-mini-i2v': 0.045,
+        'seedance-2.0-mini-t2v': 0.045,
+        'happyhorse-1.1-t2v': 0.14,
+        'happyhorse-1.1-i2v': 0.14,
+        'gemini-omni-flash-i2v': 0.13,
+        'gemini-omni-flash-edit': 0.14,
+        'gemini-omni-flash-t2v': 0.125,
+        'gemini-omni-flash-r2v-dev': 0.12,
+        'avatar-omni-human-1.5': 0.06,
+        'kling-3.0-turbo-i2v': 0.095,
+        'kling-3.0-turbo-t2v': 0.095,
+        'kling-o3-4k-i2v': 0.357,
+        'kling-o3-4k-t2v': 0.357,
+        'youchuan-8.1': 0.086,
+        'grok-imagine-1.5-i2v': 0.08,
+        'gemini-omni-flash-i2v-dev': 0.112,
+        'gemini-omni-flash-t2v-dev': 0.112,
+        'happyhorse-1.0-t2v': 0.14,
+        'happyhorse-1.0-i2v': 0.14,
+        'happyhorse-1.0-edit': 0.14,
+        'seedance-2.0-t2v': 0.09,
+        'seedance-2.0-i2v': 0.09,
+        'seedance-2.0-r2v': 0.09,
+        'seedance-2.0-fast-t2v': 0.072,
+        'seedance-2.0-fast-i2v': 0.072,
+        'seedance-2.0-fast-r2v': 0.072,
+        'wan-2.7-t2v': 0.10,
+        'wan-2.7-i2v': 0.10,
+        'wan-2.7-r2v': 0.10,
+        'wan-2.7-edit': 0.10,
+        'veo-3.1-lite-t2v': 0.05,
+        'veo-3.1-lite-start-end': 0.05,
+        'veo-3.1-lite-i2v': 0.05,
+        'vidu-q3-mix-r2v': 0.106,
+        'vidu-q3-r2v': 0.042,
+        'wan-2.2-turbo-spicy-lora': 0.026,
+        'wan-2.2-turbo-spicy-i2v': 0.02,
+        'veo-3.1-fast-i2v': 0.08,
+        'veo-3.1-fast-t2v': 0.08,
+        'veo-3.1-i2v': 0.20,
+        'veo-3.1-r2v': 0.20,
+        'veo-3.1-t2v': 0.20,
+        'grok-imagine-t2v': 0.05,
+        'grok-imagine-i2v': 0.05,
+        'grok-imagine-r2v': 0.05,
+        'grok-imagine-extend': 0.07,
+        'grok-imagine-edit': 0.07,
+        'wan-2.2-turbo-i2v': 0.02,
+        'wan-2.2-turbo-infinite': 0.02,
+        'wan-2.2-turbo-infinite-lora': 0.026,
+        'wan-2.2-turbo-spicy-infinite': 0.02,
+        'wan-2.2-turbo-spicy-infinite-lora': 0.026,
+        'wan-2.2-i2v': 0.03,
+        'wan-2.2-i2v-lora': 0.04,
+        'wan-2.2-spicy-i2v-lora': 0.04,
+        'wan-2.2-spicy-i2v': 0.03,
+        'video-upscaler': 0.018,
+        'vidu-q3-pro-start-end': 0.042,
+        'vidu-q3-turbo-i2v': 0.034,
+        'vidu-q3-turbo-start-end': 0.034,
+        'vidu-q3-turbo-t2v': 0.034,
+        'kling-v3.0-4k-i2v': 0.357,
+        'kling-v3.0-std-i2v': 0.071,
+        'kling-v3.0-pro-i2v': 0.095,
+        'kling-v3.0-pro-t2v': 0.095,
+        'kling-v3.0-4k-t2v': 0.357,
+        'kling-v3.0-std-t2v': 0.071,
+        'vidu-q3-pro-i2v': 0.042,
+        'vidu-q3-pro-t2v': 0.042,
+        'kling-2.6-pro-avatar': 0.095,
+        'kling-2.6-std-avatar': 0.048,
+        'kling-2.6-pro-motion': 0.095,
+        'kling-2.6-std-motion': 0.06,
+        'wan-2.6-i2v-flash': 0.018,
+        'seedance-1.5-pro-i2v': 0.047,
+        'seedance-1.5-pro-t2v': 0.047,
+        'seedance-1.5-pro-i2v-fast': 0.018,
+        'wan-2.6-i2v': 0.07,
+        'wan-2.6-v2v': 0.07,
+        'wan-2.6-t2v': 0.07,
+        'kling-o3-pro-edit': 0.143,
+        'kling-o3-pro-r2v': 0.095,
+        'kling-o3-pro-i2v': 0.095,
+        'kling-o3-pro-t2v': 0.095,
+        'seedance-1.5-pro-fast-t2v': 0.018,
+        'kling-2.6-pro-t2v': 0.06,
+        'kling-2.6-pro-i2v': 0.06,
+        'kling-o3-std-edit': 0.107,
+        'kling-o3-std-r2v': 0.071,
+        'kling-o3-std-i2v': 0.071,
+        'kling-o3-std-t2v': 0.071,
+        'kling-o1-i2v': 0.095,
+        'kling-o1-t2v': 0.095,
+        'pixverse-v6-extend': 0.025,
+        'pixverse-c1-i2v': 0.03,
+        'pixverse-c1-start-end': 0.03,
+        'pixverse-v6-t2v': 0.025,
+        'pixverse-v6-i2v': 0.025
+    };
+
+    const baseUsdPerSec = videoModelLookup[resolvedModelId] !== undefined ? videoModelLookup[resolvedModelId] : 0.072;
+    
+    const RESOLUTION_MULTIPLIERS = {
+        '480p': 0.5,
+        '720p': 0.7,
+        '1080p': 1.0,
+        '4k': 2.0
+    };
+
+    let resKey = (resolution || '1080p').toLowerCase().trim();
+    if (resKey.includes('512') || resKey.includes('480')) resKey = '480p';
+    else if (resKey.includes('720')) resKey = '720p';
+    else if (resKey.includes('1080')) resKey = '1080p';
+    else if (resKey.includes('4k') || resKey.includes('2160') || resKey.includes('4096')) resKey = '4k';
+    else resKey = '1080p';
+
+    const resMult = RESOLUTION_MULTIPLIERS[resKey] || 1.0;
+    const usdPerSecScaled = baseUsdPerSec * resMult;
+    
+    if (usdPerSecScaled === 0) return 0;
+
+    const exRate = 95.56;
+    const margin = 60;
+    const creditPrice = 5;
+
+    const inrPerSec = usdPerSecScaled * exRate;
+    const suggestedRetailPerSec = inrPerSec / (1 - (margin / 100));
+    
+    const estCreditsPerSec = Math.ceil(suggestedRetailPerSec / creditPrice);
+
+    return Math.max(1, estCreditsPerSec * duration);
 }

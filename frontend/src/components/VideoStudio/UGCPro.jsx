@@ -410,6 +410,7 @@ export default function UGCPro({ activeBrand, projects = [], projectsLoaded = fa
     const [jobs, setJobs] = useState([]) // { id, requestId, prompt, avatarUrl, progress, status, videoUrl, error }
     const pollRefs = useRef({})
     const [creditEstimate, setCreditEstimate] = useState(null)
+    const [showConfirmModal, setShowConfirmModal] = useState(false)
 
     useEffect(() => {
         api(`/video-studio/ugc-pro/credit-estimate?duration=${duration}`).then(d => setCreditEstimate(d)).catch(() => {})
@@ -487,10 +488,18 @@ export default function UGCPro({ activeBrand, projects = [], projectsLoaded = fa
     }, [activeBrand, productData, productImageUrls, avatarUrl, style, mood, environment, hookStyle, hookShot, duration, aspectRatio, language, cta, selectedModel])
 
     // ── Generate Video ──
-    const handleGenerate = useCallback(async (forcedPrompt = null) => {
+    const handleGenerate = useCallback(async (forcedPrompt = null, forceProceed = false) => {
         if (!canCreateVideo) { onUpgradeRequired?.(); return }
         if (!avatarUrl) { setError('Upload or generate an avatar first'); return }
         if (!productData) { setError('Analyze a product first — paste a link or upload images'); return }
+        if (forceProceed !== true) {
+            if (forcedPrompt !== null) {
+                setPromptText(forcedPrompt);
+            }
+            setShowConfirmModal(true);
+            return;
+        }
+        setShowConfirmModal(false);
         setLoading(true); setError(null)
         const activePrompt = forcedPrompt !== null ? forcedPrompt : promptText
         const jobId = `ugc-${Date.now()}`
@@ -896,6 +905,48 @@ export default function UGCPro({ activeBrand, projects = [], projectsLoaded = fa
                 onSelect={(avatar) => setAvatarUrl(avatar.imageUrl)}
                 activeBrand={activeBrand}
             />
+            {/* Cost Confirmation Modal */}
+            {showConfirmModal && (
+                <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', zIndex: 10002 }}>
+                    <div style={{ background: '#0D0D12', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 24, padding: 28, maxWidth: 400, width: '90%', display: 'flex', flexDirection: 'column', gap: 20 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                            <div style={{ width: 48, height: 48, borderRadius: 24, background: 'rgba(168,85,247,0.1)', border: '1px solid #A855F7', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
+                                <span className="material-symbols-outlined text-primary text-2xl animate-pulse" style={{ color: '#A855F7', fontSize: 24 }}>toll</span>
+                            </div>
+                            <h3 style={{ color: '#fff', fontSize: 18, fontWeight: 700, margin: 0 }}>Confirm UGC Generation</h3>
+                            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, margin: 0 }}>Please review your configuration and cost before generating.</p>
+                        </div>
+                        
+                        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 16, textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                                <span style={{ color: 'rgba(255,255,255,0.5)' }}>Selected Model</span>
+                                <span style={{ color: '#fff', fontWeight: 700, textTransform: 'capitalize' }}>{(selectedModel || 'seedance-2.0').replace(/-/g, ' ')}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                                <span style={{ color: 'rgba(255,255,255,0.5)' }}>Aspect Ratio</span>
+                                <span style={{ color: '#fff', fontWeight: 700 }}>{aspectRatio || '9:16'}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                                <span style={{ color: 'rgba(255,255,255,0.5)' }}>Video Duration</span>
+                                <span style={{ color: '#fff', fontWeight: 700 }}>{duration || 5} seconds</span>
+                            </div>
+                            <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14 }}>
+                                <span style={{ color: '#A855F7', fontWeight: 800, textTransform: 'uppercase' }}>Estimated Cost</span>
+                                <span style={{ color: '#A855F7', fontWeight: 900, fontSize: 16 }}>{credits} Credits</span>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 12 }}>
+                            <button onClick={() => setShowConfirmModal(false)} style={{ flex: 1, padding: '12px 16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
+                                Cancel
+                            </button>
+                            <button onClick={() => handleGenerate(null, true)} style={{ flex: 1, padding: '12px 16px', borderRadius: 12, background: 'linear-gradient(135deg, #A855F7 0%, #7C3AED 100%)', border: 'none', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+                                Looks Good, Proceed
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
