@@ -1104,7 +1104,19 @@ export default function QAdsV2({ activeBrand, projects = [], projectsLoaded = fa
                                 if (status === 'done' && onVideoComplete) onVideoComplete()
                             }
                         }
-                    } catch (_) {}
+                    } catch (err) {
+                        if (err.status === 404) {
+                            clearInterval(pollRefs.current[vid])
+                            setVideoJobs(prev => ({
+                                ...prev,
+                                [vid]: {
+                                    ...prev[vid],
+                                    status: 'failed',
+                                    error: 'Generation was interrupted (server restarted). Please try again.'
+                                }
+                            }))
+                        }
+                    }
                 }, 5000)
 
             } else {

@@ -166,6 +166,8 @@ export async function apiFetch(endpoint, options = {}) {
             }
 
             const err = new Error(data.error || 'API request failed');
+            err.status = response.status;
+            err.statusCode = response.status;
             // Attach domain-specific metadata for specialized error UI (e.g. SEO Audit Guard)
             if (data.diagnosis) err.diagnosis = data.diagnosis;
             if (data.metrics) err.metrics = data.metrics;

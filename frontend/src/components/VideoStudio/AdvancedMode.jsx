@@ -515,7 +515,12 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                     }
                     return prev;
                 });
-            } catch { /* keep polling */ }
+            } catch (err) {
+                if (err.status === 404) {
+                    clearInterval(pollRefs.current[jobId]); delete pollRefs.current[jobId]
+                    updateJob(jobId, { status: 'failed', error: 'Generation was interrupted (server restarted). Please try again.' })
+                }
+            }
         }, 5000)
     }
 
@@ -549,7 +554,12 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                         })
                     }
                 }
-            } catch {}
+            } catch (err) {
+                if (err.status === 404) {
+                    clearInterval(pollRefs.current[jobId]); delete pollRefs.current[jobId]
+                    updateJob(jobId, { status: 'failed', error: 'Generation was interrupted (server restarted). Please try again.' })
+                }
+            }
         }, 5000)
     }
 
