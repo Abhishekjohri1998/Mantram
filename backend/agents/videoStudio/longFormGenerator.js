@@ -202,6 +202,7 @@ async function runPipeline(jobId, params) {
                         referenceImages: params.referenceImages.slice(0, 9),
                         qualityMode: params.settings?.quality || 'fast',
                         imageRole: params.imageRole,
+                        resolution: params.settings?.resolution || '720p',
                     });
                 } else {
                     genResult = await submitVideoGeneration({
@@ -212,6 +213,8 @@ async function runPipeline(jobId, params) {
                         aspectRatio: params.aspectRatio,
                         generateAudio: false, // Native audio disabled — long-form uses FFmpeg audio pipeline
                         referenceImages: params.referenceImages.slice(0, 9),
+                        resolution: params.settings?.resolution || '720p',
+                        mode: params.settings?.quality || 'fast',
                     });
                 }
 
@@ -258,6 +261,7 @@ async function runPipeline(jobId, params) {
                             referenceImages: params.referenceImages.slice(0, 9),
                             qualityMode: params.settings?.quality || 'fast',
                             imageRole: params.imageRole,
+                            resolution: params.settings?.resolution || '720p',
                         });
                     } else {
                         retryResult = await submitVideoGeneration({
@@ -268,6 +272,8 @@ async function runPipeline(jobId, params) {
                             aspectRatio: params.aspectRatio,
                             generateAudio: false, // Native audio disabled — see primary generation
                             referenceImages: params.referenceImages.slice(0, 9),
+                            resolution: params.settings?.resolution || '720p',
+                            mode: params.settings?.quality || 'fast',
                         });
                     }
 
