@@ -40,7 +40,7 @@ import { getCachedImageBuffer, setCachedImageBuffer } from '../utils/imageCache.
 async function presignedFetch(url, opts = {}) {
     if (!url) return null;
     let fetchUrl = url;
-    const isOurS3 = url.includes('amazonaws.com') && (url.includes('mantram-assets') || url.includes('mantram-media'));
+    const isOurS3 = url.includes('amazonaws.com') && url.includes('mantram');
     // Only pre-sign if it's NOT already a signed URL (signed URLs contain X-Amz-Signature)
     if (isOurS3 && !url.includes('X-Amz-Signature')) {
         try {

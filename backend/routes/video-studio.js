@@ -53,7 +53,7 @@ import { getRouter as getAIRouter } from '../ai/router.js';
 import { getProviderBadge } from '../ai/providerRouting.js';
 import { uploadToS3, mirrorUrlToS3, getSignedUrlIfNeeded, ensureS3Url } from '../utils/s3.js';
 import { safeErrorMessage } from '../utils/safeError.js';
-import { loadBrandContext, callMultimodalAgent, callAgent } from '../agents/shared/agentUtils.js';
+import { loadBrandContext, callMultimodalAgent, callAgent, callAgentText } from '../agents/shared/agentUtils.js';
 import { buildEnhanceSystemPrompt, buildEnhanceUserPrompt, VISUAL_GROUNDING_SYSTEM } from '../agents/videoStudio/promptEnhancer.js';
 import { submitAtlasCloudVideoGeneration, getAtlasCloudGenerationStatus as pollAtlasCloudStatus, submitInfiniteTalkVideoGeneration, submitGeminiFlashVideoGeneration } from '../agents/videoStudio/atlasClient.js';
 import { geminiImageGenerate } from '../agents/videoStudio/firstFrame.js';
@@ -5909,10 +5909,7 @@ async function fetchImageAsInlineData(imageUrl) {
             return { inlineData: { mimeType: match[1], data: match[2] } };
         }
         let fetchUrl = imageUrl
-        const isOurS3 = imageUrl.includes('amazonaws.com') && (
-            imageUrl.includes('mantram-assets') ||
-            imageUrl.includes('mantram-media')
-        )
+        const isOurS3 = imageUrl.includes('amazonaws.com') && imageUrl.includes('mantram');
         if (isOurS3) {
             fetchUrl = await getSignedUrlForPath(imageUrl, 300)
         }
@@ -6332,21 +6329,9 @@ router.post('/motion-graphics/analyze', protect, async (req, res) => {
             return res.status(400).json({ success: false, error: 'At least one image is required' });
         }
 
-        const apiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey) return res.status(500).json({ success: false, error: 'GEMINI_API_KEY not configured' });
-
-        // Load image parts
-        const parts = [];
         const labelsList = [];
         for (let i = 0; i < Math.min(imageUrls.length, 4); i++) {
-            const part = await fetchImageAsInlineData(imageUrls[i]);
-            if (part) {
-                parts.push(part);
-                labelsList.push(`IMAGE ${i + 1}`);
-            }
-        }
-        if (parts.length === 0) {
-            return res.status(400).json({ success: false, error: 'Could not load any of the provided images' });
+            labelsList.push(`IMAGE ${i + 1}`);
         }
 
         const analysisPrompt = `You are a senior Motion Graphics Director with 20 years of experience at top studios.
@@ -6378,27 +6363,18 @@ Return ONLY valid JSON in this exact shape:
   "technicalNotes": "..."
 }`;
 
-        parts.push({ text: analysisPrompt });
+        const userPrompt = `Analyze the provided brand visual assets and extract structured motion graphics parameters.`;
 
-        const geminiResp = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ role: 'user', parts }],
-                    generationConfig: { temperature: 0.2, maxOutputTokens: 4096, responseMimeType: 'application/json' },
-                }),
-                signal: AbortSignal.timeout(40_000),
-            }
+        const analysis = await callMultimodalAgent(
+            analysisPrompt,
+            userPrompt,
+            imageUrls.slice(0, 4),
+            { jsonMode: true, provider: 'gemini', timeoutMs: 40_000 }
         );
 
-        const geminiData = await geminiResp.json();
-        if (geminiData.error) throw new Error(geminiData.error.message);
-
-        const rawText = geminiData.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '{}';
-        let analysis = {};
-        try { analysis = JSON.parse(rawText); } catch { analysis = { raw: rawText }; }
+        if (analysis.error) {
+            throw new Error(analysis.error);
+        }
 
         console.log(`[Motion Graphics] Asset analysis complete: ${Object.keys(analysis).length} fields extracted`);
         res.json({ success: true, analysis });
@@ -6414,9 +6390,6 @@ router.post('/motion-graphics/generate-prompt', protect, async (req, res) => {
     try {
         const { analysis, styleId, customStyle, userBrief, duration = 8 } = req.body;
         if (!analysis) return res.status(400).json({ success: false, error: 'Asset analysis is required' });
-
-        const anthropicKey = process.env.ANTHROPIC_API_KEY;
-        if (!anthropicKey) return res.status(500).json({ success: false, error: 'ANTHROPIC_API_KEY not configured' });
 
         const preset = MG_STYLE_PRESETS[styleId] || MG_STYLE_PRESETS.dynamic;
         const styleKeywords = styleId === 'custom' ? (customStyle || 'creative motion') : preset.keywords;
@@ -6460,31 +6433,15 @@ OUTPUT FORMAT: Seedance 2 video generation (text-to-video / image-to-video)
 
 Write the animation prompt now. Be the motion graphics director the brand deserves.`;
 
-        const claudeResp = await fetch(
-            'https://api.anthropic.com/v1/messages',
-            {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-api-key': anthropicKey,
-                    'anthropic-version': '2023-06-01',
-                },
-                body: JSON.stringify({
-                    model: 'claude-3-5-sonnet-20241022',
-                    max_tokens: 1024,
-                    temperature,
-                    system: systemPrompt,
-                    messages: [{ role: 'user', content: userMessage }],
-                }),
-                signal: AbortSignal.timeout(60_000),
-            }
+        const motionPrompt = await callAgentText(
+            systemPrompt,
+            userMessage,
+            temperature,
+            1024,
+            { provider: 'anthropic' }
         );
 
-        const claudeData = await claudeResp.json();
-        if (claudeData.error) throw new Error(claudeData.error.message);
-
-        const motionPrompt = claudeData.content?.[0]?.text?.trim() || '';
-        if (!motionPrompt) throw new Error('Claude returned empty prompt');
+        if (!motionPrompt) throw new Error('Model returned empty prompt');
 
         console.log(`[Motion Graphics] Claude prompt generated: ${motionPrompt.length} chars, style=${styleId}`);
         res.json({ success: true, motionPrompt, styleId, styleName });

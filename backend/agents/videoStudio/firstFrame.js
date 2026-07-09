@@ -44,8 +44,7 @@ async function fetchAndResizeImage(imageUrl, maxDimension = 512) {
         }
 
         // ── Our own S3 bucket? Use SDK directly (bypasses signed URL expiration) ──
-        const isOurS3 = imageUrl.includes('mantram-assets') || 
-                        (imageUrl.includes('.amazonaws.com') && imageUrl.includes('s3.ap-south-1'));
+        const isOurS3 = imageUrl.includes('.amazonaws.com') && imageUrl.includes('mantram');
         
         // ── Our CloudFront CDN URL? Fetch with auth headers ──
         const isOurCloudFront = imageUrl.includes('d138p2zntq2uob.cloudfront.net') ||

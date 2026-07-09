@@ -13,8 +13,10 @@ export class AnthropicProvider extends BaseProvider {
     }
 
     _mapModelForProvider(modelId) {
-        // Return the exact model ID requested by the platform natively.
-        // As of 2026, the new dateless model formats (e.g. claude-sonnet-4-6) are supported natively.
+        // Map the dateless format used across the codebase ('claude-sonnet-4-6') to the native Anthropic API model identifier.
+        if (modelId === 'claude-sonnet-4-6') {
+            return 'claude-3-5-sonnet-20241022';
+        }
         return modelId;
     }
 

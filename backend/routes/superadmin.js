@@ -706,7 +706,7 @@ router.post('/subscriptions', async (req, res) => {
         const subscription = await Subscription.create({
             user: userId, plan,
             billingCycle: billingCycle || 'monthly',
-            credits: { total: credits || planCredits[plan] || 50, used: 0 },
+            credits: Number(credits) || planCredits[plan] || 50,
             price: price || 0, startDate: new Date(), endDate, status: 'active',
             createdBy: req.user._id, notes: notes || '',
         });

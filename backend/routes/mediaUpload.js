@@ -64,7 +64,7 @@ router.get('/proxy', async (req, res) => {
 
         // PRODUCTION-READY SECURITY: Only proxy our own S3 assets or allowed origins
         // This prevents the endpoint from being used as a general-purpose open proxy.
-        const isS3 = url.includes('s3.ap-south-1.amazonaws.com') || 
+        const isS3 = (url.includes('.amazonaws.com') && url.includes('mantram')) || 
                      url.includes('canvas-layers.s3') || 
                      url.includes('mantram-assets');
         const isUnsplash = url.startsWith('https://images.unsplash.com');

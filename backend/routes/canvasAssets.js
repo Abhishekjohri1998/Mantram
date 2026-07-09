@@ -20,10 +20,7 @@ async function fetchImageAsInlineData(imageUrl) {
     try {
         // Pre-sign private S3 URLs (our bucket) so the fetch succeeds
         let fetchUrl = imageUrl
-        const isOurS3 = imageUrl.includes('amazonaws.com') && (
-            imageUrl.includes('mantram-assets') ||
-            imageUrl.includes('mantram-media')
-        )
+        const isOurS3 = imageUrl.includes('amazonaws.com') && imageUrl.includes('mantram');
         if (isOurS3) {
             fetchUrl = await getSignedUrlForPath(imageUrl, 300) // 5-min presigned URL
             console.log(`🔐 Pre-signed S3 URL for analysis fetch`)

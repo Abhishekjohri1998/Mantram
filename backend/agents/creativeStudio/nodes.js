@@ -1456,7 +1456,7 @@ export async function runCreativePipeline(params) {
                 try {
                     // Pre-sign private S3 URLs before downloading
                     let fetchUrl = url;
-                    const isOurS3 = url.includes('amazonaws.com') && (url.includes('mantram-assets') || url.includes('mantram-media'));
+                    const isOurS3 = url.includes('amazonaws.com') && url.includes('mantram');
                     if (isOurS3 && !url.includes('X-Amz-Signature')) {
                         try {
                             fetchUrl = await getSignedUrlForPath(url, 300);
