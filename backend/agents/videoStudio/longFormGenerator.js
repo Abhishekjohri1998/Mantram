@@ -198,7 +198,7 @@ async function runPipeline(jobId, params) {
                         imageUrl: lastFrameUrl,
                         duration: scene.duration,
                         aspectRatio: params.aspectRatio,
-                        generateAudio: false, // Native audio disabled — long-form uses FFmpeg audio pipeline
+                        generateAudio: params.settings?.generateAudio !== false,
                         referenceImages: params.referenceImages.slice(0, 9),
                         qualityMode: params.settings?.quality || 'fast',
                         imageRole: params.imageRole,
@@ -211,7 +211,7 @@ async function runPipeline(jobId, params) {
                         imageUrl: lastFrameUrl,
                         duration: scene.duration,
                         aspectRatio: params.aspectRatio,
-                        generateAudio: false, // Native audio disabled — long-form uses FFmpeg audio pipeline
+                        generateAudio: params.settings?.generateAudio !== false,
                         referenceImages: params.referenceImages.slice(0, 9),
                         resolution: params.settings?.resolution || '720p',
                         mode: params.settings?.quality || 'fast',
@@ -257,7 +257,7 @@ async function runPipeline(jobId, params) {
                             imageUrl: lastFrameUrl,
                             duration: scene.duration,
                             aspectRatio: params.aspectRatio,
-                            generateAudio: false, // Native audio disabled — see primary generation
+                            generateAudio: params.settings?.generateAudio !== false,
                             referenceImages: params.referenceImages.slice(0, 9),
                             qualityMode: params.settings?.quality || 'fast',
                             imageRole: params.imageRole,
@@ -270,7 +270,7 @@ async function runPipeline(jobId, params) {
                             imageUrl: lastFrameUrl,
                             duration: scene.duration,
                             aspectRatio: params.aspectRatio,
-                            generateAudio: false, // Native audio disabled — see primary generation
+                            generateAudio: params.settings?.generateAudio !== false,
                             referenceImages: params.referenceImages.slice(0, 9),
                             resolution: params.settings?.resolution || '720p',
                             mode: params.settings?.quality || 'fast',
@@ -440,13 +440,24 @@ async function stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', j
     if (segmentPaths.length === 1) {
         // Single segment — just normalize
         const outPath = path.join(tmpDir, 'final.mp4');
-        await execFileAsync(ffmpegPath, [
-            '-y', '-i', segmentPaths[0],
-            '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p`,
-            '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
-            '-movflags', '+faststart',
-            outPath,
-        ], { timeout: 120000 });
+        try {
+            await execFileAsync(ffmpegPath, [
+                '-y', '-i', segmentPaths[0],
+                '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p`,
+                '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
+                '-c:a', 'aac', '-ar', '44100', '-ac', '2',
+                '-movflags', '+faststart',
+                outPath,
+            ], { timeout: 120000 });
+        } catch {
+            await execFileAsync(ffmpegPath, [
+                '-y', '-i', segmentPaths[0],
+                '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p`,
+                '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
+                '-movflags', '+faststart',
+                outPath,
+            ], { timeout: 120000 });
+        }
         return outPath;
     }
 
@@ -455,13 +466,25 @@ async function stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', j
     const normPaths = [];
     for (let i = 0; i < segmentPaths.length; i++) {
         const normPath = path.join(tmpDir, `norm-${i}.mp4`);
-        await execFileAsync(ffmpegPath, [
-            '-y', '-i', segmentPaths[i],
-            '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p`,
-            '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
-            '-movflags', '+faststart',
-            normPath,
-        ], { timeout: 120000 });
+        try {
+            await execFileAsync(ffmpegPath, [
+                '-y', '-i', segmentPaths[i],
+                '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p`,
+                '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
+                '-c:a', 'aac', '-ar', '44100', '-ac', '2',
+                '-movflags', '+faststart',
+                normPath,
+            ], { timeout: 120000 });
+        } catch {
+            // Fallback: Normalize without audio if clip doesn't have an audio track
+            await execFileAsync(ffmpegPath, [
+                '-y', '-i', segmentPaths[i],
+                '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p`,
+                '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
+                '-movflags', '+faststart',
+                normPath,
+            ], { timeout: 120000 });
+        }
         normPaths.push(normPath);
     }
 
@@ -497,29 +520,58 @@ async function stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', j
         lastLabel = outLabel;
     }
 
-    const filterComplex = filterParts.join(';');
+    // Build audio crossfade filter parts
+    const audioFilterParts = [];
+    let lastAudioLabel = '[0:a]';
+    for (let i = 1; i < normPaths.length; i++) {
+        const outLabel = i === normPaths.length - 1 ? '[aout]' : `[a${i}]`;
+        audioFilterParts.push(
+            `${lastAudioLabel}[${i}:a]acrossfade=d=${CROSSFADE_DURATION}:c1=tri:c2=tri${outLabel}`
+        );
+        lastAudioLabel = outLabel;
+    }
+
+    const videoFilterComplex = filterParts.join(';');
+    const audioFilterComplex = audioFilterParts.join(';');
+    const filterComplexWithAudio = `${videoFilterComplex};${audioFilterComplex}`;
     const outputPath = path.join(tmpDir, 'final.mp4');
 
     try {
+        console.log(`[LongForm ${jobId}] Attempting xfade stitch with audio...`);
         await execFileAsync(ffmpegPath, [
             '-y', ...inputs,
-            '-filter_complex', filterComplex,
+            '-filter_complex', filterComplexWithAudio,
             '-map', '[vout]',
+            '-map', '[aout]',
             '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
+            '-c:a', 'aac', '-b:a', '192k',
             '-movflags', '+faststart',
             outputPath,
         ], { timeout: 300000 }); // 5 min timeout for stitching
-    } catch (xfadeErr) {
-        console.warn(`[LongForm ${jobId}] xfade filter failed or unsupported: ${xfadeErr.message}. Falling back to simple concat...`);
-        const concatFilter = normPaths.map((_, idx) => `[${idx}:v]`).join('') + `concat=n=${normPaths.length}:v=1:a=1[vout]`;
-        await execFileAsync(ffmpegPath, [
-            '-y', ...inputs,
-            '-filter_complex', concatFilter,
-            '-map', '[vout]',
-            '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
-            '-movflags', '+faststart',
-            outputPath,
-        ], { timeout: 300000 });
+    } catch (audioErr) {
+        console.warn(`[LongForm ${jobId}] xfade stitch with audio failed: ${audioErr.message}. Falling back to video-only xfade...`);
+        const videoFilterComplexOnly = filterParts.join(';');
+        try {
+            await execFileAsync(ffmpegPath, [
+                '-y', ...inputs,
+                '-filter_complex', videoFilterComplexOnly,
+                '-map', '[vout]',
+                '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
+                '-movflags', '+faststart',
+                outputPath,
+            ], { timeout: 300000 });
+        } catch (xfadeErr) {
+            console.warn(`[LongForm ${jobId}] xfade video-only failed: ${xfadeErr.message}. Falling back to simple video-only concat...`);
+            const concatFilter = normPaths.map((_, idx) => `[${idx}:v]`).join('') + `concat=n=${normPaths.length}:v=1[vout]`;
+            await execFileAsync(ffmpegPath, [
+                '-y', ...inputs,
+                '-filter_complex', concatFilter,
+                '-map', '[vout]',
+                '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
+                '-movflags', '+faststart',
+                outputPath,
+            ], { timeout: 300000 });
+        }
     }
 
     console.log(`[LongForm ${jobId}] ✅ Stitched ${normPaths.length} segments → ${outputPath}`);

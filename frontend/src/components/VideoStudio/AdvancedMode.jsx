@@ -638,6 +638,7 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
     const [aspectRatio, setAspectRatio] = useState('9:16')
     const [quality, setQuality] = useState('fast')
     const [resolution, setResolution] = useState('480p')
+    const [generateAudio, setGenerateAudio] = useState(true)
     const [videoMode, setVideoMode] = useState('t2v')
     const [shots, setShots] = useState([{ prompt: '' }])
     const [viewVideo, setViewVideo] = useState(null) // { url, prompt, model, duration, firstImageUrl, lastImageUrl, refImages }
@@ -971,7 +972,7 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                     shots: m.has.multishot ? shots : [],
                     firstImageUrl: firstFrame?.url || '',
                     lastImageUrl: lastFrame?.url || '',
-                    generateAudio: !!m.has.audio, qualityMode: quality,
+                    generateAudio: generateAudio && !!m.has.audio, qualityMode: quality,
                     brandId: activeBrand?._id || null,
                     language: language || 'English',
                     referenceImages: allRefUrls,
@@ -1016,7 +1017,7 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                     imageRole: 'product',
                     language: language || 'English',
                     aspectRatio,
-                    settings: { resolution, quality },
+                    settings: { resolution, quality, generateAudio: generateAudio && !!m.has.audio },
                     brandId: activeBrand?._id,
                     bgmPreset: 'cinematic',
                 }),
@@ -1760,6 +1761,39 @@ export default function AdvancedMode({ activeBrand, initialData, projects = [], 
                                     style={{ width: '80px', accentColor: 'var(--sys-primary)', cursor: 'pointer', height: '3px' }}
                                 />
                             </div>
+                            {m.has.audio && (
+                                <div 
+                                    onClick={() => setGenerateAudio(prev => !prev)}
+                                    style={{ 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        gap: '6px', 
+                                        padding: '0 12px', 
+                                        background: 'var(--sys-surface-glass)', 
+                                        borderRadius: '10px', 
+                                        height: '36px', 
+                                        border: '1px solid var(--sys-border)',
+                                        cursor: 'pointer',
+                                        userSelect: 'none',
+                                        transition: 'all 0.2s'
+                                    }}
+                                    title="Toggle audio generation"
+                                >
+                                    <span 
+                                        className="material-symbols-outlined" 
+                                        style={{ 
+                                            fontSize: 16, 
+                                            color: generateAudio ? 'var(--sys-primary)' : 'var(--sys-text-muted)',
+                                            transition: 'color 0.2s'
+                                        }}
+                                    >
+                                        {generateAudio ? 'volume_up' : 'volume_off'}
+                                    </span>
+                                    <span style={{ fontSize: 11, color: 'var(--sys-text)', fontWeight: 600 }}>
+                                        {generateAudio ? 'Audio On' : 'Audio Off'}
+                                    </span>
+                                </div>
+                            )}
                             <ConfigDropdown value={language} onChange={setLanguage} options={LANGUAGES.map(l => ({ value: l.id, label: l.label }))} label="Language" />
                         </div>
 
