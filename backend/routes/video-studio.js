@@ -8840,7 +8840,8 @@ router.post('/long-form/generate', protect, async (req, res) => {
         const costEst = estimateLongFormCost(model || 'seedance-2.0', dur, settings?.resolution || '1080p', settings?.quality || 'fast');
         const user = req.user;
         
-        const remaining = user.credits || 0;
+        const isSuperAdmin = user.role === 'superadmin' || user.role === 'admin' || user.plan === 'enterprise';
+        const remaining = isSuperAdmin ? Infinity : (user.credits || 0);
         if (remaining < costEst.totalCredits) {
             return res.status(402).json({
                 success: false,
@@ -8850,18 +8851,35 @@ router.post('/long-form/generate', protect, async (req, res) => {
             });
         }
 
-        // Deduct credits upfront atomically (REL-014)
-        const updatedUser = await User.findOneAndUpdate(
-            { _id: user._id, credits: { $gte: costEst.totalCredits } },
-            { $inc: { credits: -costEst.totalCredits } },
-            { returnDocument: 'after' }
-        );
+        if (!isSuperAdmin) {
+            // Deduct credits upfront atomically (REL-014)
+            const updatedUser = await User.findOneAndUpdate(
+                { _id: user._id, credits: { $gte: costEst.totalCredits } },
+                { $inc: { credits: -costEst.totalCredits } },
+                { returnDocument: 'after' }
+            );
 
-        if (!updatedUser) {
-             return res.status(402).json({
-                success: false,
-                error: 'Insufficient credits (concurrent deduction occurred).',
-            });
+            if (!updatedUser) {
+                 return res.status(402).json({
+                    success: false,
+                    error: 'Insufficient credits (concurrent deduction occurred).',
+                });
+            }
+        } else {
+            // Log admin bypass in CreditUsage
+            const CreditUsage = mongoose.models.CreditUsage || (await import('../models/CreditUsage.js')).default;
+            CreditUsage.create({
+                user: user._id,
+                action: 'videoGenerate',
+                cost: costEst.totalCredits,
+                balanceAfter: Infinity,
+                description: 'Long-Form Video Generation (Admin Bypass)',
+                metadata: {
+                    route: req.originalUrl,
+                    brandId,
+                    bypassed: true
+                },
+            }).catch(err => console.warn('Longform credit usage log (bypass) failed:', err.message));
         }
 
         // Load brand context

@@ -535,11 +535,11 @@ router.post('/users/:id/add-credits', async (req, res) => {
         const user = await User.findById(req.params.id).select('-password');
         if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
-        user.credits.bonus += amount;
+        user.credits = (user.credits || 0) + amount;
         await user.save();
 
         // Create audit log
-        const balanceAfter = (user.credits?.total || 0) + (user.credits?.bonus || 0) - (user.credits?.used || 0);
+        const balanceAfter = user.credits;
         await CreditUsage.create({
             user: user._id,
             action: 'admin_adjustment',
@@ -564,25 +564,35 @@ router.post('/users/:id/reset-credits', async (req, res) => {
         const user = await User.findById(req.params.id).select('-password');
         if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
-        // credits.used removed in new schema, nothing to reset
-        
-        // Subscription handling removed or updated if needed
-        if (user.activeSubscription) {
-            // Subscription.credits is also a single number now.
+        // Get target default credits for their plan
+        const SubscriptionPackage = mongoose.models.SubscriptionPackage || (await import('../models/SubscriptionPackage.js')).default;
+        let targetCredits = 50;
+        if (user.plan) {
+            const pkg = await SubscriptionPackage.findOne({ slug: user.plan });
+            if (pkg) {
+                targetCredits = pkg.credits?.monthly || 50;
+            } else {
+                const legacyCredits = { starter: 50, professional: 500, enterprise: 999999 };
+                targetCredits = legacyCredits[user.plan] || 50;
+            }
         }
+        
+        const previousCredits = user.credits || 0;
+        user.credits = targetCredits;
+        await user.save();
 
         // Create audit log
-        const balanceAfter = (user.credits?.total || 0) + (user.credits?.bonus || 0);
+        const balanceAfter = user.credits;
         await CreditUsage.create({
             user: user._id,
             action: 'admin_adjustment',
-            cost: previousUsed, // Adding back 'used' credits
+            cost: previousCredits - targetCredits,
             balanceAfter: Math.max(0, balanceAfter),
             description: 'Admin Adjustment: Manual Credit Reset',
             metadata: {
                 adminId: req.user._id,
                 type: 'reset',
-                previousUsed
+                previousCredits
             }
         }).catch(err => console.warn('Credit audit log failed:', err.message));
 

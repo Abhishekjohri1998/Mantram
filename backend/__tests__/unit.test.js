@@ -98,7 +98,27 @@ describe('Safe Error Messages', () => {
     });
 
     it('should keep safety errors friendly', () => {
-        assert.equal(safeErrorMessage('content safety policy violation'), 'Content safety violation — please refine your prompt.');
+        assert.equal(safeErrorMessage('content safety policy violation'), 'Content safety violation — please refine your prompt or reference images.');
+    });
+
+    it('should handle provider exhausted errors', () => {
+        assert.equal(safeErrorMessage('all video providers exhausted'), 'Video generation service is temporarily offline due to provider service limits. Our team has been notified. Please try again later.');
+    });
+
+    it('should handle database syntax errors', () => {
+        assert.equal(safeErrorMessage('TypeError: Cannot read properties of undefined'), 'An internal server error occurred while processing your request. Please try again.');
+    });
+
+    it('should handle rate limits', () => {
+        assert.equal(safeErrorMessage('rate limit exceeded 429'), 'Too many requests. Please wait a moment and try again.');
+    });
+
+    it('should handle timeouts', () => {
+        assert.equal(safeErrorMessage('Network request timed out'), 'AI generation request timed out. The provider servers are currently overloaded. Please try again.');
+    });
+
+    it('should handle format errors', () => {
+        assert.equal(safeErrorMessage('Unsupported format or mime type'), 'Unsupported media format. Please upload JPG, PNG, or MP4 files.');
     });
 
     it('should return fallback for null/undefined', () => {

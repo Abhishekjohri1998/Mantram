@@ -36,8 +36,15 @@ const COSTS = {
     wizard:     60, // All-in-one: identity + stationery + guide
 };
 
-// ── Helper: read credit balance (mirrors existing brand-studio pattern) ──────
-const getBalance = (user) => (user.credits?.total || 0) + (user.credits?.bonus || 0);
+const getBalance = (user) => {
+    if (user.role === 'superadmin' || user.role === 'admin' || user.plan === 'enterprise') {
+        return Infinity;
+    }
+    if (typeof user.credits === 'number') {
+        return user.credits;
+    }
+    return (user.credits?.total || 0) + (user.credits?.bonus || 0);
+};
 
 // ── Helper: save asset to DB ──────────────────────────────────────────────────
 async function saveAsset(userId, brandId, assetType, result, brief, scopeLabel, creditsUsed) {

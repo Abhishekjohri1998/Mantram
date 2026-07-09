@@ -20,6 +20,16 @@ const router = express.Router();
 
 const CREDITS = { deck: 20, email: 12, landing: 18, aplus: 15, aplusPlus: 25 };
 
+const getBalance = (user) => {
+    if (user.role === 'superadmin' || user.role === 'admin' || user.plan === 'enterprise') {
+        return Infinity;
+    }
+    if (typeof user.credits === 'number') {
+        return user.credits;
+    }
+    return (user.credits?.total || 0) + (user.credits?.bonus || 0);
+};
+
 // ── POST /api/brand-studio/fetch-url ─────────────────────────
 // Scrapes a product/brand URL and returns structured content
 // for use as enriched context in generation requests.
@@ -213,7 +223,7 @@ router.post('/quick-post', protect, async (req, res) => {
         const isMulti   = ratioList.length > 1;
         const QUICK_POST_CREDITS = isMulti ? 12 : 8;  // Batch discount vs. individual
 
-        const balance = (req.user.credits?.total || 0) + (req.user.credits?.bonus || 0);
+        const balance = getBalance(req.user);
         if (balance < QUICK_POST_CREDITS) return res.status(402).json({ success: false, error: 'Insufficient credits', required: QUICK_POST_CREDITS });
 
         let brandContext = '';
@@ -315,7 +325,7 @@ router.post('/mood-board', protect, async (req, res) => {
         if (!productDNA) return res.status(400).json({ success: false, error: 'productDNA required' });
 
         const MOOD_CREDITS = 5;
-        const balance = (req.user.credits?.total || 0) + (req.user.credits?.bonus || 0);
+        const balance = getBalance(req.user);
         if (balance < MOOD_CREDITS) return res.status(402).json({ success: false, error: 'Insufficient credits', required: MOOD_CREDITS });
 
         let brandContext = '';
@@ -391,7 +401,7 @@ router.post('/social-kit/generate', protect, async (req, res) => {
         if (!productDNA) return res.status(400).json({ success: false, error: 'productDNA required' });
 
         const SOCIAL_KIT_CREDITS = 15;
-        const balance = (req.user.credits?.total || 0) + (req.user.credits?.bonus || 0);
+        const balance = getBalance(req.user);
         if (balance < SOCIAL_KIT_CREDITS) return res.status(402).json({ success: false, error: 'Insufficient credits', required: SOCIAL_KIT_CREDITS });
 
         const model = imageModel || 'gpt-image-2';
@@ -826,7 +836,7 @@ router.post('/social-kit/make-reel', protect, async (req, res) => {
         if (!imageUrl) return res.status(400).json({ success: false, error: 'imageUrl required' });
 
         const REEL_CREDITS = 5;
-        const balance = (req.user.credits?.total || 0) + (req.user.credits?.bonus || 0);
+        const balance = getBalance(req.user);
         if (balance < REEL_CREDITS) return res.status(402).json({ success: false, error: 'Insufficient credits', required: REEL_CREDITS });
 
         // Motion style → Seedance camera directive
@@ -889,7 +899,7 @@ router.post('/brochure/generate', protect, async (req, res) => {
         if (!productDNA) return res.status(400).json({ success: false, error: 'productDNA required' });
 
         const BROCHURE_CREDITS = 12;
-        const balance = (req.user.credits?.total || 0) + (req.user.credits?.bonus || 0);
+        const balance = getBalance(req.user);
         if (balance < BROCHURE_CREDITS) return res.status(402).json({ success: false, error: 'Insufficient credits', required: BROCHURE_CREDITS });
 
         // Always use GPT Image 2 for brochures — best typography + layout in generated images
@@ -1253,7 +1263,7 @@ router.post('/deck/generate', protect, async (req, res) => {
         if (!brandId || !brief)
             return res.status(400).json({ success: false, error: 'brandId and brief required' });
 
-        const balance = (req.user.credits?.total || 0) + (req.user.credits?.bonus || 0);
+        const balance = getBalance(req.user);
         if (balance < CREDITS.deck) return res.status(402).json({ success: false, error: 'Insufficient credits', required: CREDITS.deck });
 
         const result = await generateCampaignDeck({
@@ -1350,7 +1360,7 @@ router.post('/email/generate', protect, async (req, res) => {
         if (!brandId || !brief)
             return res.status(400).json({ success: false, error: 'brandId and brief required' });
 
-        const balance = (req.user.credits?.total || 0) + (req.user.credits?.bonus || 0);
+        const balance = getBalance(req.user);
         if (balance < CREDITS.email) return res.status(402).json({ success: false, error: 'Insufficient credits', required: CREDITS.email });
 
         const result = await generateEmail({ brandId, brief, emailType: emailType || 'campaign', urlContext, referenceImage, designContext: designContext || null, imageModel: imageModel || undefined });
@@ -1453,7 +1463,7 @@ router.post('/landing-page/generate', protect, async (req, res) => {
             }
         }
 
-        const balance = (req.user.credits?.total || 0) + (req.user.credits?.bonus || 0);
+        const balance = getBalance(req.user);
         if (balance < CREDITS.landing) return res.status(402).json({ success: false, error: 'Insufficient credits', required: CREDITS.landing });
 
         const result = await generateLandingPage({
@@ -2299,7 +2309,7 @@ router.post('/aplus/generate', protect, async (req, res) => {
         console.log(`🔷 A+ Generate: listingTier=${listingTier}, isPremium=${isPremium}, creditCost=${creditCost}, modules=${moduleCount}`);
 
         // ── Credit balance pre-flight check ───────────────────────────────────────
-        const balance = (req.user.credits?.total || 0) + (req.user.credits?.bonus || 0);
+        const balance = getBalance(req.user);
         if (balance < creditCost) return res.status(402).json({ success: false, error: 'Insufficient credits', required: creditCost });
 
         const result = await generateAplusListing({
