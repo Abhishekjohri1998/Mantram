@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import VideoHoverActions from './VideoHoverActions'
 
 const API_BASE = import.meta.env.VITE_API_URL || `${window.location.origin}/api`
@@ -204,6 +204,92 @@ export default function MotionGraphics({ activeBrand, canCreateVideo = true, onU
     const pollRef = useRef()
 
     const busy = ['analyzing', 'prompting', 'generating'].includes(stage)
+
+    useEffect(() => {
+        let active = true;
+        
+        async function loadLatestProject() {
+            if (!activeBrand?._id) return;
+            try {
+                const d = await api(`/video-studio?limit=1&brandId=${activeBrand._id}&mode=motion-graphics`);
+                if (!active) return;
+                
+                if (d.success && d.projects && d.projects.length > 0) {
+                    const p = d.projects[0];
+                    
+                    if (p.input?.images && p.input.images.length > 0) {
+                        setImages(p.input.images.map(img => ({
+                            url: img.url,
+                            preview: img.url,
+                            name: img.label || 'brand-asset'
+                        })));
+                    }
+                    
+                    if (p.advancedConfig) {
+                        if (p.advancedConfig.styleId) setStyle(p.advancedConfig.styleId);
+                        if (p.advancedConfig.aspectRatio) setRatio(p.advancedConfig.aspectRatio);
+                        if (p.advancedConfig.duration) setDuration(p.advancedConfig.duration);
+                        if (p.advancedConfig.resolution) setResolution(p.advancedConfig.resolution);
+                    }
+                    if (p.generation?.model) setModel(p.generation.model);
+                    
+                    if (p.backendPrompt) {
+                        setMotionPrompt(p.backendPrompt);
+                        setEditedPrompt(p.backendPrompt);
+                    }
+                    
+                    const isGenerating = p.status === 'generating' || p.status === 'advanced-generating';
+                    const hasVideo = p.finalVideoUrl || p.generation?.s3VideoUrl || p.generation?.videoUrl;
+                    
+                    if (isGenerating) {
+                        const rid = p.generation?.requestId || p.generation?.taskId;
+                        if (rid) {
+                            setRequestId(rid);
+                            setProgress(p.generation?.progress || 5);
+                            setStage('generating');
+                            startPolling(rid);
+                        }
+                    } else if (p.status === 'done' || p.status === 'completed' || hasVideo) {
+                        const rawUrl = p.finalVideoUrl || p.generation?.s3VideoUrl || p.generation?.videoUrl || '';
+                        const isS3 = rawUrl.includes('amazonaws.com');
+                        const isKnownCdn = rawUrl && (rawUrl.includes('fal.media') || rawUrl.includes('muapi.ai') || rawUrl.includes('fal.run'));
+                        
+                        const resolvedVideoUrl = isS3
+                            ? `${API_BASE}/video-studio/${p._id}/video`
+                            : isKnownCdn
+                                ? rawUrl
+                                : (rawUrl ? `${API_BASE}/video-studio/${p._id}/video` : '');
+                                
+                        setVideoUrl(resolvedVideoUrl);
+                        setStage('done');
+                    } else if (p.status === 'failed' || p.generation?.status === 'FAILED') {
+                        setStage('error');
+                        setError(p.generation?.error || 'Generation failed');
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to load latest motion graphics project:', err);
+            }
+        }
+        
+        setImages([]);
+        setBrief('');
+        setVideoUrl(null);
+        setStage('idle');
+        setMotionPrompt('');
+        setEditedPrompt('');
+        setError('');
+        setProgress(0);
+        setRequestId(null);
+        if (pollRef.current) clearInterval(pollRef.current);
+        
+        loadLatestProject();
+        
+        return () => {
+            active = false;
+            if (pollRef.current) clearInterval(pollRef.current);
+        };
+    }, [activeBrand?._id]);
 
     // ── Upload images directly to S3 via multipart upload ──
     const handleFiles = useCallback(async (files) => {
