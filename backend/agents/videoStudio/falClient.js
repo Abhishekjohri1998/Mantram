@@ -680,7 +680,7 @@ function buildPayload(model, { prompt, imageUrl, duration, resolution, mode, sho
 /**
  * Robust cascading poll for seedance-2.0
  */
-async function trySeedanceCascade({ prompt, imageUrl, duration, resolution, aspectRatio, generateAudio, mode, referenceImages, refAudio, refVideo, model }) {
+async function trySeedanceCascade({ prompt, imageUrl, duration, resolution, aspectRatio, generateAudio, mode, referenceImages, refAudio, refVideo, model, imageRole }) {
     if (isLaozhangAvailable()) {
         try {
             const r = await submitLaozhangVideoGeneration({
@@ -706,7 +706,8 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, resolution, aspe
             generateAudio, referenceImages: referenceImages || [], qualityMode: mode || 'fast',
             refAudio, refVideo,
             resolution,
-            model: model || 'seedance-2.0'
+            model: model || 'seedance-2.0',
+            imageRole
         });
         if (atlasResult?.taskId) {
             console.log('✅ [Cascade] Step 2 done: Atlas Cloud (seedance)');
@@ -755,7 +756,7 @@ async function trySeedanceCascade({ prompt, imageUrl, duration, resolution, aspe
     throw new Error('All video providers exhausted: MuAPI, Atlas Cloud, Kie.ai, and LaoZhang are all unavailable or out of credits. Please try again in 30 minutes.');
 }
 
-export async function submitVideoGeneration({ model, prompt, imageUrl, duration, resolution, mode, shots, generateAudio, aspectRatio, referenceImages, refAudio, refVideo }) {
+export async function submitVideoGeneration({ model, prompt, imageUrl, duration, resolution, mode, shots, generateAudio, aspectRatio, referenceImages, refAudio, refVideo, imageRole }) {
     if (!MODEL_AVAILABLE[model]) throw new Error(`Model '${model}' is not available.`);
 
     // Enforce provider-specific prompt length limits
@@ -883,7 +884,8 @@ export async function submitVideoGeneration({ model, prompt, imageUrl, duration,
                 referenceImages: s3ReferenceImages, 
                 refAudio: s3RefAudio, refVideo: s3RefVideo,
                 resolution,
-                model
+                model,
+                imageRole
             });
             return {
                 requestId: cascade.taskId || `lz-${Date.now()}`,

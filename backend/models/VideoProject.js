@@ -19,7 +19,7 @@ const videoProjectSchema = new mongoose.Schema({
     checkpoint: { type: Number, default: 0 }, // for resumability
 
     // ── Studio mode ──
-    mode: { type: String, enum: ['advanced', 'storyboard', 'ugc', 'agent-scene', 'image-to-video', 'extend'], default: 'storyboard' },
+    mode: { type: String, enum: ['advanced', 'storyboard', 'ugc', 'agent-scene', 'image-to-video', 'extend', 'motion-graphics'], default: 'storyboard' },
     studioMode: { type: String, default: '' },  // 'ugc-pro', 'q-ads', 'q-ads-v2', 'advanced' — cross-cutting tag for filtering history
 
     // ── Advanced Mode Config (power-user direct generation) ──
