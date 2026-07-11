@@ -391,7 +391,7 @@ export const requireCredits = (actionOrCost = 1) => {
 
             // Determine if it was a video generate action to calculate the margin tracking
             let costInrAtDebit = null;
-            if (rawCost === 'dynamic' && (actionName === 'videoGenerate' || actionName === 'storyboardAnimate' || actionName === 'storyboardAnimateLongForm')) {
+            if (['videoGenerate', 'storyboardAnimate', 'storyboardAnimateLongForm'].includes(actionName)) {
                  const duration = parseInt(req.body.duration) || 5;
                  costInrAtDebit = Math.ceil(duration * COST_PER_SECOND_INR);
             }
