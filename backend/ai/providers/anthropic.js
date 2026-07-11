@@ -13,11 +13,9 @@ export class AnthropicProvider extends BaseProvider {
     }
 
     _mapModelForProvider(modelId) {
-        // Map the dateless format used across the codebase ('claude-sonnet-4-6') to the native Anthropic API model identifier.
-        // NOTE: claude-3-5-sonnet-20241022 was deprecated in 2025 and returns 404.
-        if (modelId === 'claude-sonnet-4-6') {
-            return 'claude-sonnet-4-20250514';
-        }
+        // Since the 4.6 generation, Anthropic uses dateless model IDs natively.
+        // 'claude-sonnet-4-6' is the correct API ID — no remapping needed.
+        // NOTE: The old dated format 'claude-3-5-sonnet-20241022' was deprecated in 2025.
         return modelId;
     }
 

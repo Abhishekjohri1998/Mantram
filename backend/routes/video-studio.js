@@ -2007,7 +2007,7 @@ router.post('/agent/v2/graph/:sessionId/presets', protect, async (req, res) => {
         const graph = await VideoGraph.findOneAndUpdate(
             { session: sessionDoc._id, user: req.user._id },
             { $push: { customPresets: newPreset } },
-            { new: true }
+            { returnDocument: 'after' }
         );
 
         if (!graph) return res.status(404).json({ success: false, error: 'Graph not found' });
@@ -2029,7 +2029,7 @@ router.delete('/agent/v2/graph/:sessionId/presets/:presetId', protect, async (re
         const graph = await VideoGraph.findOneAndUpdate(
             { session: sessionDoc._id, user: req.user._id },
             { $pull: { customPresets: { id: req.params.presetId } } },
-            { new: true }
+            { returnDocument: 'after' }
         );
 
         if (!graph) return res.status(404).json({ success: false, error: 'Graph not found' });
@@ -11616,7 +11616,7 @@ router.patch('/storyboard/:projectId', protect, async (req, res) => {
         const project = await VideoProject.findOneAndUpdate(
             { _id: req.params.projectId, user: req.user._id },
             { $set: updateFields },
-            { new: true }
+            { returnDocument: 'after' }
         );
 
         if (!project) return res.status(404).json({ success: false, error: 'Project not found' });

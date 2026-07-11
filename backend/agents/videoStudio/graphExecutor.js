@@ -91,7 +91,7 @@ class AssistantHandler extends NodeHandler {
             modelId = 'gpt-4o';
         } else if (modelParam === 'claude-3-5-sonnet') {
             provider = 'anthropic';
-            modelId = 'claude-sonnet-4-20250514';
+            modelId = 'claude-sonnet-4-6';
         } else if (modelParam === 'grok-beta') {
             provider = 'xai';
             modelId = 'grok-beta';
