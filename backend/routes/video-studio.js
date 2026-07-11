@@ -10158,26 +10158,31 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
             }
         }
 
-        const posterDataUrl = await generateStoryboardPoster(
-            plan.imagePrompt,
-            style,
-            format,
-            productImageUrls,      // S3 URLs (fallback if no raw buffers)
-            null,                  // legacy single avatarUrl — not used (multi-avatar below)
-            imageModel,
-            rawProductBuffers,     // raw buffers — contains actual pixel data
-            null,                  // legacy single rawAvatarBuffer — not used
-            imageSizeForModel,     // NanoBanana resolution e.g. '2K'
-            plan.logoUrl || null,  // brand logo URL (null if includeBranding=false)
-            rawLogoBuffer,         // brand logo buffer (null if includeBranding=false)
-            // ── New multi-character + ref image params ──
-            avatarUrls,
-            avatarNames,
-            rawAvatarBuffers,
-            refImageUrls,
-            rawRefBuffers,
-            Math.min(plan.cuts?.length || 5, 8),  // dynamic panel count
-        );
+        let posterDataUrl = null;
+        try {
+            posterDataUrl = await generateStoryboardPoster(
+                plan.imagePrompt,
+                style,
+                format,
+                productImageUrls,      // S3 URLs (fallback if no raw buffers)
+                null,                  // legacy single avatarUrl — not used (multi-avatar below)
+                imageModel,
+                rawProductBuffers,     // raw buffers — contains actual pixel data
+                null,                  // legacy single rawAvatarBuffer — not used
+                imageSizeForModel,     // NanoBanana resolution e.g. '2K'
+                plan.logoUrl || null,  // brand logo URL (null if includeBranding=false)
+                rawLogoBuffer,         // brand logo buffer (null if includeBranding=false)
+                // ── New multi-character + ref image params ──
+                avatarUrls,
+                avatarNames,
+                rawAvatarBuffers,
+                refImageUrls,
+                rawRefBuffers,
+                Math.min(plan.cuts?.length || 5, 8),  // dynamic panel count
+            );
+        } catch (posterErr) {
+            console.warn(`[Storyboard Create] ⚠️ Poster generation failed — continuing without poster: ${posterErr.message}`);
+        }
 
 
         // Upload data URI → S3 so the frontend gets a real HTTP URL (not a giant base64 blob)
@@ -10192,7 +10197,7 @@ router.post('/storyboard/create', protect, requireCredits('storyboardCreate'), s
             }
         }
 
-        plan.imageUrl = posterUrl;
+        plan.imageUrl = posterUrl || null;
 
         // Load brand context for scene planner
         let dbBrandContext = '';

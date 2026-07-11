@@ -220,30 +220,63 @@ export async function generateStoryboardPoster(
     console.log(`  raw buffers: product=${rawProductBuffers.length}, avatars=${allRawAvatarBuffers.length}, logo=${!!rawLogoBuffer}, refs=${rawRefBuffers.length}`);
     console.log(`  Prompt (first 120): ${finalPrompt.substring(0, 120)}...`);
 
-    const TIMEOUT_MS = 300000; // 300s (5 minutes) — no fallback, allows long prompts/high load to finish
+    const TIMEOUT_MS = 300000; // 300s (5 minutes) — allows long prompts/high load to finish
 
-    if (useNanoBanana) {
-        const result = await generateWithNanoBanana(
-            finalPrompt, ar,
-            rawProductBuffers, null, productImageUrls, null,
-            TIMEOUT_MS, imageSize, logoUrl, rawLogoBuffer,
-            allRawAvatarBuffers, allAvatarUrls, avatarNames,
-            rawRefBuffers, refImageUrls,
-        );
-        if (!result) throw new Error('NanoBanana (Gemini Vertex) returned an empty image response.');
-        return result;
-    }
-
-    // GPT-Image-2 path — NO FALLBACK to NanoBanana, fail immediately with the real error
-    const result = await generateWithGptImage2(
+    // Helper closures to avoid repeating long arg lists
+    const _callNanoBanana = () => generateWithNanoBanana(
+        finalPrompt, ar,
+        rawProductBuffers, null, productImageUrls, null,
+        TIMEOUT_MS, imageSize, logoUrl, rawLogoBuffer,
+        allRawAvatarBuffers, allAvatarUrls, avatarNames,
+        rawRefBuffers, refImageUrls,
+    );
+    const _callGptImage2 = () => generateWithGptImage2(
         finalPrompt, ar,
         rawProductBuffers, null, productImageUrls, null,
         TIMEOUT_MS, logoUrl, rawLogoBuffer,
         allRawAvatarBuffers, allAvatarUrls, avatarNames,
         rawRefBuffers, refImageUrls,
     );
-    if (!result) throw new Error('GPT Image 2 returned an empty image response.');
-    return result;
+
+    if (useNanoBanana) {
+        // NanoBanana primary → GPT-Image-2 fallback
+        try {
+            const result = await _callNanoBanana();
+            if (!result) throw new Error('NanoBanana (Gemini Vertex) returned an empty image response.');
+            return result;
+        } catch (primaryErr) {
+            console.warn(`[SB Poster] NanoBanana failed (${primaryErr.message}), falling back to GPT-Image-2...`);
+            try {
+                const fallbackResult = await _callGptImage2();
+                if (fallbackResult) {
+                    console.log(`[SB Poster] ✅ GPT-Image-2 fallback succeeded`);
+                    return fallbackResult;
+                }
+            } catch (fbErr) {
+                console.warn(`[SB Poster] GPT-Image-2 fallback also failed: ${fbErr.message}`);
+            }
+            throw primaryErr; // re-throw original if both fail
+        }
+    }
+
+    // GPT-Image-2 primary → NanoBanana fallback
+    try {
+        const result = await _callGptImage2();
+        if (!result) throw new Error('GPT Image 2 returned an empty image response.');
+        return result;
+    } catch (primaryErr) {
+        console.warn(`[SB Poster] GPT-Image-2 failed (${primaryErr.message}), falling back to NanoBanana...`);
+        try {
+            const fallbackResult = await _callNanoBanana();
+            if (fallbackResult) {
+                console.log(`[SB Poster] ✅ NanoBanana fallback succeeded`);
+                return fallbackResult;
+            }
+        } catch (fbErr) {
+            console.warn(`[SB Poster] NanoBanana fallback also failed: ${fbErr.message}`);
+        }
+        throw primaryErr; // re-throw original if both fail
+    }
 }
 
 // ── GPT Image 2 via LaoZhang ─────────────────────────────────────────────────

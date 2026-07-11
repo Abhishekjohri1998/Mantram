@@ -197,7 +197,7 @@ async function strategistAgent(brandContext, industry, allSignals) {
             'anthropic-version': '2023-06-01',
           },
           body: JSON.stringify({
-            model: 'claude-3-5-sonnet-20241022',
+            model: 'claude-sonnet-4-20250514',
             max_tokens: 1024,
             messages: [{ role: 'user', content: `You are a STRATEGIC CMO ADVISOR. You don't just find keywords — you decide which ones THIS brand should actually invest in.
 

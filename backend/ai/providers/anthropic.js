@@ -14,8 +14,9 @@ export class AnthropicProvider extends BaseProvider {
 
     _mapModelForProvider(modelId) {
         // Map the dateless format used across the codebase ('claude-sonnet-4-6') to the native Anthropic API model identifier.
+        // NOTE: claude-3-5-sonnet-20241022 was deprecated in 2025 and returns 404.
         if (modelId === 'claude-sonnet-4-6') {
-            return 'claude-3-5-sonnet-20241022';
+            return 'claude-sonnet-4-20250514';
         }
         return modelId;
     }
