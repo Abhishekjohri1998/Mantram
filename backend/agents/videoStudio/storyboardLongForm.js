@@ -1116,10 +1116,10 @@ async function _stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', 
             '-y', ...inputs,
             '-filter_complex', concatFilter,
             '-map', '[vout]',
-            '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
+            '-c:v', 'libx264', '-preset', 'superfast', '-crf', '18',
             '-movflags', '+faststart',
             videoOnlyStitchedPath,
-        ], { timeout: 300000 });
+        ], { timeout: 900000 });
     }
 
     // Step 3: Add silent audio track to the video-only stitched file
