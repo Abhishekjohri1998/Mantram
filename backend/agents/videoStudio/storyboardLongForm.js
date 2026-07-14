@@ -1088,7 +1088,7 @@ async function _stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', 
     // A hard cut therefore looks perfectly seamless.
     console.log(`[SB LongForm ${jobId}] Stitching ${normPaths.length} segments with HARD CUTS (no dissolves)`);
     const concatListPath = path.join(tmpDir, 'concat.txt');
-    const concatContent = normPaths.map(p => `file '${p}'`).join('\n');
+    const concatContent = normPaths.map(p => `file '${p.replace(/\\/g, '/')}'`).join('\n');
     fs.writeFileSync(concatListPath, concatContent, 'utf8');
 
     const outputPath = path.join(tmpDir, 'stitched.mp4');
@@ -1105,19 +1105,53 @@ async function _stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', 
         ], { timeout: 300000 });
         return outputPath;
     } catch (stitchErr) {
-        // Fallback: use FFmpeg concat filter if concat demuxer fails
-        console.warn(`[SB LongForm ${jobId}] Concat demuxer failed: ${stitchErr.message}. Trying filter_complex concat...`);
-        const concatFilter = normPaths.map((_, idx) => `[${idx}:v][${idx}:a]`).join('') + `concat=n=${normPaths.length}:v=1:a=1[vout][aout]`;
-        const inputs = normPaths.flatMap(p => ['-i', p]);
-        await execFileAsync(ffmpegPath, [
-            '-y', ...inputs,
-            '-filter_complex', concatFilter,
-            '-map', '[vout]', '-map', '[aout]',
-            '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
-            '-c:a', 'aac', '-b:a', '192k',
-            '-movflags', '+faststart',
-            outputPath,
-        ], { timeout: 300000 });
+        console.warn(`[SB LongForm ${jobId}] Concat demuxer failed: ${stitchErr.message}. Trying filter_complex concat with audio...`);
+        try {
+            // Fallback 1: Filter complex with audio
+            const concatFilter = normPaths.map((_, idx) => `[${idx}:v][${idx}:a]`).join('') + `concat=n=${normPaths.length}:v=1:a=1[vout][aout]`;
+            const inputs = normPaths.flatMap(p => ['-i', p]);
+            await execFileAsync(ffmpegPath, [
+                '-y', ...inputs,
+                '-filter_complex', concatFilter,
+                '-map', '[vout]', '-map', '[aout]',
+                '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
+                '-c:a', 'aac', '-b:a', '192k',
+                '-movflags', '+faststart',
+                outputPath,
+            ], { timeout: 300000 });
+        } catch (filterAudioErr) {
+            console.warn(`[SB LongForm ${jobId}] Filter complex concat with audio failed: ${filterAudioErr.message}. Trying video-only filter complex concat...`);
+            try {
+                // Fallback 2: Video-only filter complex concat
+                const concatFilter = normPaths.map((_, idx) => `[${idx}:v]`).join('') + `concat=n=${normPaths.length}:v=1:a=0[vout]`;
+                const inputs = normPaths.flatMap(p => ['-i', p]);
+                const videoOnlyTempPath = path.join(tmpDir, 'stitched-video-only.mp4');
+                await execFileAsync(ffmpegPath, [
+                    '-y', ...inputs,
+                    '-filter_complex', concatFilter,
+                    '-map', '[vout]',
+                    '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
+                    '-movflags', '+faststart',
+                    videoOnlyTempPath,
+                ], { timeout: 300000 });
+
+                // Add silent audio track to match output requirements
+                console.log(`[SB LongForm ${jobId}] Adding silent audio track to video-only stitched output...`);
+                await execFileAsync(ffmpegPath, [
+                    '-y',
+                    '-i', videoOnlyTempPath,
+                    '-f', 'lavfi', '-i', `anullsrc=r=48000:cl=stereo`,
+                    '-c:v', 'copy',
+                    '-c:a', 'aac', '-b:a', '192k',
+                    '-shortest',
+                    '-movflags', '+faststart',
+                    outputPath,
+                ], { timeout: 120000 });
+            } catch (videoOnlyErr) {
+                console.error(`[SB LongForm ${jobId}] Video-only stitching failed: ${videoOnlyErr.message}`);
+                throw videoOnlyErr;
+            }
+        }
     }
 
     console.log(`[SB LongForm ${jobId}] ✅ Stitched ${normPaths.length} segments → ${outputPath}`);
