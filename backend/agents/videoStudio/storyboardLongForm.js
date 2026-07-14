@@ -1032,23 +1032,34 @@ async function _stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', 
         : aspectRatio === '1:1'  ? [1080, 1080]
         : [1080, 1920]; // 9:16 default
 
-
-
     if (segmentPaths.length === 1) {
         const outPath = path.join(tmpDir, 'stitched.mp4');
         await execFileAsync(ffmpegPath, [
             '-y', '-i', segmentPaths[0],
             '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p`,
             '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
-            '-c:a', 'aac', '-b:a', '192k',
+            '-an',
             '-movflags', '+faststart',
             outPath,
         ], { timeout: 120000 });
-        return outPath;
+
+        // Add silent audio track for compat
+        const silentPath = path.join(tmpDir, 'stitched-with-audio.mp4');
+        await execFileAsync(ffmpegPath, [
+            '-y',
+            '-i', outPath,
+            '-f', 'lavfi', '-i', `anullsrc=r=48000:cl=stereo`,
+            '-c:v', 'copy',
+            '-c:a', 'aac', '-b:a', '192k',
+            '-shortest',
+            '-movflags', '+faststart',
+            silentPath,
+        ], { timeout: 120000 });
+        return silentPath;
     }
 
-    // Step 1: Normalize all segments to the same resolution/fps/audio
-    console.log(`[SB LongForm ${jobId}] Normalizing ${segmentPaths.length} segments → ${w}x${h}@24fps (with audio)`);
+    // Step 1: Normalize all segments to the same resolution/fps/format (video-only)
+    console.log(`[SB LongForm ${jobId}] Normalizing ${segmentPaths.length} segments to video-only → ${w}x${h}@24fps`);
     const normPaths = [];
     for (let i = 0; i < segmentPaths.length; i++) {
         const normPath = path.join(tmpDir, `norm-${i}.mp4`);
@@ -1057,14 +1068,10 @@ async function _stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', 
         await execFileAsync(ffmpegPath, [
             '-y',
             '-i', segmentPaths[i],
-            '-f', 'lavfi', '-i', `anullsrc=r=48000:cl=stereo:d=${targetDur}`,
             '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p`,
             '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
-            '-c:a', 'aac', '-b:a', '192k', '-ac', '2', '-ar', '48000',
-            '-map', '0:v:0',
-            '-map', '1:a:0',
+            '-an',
             '-t', String(targetDur),
-            '-shortest',
             '-movflags', '+faststart',
             normPath,
         ], { timeout: 120000 }).catch(async (err) => {
@@ -1083,76 +1090,51 @@ async function _stitchWithCrossfade(tmpDir, segmentPaths, aspectRatio = '9:16', 
     }
 
     // Step 2: Write a concat list file for hard-cut joining (no xfade dissolves)
-    // Since each segment's last frame is extracted and used as the next segment's
-    // first frame anchor, segments are already visually adjacent at cut points.
-    // A hard cut therefore looks perfectly seamless.
     console.log(`[SB LongForm ${jobId}] Stitching ${normPaths.length} segments with HARD CUTS (no dissolves)`);
     const concatListPath = path.join(tmpDir, 'concat.txt');
     const concatContent = normPaths.map(p => `file '${p.replace(/\\/g, '/')}'`).join('\n');
     fs.writeFileSync(concatListPath, concatContent, 'utf8');
 
-    const outputPath = path.join(tmpDir, 'stitched.mp4');
+    const videoOnlyStitchedPath = path.join(tmpDir, 'stitched-video-only.mp4');
     try {
+        // Fast Concat Demuxer (No Re-encoding!)
+        console.log(`[SB LongForm ${jobId}] Stage 1: Attempting fast concat demuxer...`);
         await execFileAsync(ffmpegPath, [
             '-y',
             '-f', 'concat',
             '-safe', '0',
             '-i', concatListPath,
-            '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
-            '-c:a', 'aac', '-b:a', '192k',
+            '-c', 'copy',
             '-movflags', '+faststart',
-            outputPath,
-        ], { timeout: 300000 });
-        return outputPath;
+            videoOnlyStitchedPath,
+        ], { timeout: 120000 });
     } catch (stitchErr) {
-        console.warn(`[SB LongForm ${jobId}] Concat demuxer failed: ${stitchErr.message}. Trying filter_complex concat with audio...`);
-        try {
-            // Fallback 1: Filter complex with audio
-            const concatFilter = normPaths.map((_, idx) => `[${idx}:v][${idx}:a]`).join('') + `concat=n=${normPaths.length}:v=1:a=1[vout][aout]`;
-            const inputs = normPaths.flatMap(p => ['-i', p]);
-            await execFileAsync(ffmpegPath, [
-                '-y', ...inputs,
-                '-filter_complex', concatFilter,
-                '-map', '[vout]', '-map', '[aout]',
-                '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
-                '-c:a', 'aac', '-b:a', '192k',
-                '-movflags', '+faststart',
-                outputPath,
-            ], { timeout: 300000 });
-        } catch (filterAudioErr) {
-            console.warn(`[SB LongForm ${jobId}] Filter complex concat with audio failed: ${filterAudioErr.message}. Trying video-only filter complex concat...`);
-            try {
-                // Fallback 2: Video-only filter complex concat
-                const concatFilter = normPaths.map((_, idx) => `[${idx}:v]`).join('') + `concat=n=${normPaths.length}:v=1:a=0[vout]`;
-                const inputs = normPaths.flatMap(p => ['-i', p]);
-                const videoOnlyTempPath = path.join(tmpDir, 'stitched-video-only.mp4');
-                await execFileAsync(ffmpegPath, [
-                    '-y', ...inputs,
-                    '-filter_complex', concatFilter,
-                    '-map', '[vout]',
-                    '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
-                    '-movflags', '+faststart',
-                    videoOnlyTempPath,
-                ], { timeout: 300000 });
-
-                // Add silent audio track to match output requirements
-                console.log(`[SB LongForm ${jobId}] Adding silent audio track to video-only stitched output...`);
-                await execFileAsync(ffmpegPath, [
-                    '-y',
-                    '-i', videoOnlyTempPath,
-                    '-f', 'lavfi', '-i', `anullsrc=r=48000:cl=stereo`,
-                    '-c:v', 'copy',
-                    '-c:a', 'aac', '-b:a', '192k',
-                    '-shortest',
-                    '-movflags', '+faststart',
-                    outputPath,
-                ], { timeout: 120000 });
-            } catch (videoOnlyErr) {
-                console.error(`[SB LongForm ${jobId}] Video-only stitching failed: ${videoOnlyErr.message}`);
-                throw videoOnlyErr;
-            }
-        }
+        console.warn(`[SB LongForm ${jobId}] Fast concat demuxer failed: ${stitchErr.message}. Stage 2: Trying filter_complex video-only concat...`);
+        const concatFilter = normPaths.map((_, idx) => `[${idx}:v]`).join('') + `concat=n=${normPaths.length}:v=1:a=0[vout]`;
+        const inputs = normPaths.flatMap(p => ['-i', p]);
+        await execFileAsync(ffmpegPath, [
+            '-y', ...inputs,
+            '-filter_complex', concatFilter,
+            '-map', '[vout]',
+            '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
+            '-movflags', '+faststart',
+            videoOnlyStitchedPath,
+        ], { timeout: 300000 });
     }
+
+    // Step 3: Add silent audio track to the video-only stitched file
+    const outputPath = path.join(tmpDir, 'stitched.mp4');
+    console.log(`[SB LongForm ${jobId}] Adding silent audio track to video-only stitched output...`);
+    await execFileAsync(ffmpegPath, [
+        '-y',
+        '-i', videoOnlyStitchedPath,
+        '-f', 'lavfi', '-i', `anullsrc=r=48000:cl=stereo`,
+        '-c:v', 'copy',
+        '-c:a', 'aac', '-b:a', '192k',
+        '-shortest',
+        '-movflags', '+faststart',
+        outputPath,
+    ], { timeout: 120000 });
 
     console.log(`[SB LongForm ${jobId}] ✅ Stitched ${normPaths.length} segments → ${outputPath}`);
     return outputPath;
