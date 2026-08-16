@@ -1597,7 +1597,7 @@ router.get('/:id/video-status', protect, async (req, res) => {
 
         // Poll Video Studio
         const baseUrl = process.env.INTERNAL_API_URL || `http://localhost:${process.env.PORT || 3001}`;
-        const pollResp = await fetch(`${baseUrl}/api/video-studio/${projectId}/status`, {
+        const pollResp = await fetch(`${baseUrl}/api/video-studio/${projectId}/status?allowDiskUse=true`, {
             headers: { Authorization: req.headers.authorization },
         });
 
