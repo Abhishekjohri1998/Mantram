@@ -1459,6 +1459,18 @@ Bold, ${moodPhrase} visual suitable for advertising and social media. ${ratioPhr
             'grok-imagen':    { provider: 'grok', name: 'Grok Imagen' },
         };
 
+        // Ensure promoCuts is properly formatted before any database update
+        if (req.body.promoCuts && typeof req.body.promoCuts === 'string') {
+            try {
+                req.body.promoCuts = JSON.parse(req.body.promoCuts);
+            } catch (e) {
+                req.body.promoCuts = [];
+            }
+        }
+        if (!Array.isArray(req.body.promoCuts)) {
+            req.body.promoCuts = [];
+        }
+
         const modelCfg = PHOTOSHOOT_MODELS[imageModel] || PHOTOSHOOT_MODELS['nanobanana-2'];
         console.log(`📸 Photoshoot model: ${modelCfg.name} (${modelCfg.provider})`);
 
