@@ -246,7 +246,7 @@ const TOOLS = {
         if (!prompt) throw new Error('queue_generation: prompt is required');
 
         const baseUrl = process.env.INTERNAL_API_URL || `http://localhost:${process.env.PORT || 3001}`;
-        const resp = await fetch(`${baseUrl}/api/video-studio/advanced/generate`, {
+        const resp = await fetch(`${baseUrl}/api/video-studio/advanced/generate?allowDiskUse=true`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
